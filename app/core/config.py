@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, date, datetime
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -84,6 +85,15 @@ class Settings(BaseSettings):
     hospital_interface_api_key: str = ""
     # Desk SLA for open evidence packs (minutes). Breach flags Today / ops metrics.
     packet_sla_minutes: int = 240
+    # Real-data trial attestations (required when ALLOW_PHI + PHI_PROGRAM_ATTESTED).
+    # These are references to signed, human-owned artefacts — the app only checks
+    # that they are recorded, never that the underlying approval is valid.
+    trial_ethics_approval_ref: str = ""  # IEC / IRB approval number
+    dpo_contact: str = ""  # Data protection officer / grievance officer contact
+    security_assessment_ref: str = ""  # VAPT / pen-test report id
+    breach_runbook_url: str = ""  # Incident & breach response runbook location
+    trial_site_org_code: str = ""  # The single organizations.org_code in the trial
+    trial_end_date: str = ""  # ISO date (YYYY-MM-DD); trial stops after this day
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -101,6 +111,85 @@ class Settings(BaseSettings):
     def hospital_practice_mode(self) -> bool:
         """True until PHI program is attested — synthetic/consent feeds only."""
         return not (self.allow_phi and self.phi_program_attested)
+
+    def real_data_mode(self) -> bool:
+        """ALLOW_PHI + PHI_PROGRAM_ATTESTED: real patient data may be stored."""
+        return bool(self.allow_phi and self.phi_program_attested)
+
+    def deployment_mode(self) -> str:
+        """Operator-facing mode for banners and /ready: demo | trial | practice."""
+        if self.real_data_mode():
+            return "trial"
+        if self.env_name() in {"local", "test", "docker"}:
+            return "demo"
+        return "practice"
+
+    def trial_end(self) -> date | None:
+        raw = self.trial_end_date.strip()
+        if not raw:
+            return None
+        try:
+            return date.fromisoformat(raw)
+        except ValueError:
+            return None
+
+    def real_data_trial_problems(self, today: date | None = None) -> list[str]:
+        """Every unmet requirement for storing real patient data (empty → OK).
+
+        Applies in any ENVIRONMENT once ALLOW_PHI and PHI_PROGRAM_ATTESTED are both true.
+        """
+        if not self.real_data_mode():
+            return []
+        problems: list[str] = []
+        env = self.env_name()
+        if env not in REAL_DATA_ENVIRONMENTS:
+            problems.append(
+                f"ENVIRONMENT must be one of {', '.join(sorted(REAL_DATA_ENVIRONMENTS))} "
+                f"for real data (got {env!r})"
+            )
+        if self.auth_mode.strip().lower() != "oidc":
+            problems.append("AUTH_MODE=oidc")
+        if "postgresql" not in self.database_url.lower():
+            problems.append("DATABASE_URL must be PostgreSQL")
+        if not self.org_scope_enforced():
+            problems.append("ENFORCE_ORG_SCOPE=true")
+        if self.seed_on_startup:
+            problems.append("SEED_ON_STARTUP=false")
+        if self.synthetic_lifelong is True:
+            problems.append("SYNTHETIC_LIFELONG must not be enabled")
+        for env_var, value in (
+            ("TRIAL_ETHICS_APPROVAL_REF", self.trial_ethics_approval_ref),
+            ("DPO_CONTACT", self.dpo_contact),
+            ("SECURITY_ASSESSMENT_REF", self.security_assessment_ref),
+            ("BREACH_RUNBOOK_URL", self.breach_runbook_url),
+            ("TRIAL_SITE_ORG_CODE", self.trial_site_org_code),
+        ):
+            if not value.strip():
+                problems.append(env_var)
+        region = self.data_residency_region.strip().lower()
+        if not region or region == "global":
+            problems.append("DATA_RESIDENCY_REGION (a concrete region, not 'global')")
+        end = self.trial_end()
+        if not self.trial_end_date.strip():
+            problems.append("TRIAL_END_DATE (YYYY-MM-DD)")
+        elif end is None:
+            problems.append(f"TRIAL_END_DATE must be an ISO date YYYY-MM-DD (got {self.trial_end_date!r})")
+        else:
+            current = today or datetime.now(UTC).date()
+            if end < current:
+                problems.append(f"TRIAL_END_DATE {end.isoformat()} is in the past")
+        return problems
+
+    def validate_real_data_trial(self, today: date | None = None) -> None:
+        problems = self.real_data_trial_problems(today)
+        if problems:
+            raise AppError(
+                "LIVE_CONFIG_INVALID",
+                "Real-data trial (ALLOW_PHI + PHI_PROGRAM_ATTESTED) is missing: "
+                + "; ".join(problems)
+                + ". See docs/GO_LIVE.md.",
+                503,
+            )
 
     def hospital_simulate_allowed(self) -> bool:
         if self.hospital_allow_simulate is not None:
@@ -361,6 +450,11 @@ class Settings(BaseSettings):
                     "LLM_PHI_EGRESS_ALLOWED (or use LLM_PROVIDER=local/ollama).",
                     503,
                 )
+
+        self.validate_real_data_trial()
+
+
+REAL_DATA_ENVIRONMENTS = frozenset({"pilot", "staging", "production", "prod", "kubernetes"})
 
 
 def _looks_like_ollama_tag(value: str) -> bool:
