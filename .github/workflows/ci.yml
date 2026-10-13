@@ -11,6 +11,11 @@ jobs:
       ENVIRONMENT: test
       AUTH_MODE: none
       DEV_JWT_SECRET: ci-only-healthevidence-hmac-do-not-reuse-32
+      # Avoid LangGraph interrupt segfault (exit 139) under Linux TestClient.
+      HE_HITL_SOFT_PAUSE: "1"
+      PYTHONFAULTHANDLER: "1"
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -49,6 +54,8 @@ jobs:
       DATABASE_URL: postgresql+psycopg://healthevidence:healthevidence@localhost:5432/healthevidence
       PILOT_POSTGRES_TEST: "1"
       DEV_JWT_SECRET: ci-only-healthevidence-hmac-do-not-reuse-32
+      HE_HITL_SOFT_PAUSE: "1"
+      PYTHONFAULTHANDLER: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6

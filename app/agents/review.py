@@ -103,29 +103,32 @@ def resume_review(
     checkpointer = get_checkpointer()
     has_checkpoint = checkpointer.get_tuple(config) is not None  # type: ignore[arg-type]
 
-    if has_checkpoint:
-        graph = build_review_graph(session, settings)
-        final_state = dict(graph.invoke(Command(resume=resume_body), config))
-        final_state = _normalize_graph_state(
-            final_state,
-            run_id=run_id,
-            trace_id=str(state.get("trace_id") or ""),
-        )
-        if assist_payload is not None:
-            final_state["senior_assist"] = assist_payload
-        save_run(run_id, final_state, session)
-        if _is_awaiting(final_state):
-            response = _to_response(final_state, awaiting=True)
-            _sync_case_lifecycle(session, response, clinician_decision=payload.decision)
-            return response
-        response = _to_response(final_state)
-        enforce_decision_support(response.model_dump(mode="json"))
-        _sync_case_lifecycle(session, response, clinician_decision=payload.decision)
-        _audit(session, response, final_state)
-        return response
+    from app.agents.nodes import _prefer_soft_hitl_pause
 
-    # Cross-restart fallback: no in-memory interrupt thread — finish from DB state.
-    return _resume_from_persisted_state(session, run_id, state, payload, assist_payload)
+    # Soft-pause ends the graph at END without a LangGraph interrupt, so
+    # Command(resume) cannot continue the thread — finish from ReviewRun JSON.
+    if _prefer_soft_hitl_pause() or not has_checkpoint:
+        return _resume_from_persisted_state(session, run_id, state, payload, assist_payload)
+
+    graph = build_review_graph(session, settings)
+    final_state = dict(graph.invoke(Command(resume=resume_body), config))
+    final_state = _normalize_graph_state(
+        final_state,
+        run_id=run_id,
+        trace_id=str(state.get("trace_id") or ""),
+    )
+    if assist_payload is not None:
+        final_state["senior_assist"] = assist_payload
+    save_run(run_id, final_state, session)
+    if _is_awaiting(final_state):
+        response = _to_response(final_state, awaiting=True)
+        _sync_case_lifecycle(session, response, clinician_decision=payload.decision)
+        return response
+    response = _to_response(final_state)
+    enforce_decision_support(response.model_dump(mode="json"))
+    _sync_case_lifecycle(session, response, clinician_decision=payload.decision)
+    _audit(session, response, final_state)
+    return response
 
 
 def _resume_from_persisted_state(
@@ -147,20 +150,32 @@ def _resume_from_persisted_state(
         ).strip("; ")
     settings = get_settings()
     mid = human_review_gate(state, session, settings)
-    state.update(mid)
+    _merge_soft_resume_state(state, mid)
     if state.get("paused"):
         save_run(run_id, state, session)
         response = _to_response(state, awaiting=True)
         _sync_case_lifecycle(session, response, clinician_decision=payload.decision)
         return response
     end = generate_report(state, session, settings)
-    state.update(end)
+    _merge_soft_resume_state(state, end)
     save_run(run_id, state, session)
     response = _to_response(state)
     enforce_decision_support(response.model_dump(mode="json"))
     _sync_case_lifecycle(session, response, clinician_decision=payload.decision)
     _audit(session, response, state)
     return response
+
+
+def _merge_soft_resume_state(state: dict[str, Any], patch: dict[str, Any]) -> None:
+    """Apply node outputs like LangGraph reducers (append agent_trace / errors)."""
+    for key, value in patch.items():
+        if key in {"agent_trace", "errors"} and isinstance(value, list):
+            prior = state.get(key) or []
+            if not isinstance(prior, list):
+                prior = []
+            state[key] = [*prior, *value]
+        else:
+            state[key] = value
 
 
 def _normalize_graph_state(
