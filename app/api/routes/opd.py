@@ -6,10 +6,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import enforce_patient_write, get_db, get_principal, require_any_role
 from app.auth.oidc import AuthPrincipal
 from app.auth.rbac import ROLES_CHART_WRITE
+from app.core.exceptions import AppError
 from app.schemas.api import OpdFhirIngestRequest, OpdIngestRequest, OpdIngestResponse
 from app.services.fhir_opd import fhir_bundle_to_opd_request
 from app.services.opd_ingest import ingest_opd_packet
-from app.core.exceptions import AppError
 from app.services.org_scope import org_scope_active, resolve_org_id
 from app.services.realtime import publish_desk_event
 

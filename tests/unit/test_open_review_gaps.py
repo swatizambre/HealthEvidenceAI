@@ -5,7 +5,6 @@ from __future__ import annotations
 from app.models import AuditEvent, Organization, Patient
 from app.services.opd_ingest import _find_patient_by_external
 from app.services.rag.pipeline import load_corpus
-from fastapi.testclient import TestClient
 from sqlalchemy import select
 from tests.conftest import make_client
 
