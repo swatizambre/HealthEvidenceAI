@@ -424,6 +424,69 @@ def test_assertion_cues_do_not_over_negate_real_positives() -> None:
         assert "diabetes" in result.evidence[0].text_reference.lower()
 
 
+def test_keyword_matches_whole_words_and_scoped_clauses() -> None:
+    expectations = {
+        "Prediabetes, diet controlled.": "MISSING",
+        "Likely diabetes; awaiting HbA1c.": "MISSING",
+        "Denies fever, chills, or diabetes.": "MISSING",
+        "Denies chest pain, has type 2 diabetes.": "SUPPORTED",
+        "Lives with her mother, has diabetes on insulin.": "SUPPORTED",
+        "Diabetes, uncertain type.": "SUPPORTED",
+    }
+    for text, status in expectations.items():
+        assert evaluate_criterion(_DM_CRITERION, [_note(text)], []).status == status, text
+    mi = CriterionInput(
+        code="CRIT-MI",
+        description="Prior MI documented.",
+        rule={"type": "keyword", "required_any": ["mi"], "missing_label": "MI"},
+    )
+    assert evaluate_criterion(mi, [_note("Patient reports minimal back pain.")], []).status == "MISSING"
+
+
+def _a1c_lab(content: str, value: str, unit: str, days_ago: float | None = None) -> LabRecord:
+    from datetime import UTC, datetime, timedelta
+
+    collected = datetime.now(UTC) - timedelta(days=days_ago) if days_ago is not None else None
+    return LabRecord(
+        test_name="HbA1c",
+        content=content,
+        document_id="DOC-L000009",
+        chunks=(("DOC-L000009-01", content),),
+        value=value,
+        unit=unit,
+        collected_at=collected,
+    )
+
+
+def test_lab_edge_cases_are_conservative() -> None:
+    rule = {"type": "lab_test", "test_name": "HbA1c", "comparator": ">", "threshold": 7.0, "unit": "%"}
+    fresh = {**rule, "max_age_days": 90}
+    presence = {"type": "lab_test", "test_name": "HbA1c", "presence": True}
+    cases: list[tuple[dict[str, object], LabRecord, str]] = [
+        # Content-only parse must skip the "1" inside "HbA1c".
+        (rule, _a1c_lab("HbA1c - 8.1%", "", ""), "SUPPORTED"),
+        # 53 mmol/mol is 7.0 % at reporting precision: not > 7 %.
+        (rule, _a1c_lab("HbA1c: 53 mmol/mol", "53", "mmol/mol"), "NOT_SUPPORTED"),
+        ({**rule, "comparator": ">="}, _a1c_lab("HbA1c: 53 mmol/mol", "53", "mmol/mol"), "SUPPORTED"),
+        # Censored values cannot be compared to a threshold.
+        (rule, _a1c_lab("HbA1c: <7.5 %", "<7.5", "%"), "UNKNOWN"),
+        # Recency required: stale, undated, and fresh results.
+        (fresh, _a1c_lab("HbA1c: 8.1 %", "8.1", "%", days_ago=400), "UNKNOWN"),
+        (fresh, _a1c_lab("HbA1c: 8.1 %", "8.1", "%"), "UNKNOWN"),
+        (fresh, _a1c_lab("HbA1c: 8.1 %", "8.1", "%", days_ago=10), "SUPPORTED"),
+        # A row with no reportable result is not "present".
+        (presence, _a1c_lab("HbA1c: pending", "pending", ""), "UNKNOWN"),
+        (presence, _a1c_lab("HbA1c: 6.2 %", "6.2", "%"), "SUPPORTED"),
+    ]
+    for lab_rule, lab, status in cases:
+        result = evaluate_criterion(
+            CriterionInput(code="CRIT-A1C", description="HbA1c > 7%", rule=dict(lab_rule)),
+            [],
+            [lab],
+        )
+        assert result.status == status, (lab_rule, lab.content)
+
+
 def test_find_affirmed_phrase_is_public_alias() -> None:
     from app.services.evaluator import find_affirmed_phrase
 

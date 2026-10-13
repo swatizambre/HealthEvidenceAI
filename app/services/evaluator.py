@@ -33,7 +33,7 @@ _NEGATION_PREFIX = re.compile(
     r"\bfamily\s+history\s+of\b|\bfamily\s+hx\s+of\b|\bfh(?:x)?\s+of\b|"
     r"\brule\s+out\b|\br/o\b|\br\.o\.\b|"
     r"\bpossible\b|\bprobable\b|\bsuspected\b|\bquestionable\b|\bquery\b|"
-    r"\bunlikely\b|\bdoubtful\b|"
+    r"\bunlikely\b|\blikely\b|\bdoubtful\b|"
     r"\bevaluate\s+for\b|\bevaluation\s+for\b|\bscreen(?:ing)?\s+for\b|"
     r"\bno\s+history\s+of\b|\bno\s+known\b|\bnegative\s+for\b|\bruled\s+out\b|"
     r"\babsence\s+of\b|\bfree\s+of\b|\bdenies\b|\bdenied\b|\bwithout\b|\bnever\b|"
@@ -55,7 +55,9 @@ _TRAILING_NONE = re.compile(
 _TRAILING_HEDGE = re.compile(
     r"^\s*(?:[,:(\-–—]\s*)*(?:is\s+|was\s+|remains\s+)?(?:"
     r"\?|"
-    r"(?:unlikely|doubtful|questionable|uncertain|unconfirmed|"
+    r"(?:unlikely|doubtful|questionable|unconfirmed|"
+    # "Diabetes, uncertain type" still affirms diabetes; "Diabetes uncertain" does not.
+    r"(?:uncertain|unclear)(?!\s+(?:type|etiology|aetiology|cause|duration|onset|severity))|"
     r"not\s+(?:confirmed|established|likely)|"
     r"to\s+be\s+(?:ruled\s+out|excluded|confirmed))\b"
     r")",
@@ -79,11 +81,25 @@ _EXPERIENCER_AFTER = re.compile(
     rf"^\s*(?:[(:\-–—]\s*)?(?:in\s+(?:(?:his|her|their|the|patient's)\s+)?)?{_RELATIVE}\b",
     re.I,
 )
-_CLAUSE_BREAK = re.compile(r"[.;\n]|,\s*but\b|\bbut\b|\bhowever\b|\balthough\b", re.I)
+# A comma followed by a new predicate starts a new clause ("Denies chest pain, has
+# diabetes"), while a plain list stays in scope ("Denies fever, chills, or diabetes").
+_CLAUSE_BREAK = re.compile(
+    r"[.;\n]|,\s*but\b|\bbut\b|\bhowever\b|\balthough\b|"
+    r",\s*(?:and\s+)?(?:has|have|had|with|known|reports?|diagnosed)\b",
+    re.I,
+)
+# Censored lab values ("<7.5", ">14") cannot be compared to a threshold safely.
+_CENSORED = re.compile(r"^\s*(?:<|>|≤|≥|less\s+than|greater\s+than)", re.I)
+# Lab rows that exist but carry no reportable result.
+_NO_RESULT = re.compile(
+    r"\b(?:pending|not\s+reported|hemoly[sz]ed|haemoly[sz]ed|cancel+ed|insufficient|"
+    r"unable|see\s+note|not\s+done|qns)\b",
+    re.I,
+)
 _NUMERIC = re.compile(r"[-+]?\d+(?:\.\d+)?")
 _UNIT_TOKEN = re.compile(
-    r"\b(?:%|percent|mmol\s*/\s*mol|mmol/mol|mg\s*/\s*d[lL]|mg/dl|g\s*/\s*d[lL]|g/dl|"
-    r"mmol\s*/\s*[lL]|mmol/l|u\s*/\s*[lL]|iu\s*/\s*[lL])\b",
+    r"(?:%|\bpercent\b|\b(?:mmol\s*/\s*mol|mmol/mol|mg\s*/\s*d[lL]|mg/dl|g\s*/\s*d[lL]|g/dl|"
+    r"mmol\s*/\s*[lL]|mmol/l|u\s*/\s*[lL]|iu\s*/\s*[lL])\b)",
     re.I,
 )
 
@@ -277,6 +293,16 @@ def _evaluate_lab(
             reason=_REASONS[STATUS_MISSING],
             missing_label=missing_label,
         )
+    unknown = Evaluation(
+        criterion_id=criterion.code,
+        criterion=criterion.description,
+        status=STATUS_UNKNOWN,
+        evidence=[evidence],
+        reason=_REASONS[STATUS_UNKNOWN],
+    )
+    # A row with no reportable result (pending, hemolyzed, cancelled) is not a result.
+    if _NO_RESULT.search(lab.value) or (not lab.value.strip() and _NO_RESULT.search(lab.content)):
+        return unknown
     # Explicit presence checks (not numeric). Bare lab_test without comparator → UNKNOWN.
     if presence_only and not comparator:
         return Evaluation(
@@ -294,7 +320,10 @@ def _evaluate_lab(
             evidence=[evidence],
             reason=_REASONS[STATUS_UNKNOWN],
         )
-    if max_age_days is not None and lab.collected_at is not None:
+    if max_age_days is not None:
+        # Policy requires a recent result but the collection date is unknown.
+        if lab.collected_at is None:
+            return unknown
         collected = lab.collected_at
         if collected.tzinfo is None:
             collected = collected.replace(tzinfo=UTC)
@@ -448,17 +477,15 @@ def _find_phrase(text: str, phrases: list[str]) -> str | None:
 def _affirmed_index(text: str, phrase: str) -> int | None:
     """Index of the first occurrence of ``phrase`` that is not negated/hedged/familial."""
     lowered = text.lower()
-    needle = phrase.lower()
+    needle = phrase.lower().strip()
     if not needle:
         return None
-    start = 0
-    while True:
-        index = lowered.find(needle, start)
-        if index < 0:
-            return None
-        if not _is_negated(lowered, index, len(needle)):
-            return index
-        start = index + len(needle)
+    # Whole-word match: "diabetes" must not hit "prediabetes", nor "mi" hit "minimal".
+    pattern = re.compile(rf"(?<![a-z0-9]){re.escape(needle)}(?![a-z0-9])")
+    for match in pattern.finditer(lowered):
+        if not _is_negated(lowered, match.start(), len(needle)):
+            return match.start()
+    return None
 
 
 def _clause_span(text: str, match_index: int) -> tuple[int, int]:
@@ -542,6 +569,8 @@ def _normalize_unit(unit: str) -> str:
 
 def _parse_lab_measurement(lab: LabRecord) -> tuple[float | None, str]:
     if lab.value.strip():
+        if _CENSORED.match(lab.value):
+            return None, _normalize_unit(lab.unit)
         match = _NUMERIC.search(lab.value)
         if match is None:
             return None, _normalize_unit(lab.unit)
@@ -550,8 +579,14 @@ def _parse_lab_measurement(lab: LabRecord) -> tuple[float | None, str]:
         except ValueError:
             return None, _normalize_unit(lab.unit)
     text = lab.content
+    # Drop the test name so digits inside it ("HbA1c") are not read as the value.
+    if text.lower().lstrip().startswith(lab.test_name.lower()) and lab.test_name:
+        text = text.lstrip()[len(lab.test_name) :]
     if ":" in text:
         text = text.split(":", 1)[1]
+    text = text.lstrip(" -–—=")
+    if _CENSORED.match(text):
+        return None, _normalize_unit(lab.unit)
     match = _NUMERIC.search(text)
     if match is None:
         return None, _normalize_unit(lab.unit)
@@ -580,11 +615,12 @@ def _convert_lab_value(
         dst = src
     if src == dst:
         return value, src
-    # HbA1c IFCC (mmol/mol) ↔ NGSP (%)
+    # HbA1c IFCC (mmol/mol) ↔ NGSP (%), rounded to reporting precision so that
+    # 53 mmol/mol reads as 7.0 % (not 7.0004 %) at a "> 7 %" threshold.
     if src == "mmol/mol" and dst == "%":
-        return (0.09148 * value) + 2.152, "%"
+        return round((0.09148 * value) + 2.152, 1), "%"
     if src == "%" and dst == "mmol/mol":
-        return (value - 2.152) / 0.09148, "mmol/mol"
+        return float(round((value - 2.152) / 0.09148)), "mmol/mol"
     return None
 
 

@@ -1,6 +1,7 @@
 """Gold-set evaluation gate (clinical-safety metrics).
 
-Tracks false-SUPPORTED rate, MISSING recall, citation precision, and latency.
+Tracks false-SUPPORTED rate (over gold not-SUPPORTED cases), MISSING recall,
+SUPPORTED recall, citation presence, per-status confusion counts, and latency.
 Run separately per path (rules today; model paths when configured).
 
   uv run python -m evaluation.run_gold
@@ -12,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from app.services.evaluator import (
@@ -41,6 +43,10 @@ def _note(content: str, index: int) -> TextRecord:
 def _lab(raw: dict, index: int) -> LabRecord:
     doc = f"DOC-GOLD-LAB-{index:04d}"
     content = str(raw.get("content") or "")
+    collected_at = None
+    if raw.get("collected_days_ago") is not None:
+        # Relative to now so stale/fresh fixtures stay stable over time.
+        collected_at = datetime.now(UTC) - timedelta(days=float(raw["collected_days_ago"]))
     return LabRecord(
         test_name=str(raw.get("test_name") or "lab"),
         content=content,
@@ -48,6 +54,7 @@ def _lab(raw: dict, index: int) -> LabRecord:
         chunks=((f"{doc}-01", content),),
         value=str(raw.get("value") or ""),
         unit=str(raw.get("unit") or ""),
+        collected_at=collected_at,
     )
 
 
@@ -108,10 +115,14 @@ def main(argv: list[str] | None = None) -> int:
         type=float,
         default=0.85,
     )
+    parser.add_argument("--min-supported-recall", type=float, default=0.9)
     parser.add_argument(
-        "--min-citation-precision",
+        "--min-citation-presence",
+        "--min-citation-precision",  # deprecated alias (old name overstated the check)
+        dest="min_citation_presence",
         type=float,
         default=0.95,
+        help="Min share of predicted SUPPORTED rows with >=1 citation (presence only)",
     )
     parser.add_argument(
         "--max-latency-p95-ms",
@@ -147,7 +158,8 @@ def main(argv: list[str] | None = None) -> int:
         report,
         max_false_supported_rate=args.max_false_supported,
         min_missing_recall=args.min_missing_recall,
-        min_citation_precision=args.min_citation_precision,
+        min_supported_recall=args.min_supported_recall,
+        min_citation_presence=args.min_citation_presence,
         max_latency_p95_ms=args.max_latency_p95_ms,
         min_cases=args.min_cases,
     )

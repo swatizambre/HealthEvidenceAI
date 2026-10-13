@@ -176,3 +176,41 @@ def test_hit_index_and_cited_ids() -> None:
         "C7"
     }
     assert "downgraded=0" in verify_citations([], [], {}).summary()
+
+
+def test_every_gold_rules_citation_passes_the_verifier() -> None:
+    """Rules-path SUPPORTED citations must never be downgraded by the lexical verifier."""
+    import json
+    from pathlib import Path
+
+    from evaluation.run_gold import GOLD_PATH, _lab, _note
+
+    cases = json.loads(Path(GOLD_PATH).read_text(encoding="utf-8"))["cases"]
+    checked = 0
+    for case in cases:
+        notes = [_note(text, i) for i, text in enumerate(case.get("notes") or [], start=1)]
+        labs = [_lab(raw, i) for i, raw in enumerate(case.get("labs") or [], start=1)]
+        raw = case["criterion"]
+        result = evaluate_criterion(
+            CriterionInput(raw["code"], raw["description"], dict(raw["rule"])), notes, labs
+        )
+        if result.status != "SUPPORTED":
+            continue
+        chunks: dict[str, ChunkText] = {}
+        for record in [*notes, *labs]:
+            for code, text in record.chunks:
+                chunks[code] = ChunkText(record.document_id, text)
+        rows = [
+            {
+                "criterion_id": raw["code"],
+                "status": "SUPPORTED",
+                "evidence": [
+                    {"document_id": ev.document_id, "chunk_id": ev.chunk_id} for ev in result.evidence
+                ],
+            }
+        ]
+        spec = [{"criterion_id": raw["code"], "description": raw["description"], "rule": raw["rule"]}]
+        check = verify_citations(rows, spec, chunks)
+        assert not check.downgraded, case["id"]
+        checked += 1
+    assert checked >= 15
