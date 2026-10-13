@@ -5,6 +5,9 @@ Run separately per path (rules today; model paths when configured).
 
   uv run python -m evaluation.run_gold
   uv run python -m evaluation.run_gold --path rules
+  uv run python -m evaluation.run_gold --path rules --out data/gold_gate_result.json
+
+--out writes a machine-readable result that `python -m app.cli.go_live_check` reads.
 """
 
 from __future__ import annotations
@@ -12,7 +15,9 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from app.services.evaluator import (
     CriterionInput,
@@ -119,6 +124,12 @@ def main(argv: list[str] | None = None) -> int:
         default=500.0,
     )
     parser.add_argument("--min-cases", type=int, default=20)
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="Write a JSON gate result (read by app.cli.go_live_check)",
+    )
     args = parser.parse_args(argv)
 
     payload = json.loads(args.cases.read_text(encoding="utf-8"))
@@ -155,11 +166,29 @@ def main(argv: list[str] | None = None) -> int:
     if failed:
         passed_gate = False
         reasons.append(f"case_failures={len(failed)}")
+    if args.out is not None:
+        _write_result(
+            args.out,
+            {
+                "passed": passed_gate,
+                "path": args.path,
+                "dataset": payload.get("version"),
+                "dataset_status": payload.get("status"),
+                "metrics": report.as_dict(),
+                "reasons": reasons,
+                "generated_at": datetime.now(UTC).isoformat(),
+            },
+        )
     if passed_gate:
         print(f"GATE PASS path={args.path}")
         return 0
     print(f"GATE FAIL path={args.path} reasons={reasons}")
     return 1
+
+
+def _write_result(path: Path, result: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ import {
   setAuthPatientId,
   setAuthRoles,
   type AuthMe,
+  type DeploymentInfo,
 } from "./api";
 
 /** Desk + patient identities across clinic to teaching-hospital settings. */
@@ -70,6 +71,8 @@ type RoleContextValue = {
   authMode: string;
   signedInSubject: string;
   loadingAuth: boolean;
+  /** Demo / trial / practice banner facts from /auth/capabilities (null if unknown). */
+  deployment: DeploymentInfo | null;
 };
 
 const ROLE_KEY = "he.ai.deskRole";
@@ -178,6 +181,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   const [authMode, setAuthMode] = useState("dev-jwt");
   const [signedInSubject, setSignedInSubject] = useState("");
   const [loadingAuth, setLoadingAuth] = useState(true);
+  const [deployment, setDeployment] = useState<DeploymentInfo | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -187,6 +191,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         setDemoSigninAllowed(caps.demo_signin_allowed);
         setAuthMode(caps.auth_mode || "unknown");
+        setDeployment(caps.deployment);
         if (!caps.demo_signin_allowed) {
           const me: AuthMe = await getAuthMe();
           if (cancelled) return;
@@ -319,6 +324,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       authMode,
       signedInSubject,
       loadingAuth,
+      deployment,
     };
   }, [
     role,
@@ -331,6 +337,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     authMode,
     signedInSubject,
     loadingAuth,
+    deployment,
   ]);
 
   return <RoleContext.Provider value={value}>{children}</RoleContext.Provider>;

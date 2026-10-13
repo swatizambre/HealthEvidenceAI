@@ -157,3 +157,40 @@ def test_desk_catalog_requires_auth_when_jwt_on(monkeypatch) -> None:
         )
         assert ok.status_code == 200
         assert len(ok.json()["specialties"]) >= 8
+
+
+def test_ready_reports_demo_mode_without_secrets(monkeypatch) -> None:
+    secret = "demo-secret-value-that-is-long-enough-123"
+    with make_client(monkeypatch, AUTH_MODE="dev-jwt", ENVIRONMENT="local", DEV_JWT_SECRET=secret) as client:
+        body = client.get("/ready").json()
+        assert body["mode"] == "demo"
+        assert body["banner"] == "DEMO — synthetic data"
+        assert body["trial_site_org_code"] == ""
+        assert body["trial_end_date"] == ""
+        assert secret not in client.get("/ready").text
+        caps = client.get("/api/v1/auth/capabilities").json()
+        assert caps["deployment"]["mode"] == "demo"
+    get_settings.cache_clear()
+
+
+def test_deployment_banner_for_trial_and_practice() -> None:
+    trial = Settings(
+        ENVIRONMENT="pilot",
+        ALLOW_PHI="true",
+        PHI_PROGRAM_ATTESTED="true",
+        TRIAL_SITE_ORG_CODE="ORG-000001",
+        TRIAL_END_DATE="2026-12-31",
+        DPO_CONTACT="dpo@hospital.example",
+    )
+    banner = trial.deployment_banner()
+    assert banner["mode"] == "trial"
+    assert banner["trial_site_org_code"] == "ORG-000001"
+    assert banner["trial_end_date"] == "2026-12-31"
+    assert banner["banner"] == "REAL-DATA TRIAL — ORG-000001 until 2026-12-31"
+    assert "dpo@hospital.example" not in str(banner)
+
+    practice = Settings(ENVIRONMENT="staging", ALLOW_PHI="false", TRIAL_SITE_ORG_CODE="ORG-000001")
+    shown = practice.deployment_banner()
+    assert shown["mode"] == "practice"
+    assert shown["trial_site_org_code"] == ""
+    assert shown["banner"].startswith("PRACTICE")

@@ -124,6 +124,24 @@ class Settings(BaseSettings):
             return "demo"
         return "practice"
 
+    def deployment_banner(self) -> dict[str, str]:
+        """Public, secret-free mode facts for /ready, capabilities, and the UI banner."""
+        mode = self.deployment_mode()
+        site = self.trial_site_org_code.strip() if mode == "trial" else ""
+        end = self.trial_end_date.strip() if mode == "trial" else ""
+        if mode == "trial":
+            text = f"REAL-DATA TRIAL — {site or 'unconfigured site'} until {end or 'unset date'}"
+        elif mode == "demo":
+            text = "DEMO — synthetic data"
+        else:
+            text = "PRACTICE — synthetic / consented test data only"
+        return {
+            "mode": mode,
+            "trial_site_org_code": site,
+            "trial_end_date": end,
+            "banner": text,
+        }
+
     def trial_end(self) -> date | None:
         raw = self.trial_end_date.strip()
         if not raw:

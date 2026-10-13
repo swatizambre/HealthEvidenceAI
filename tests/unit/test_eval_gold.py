@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from evaluation.metrics import CaseOutcome, gate_ok, summarize_outcomes
 from evaluation.run_gold import main as run_gold_main
 
@@ -20,6 +23,15 @@ def test_false_supported_metric() -> None:
 
 def test_gold_rules_path_passes_gate() -> None:
     assert run_gold_main(["--path", "rules"]) == 0
+
+
+def test_gold_writes_result_file(tmp_path: Path) -> None:
+    out = tmp_path / "gate" / "gold.json"
+    assert run_gold_main(["--path", "rules", "--out", str(out)]) == 0
+    result = json.loads(out.read_text(encoding="utf-8"))
+    assert result["passed"] is True
+    assert result["path"] == "rules"
+    assert "false_supported_rate" in result["metrics"]
 
 
 def test_gate_rejects_false_supported() -> None:

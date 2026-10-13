@@ -35,6 +35,7 @@ def ready(request: Request) -> ReadyResponse | JSONResponse:
     phi_live = not practice
     oidc_configured = bool(settings.oidc_issuer.strip() and settings.oidc_jwks_url.strip())
     seed_on_startup = bool(settings.seed_on_startup)
+    deployment = settings.deployment_banner()
     engine = getattr(request.app.state, "engine", None)
     if engine is None:
         return JSONResponse(
@@ -50,6 +51,7 @@ def ready(request: Request) -> ReadyResponse | JSONResponse:
                 "phi_live": phi_live,
                 "oidc_configured": oidc_configured,
                 "seed_on_startup": seed_on_startup,
+                **deployment,
             },
         )
     try:
@@ -66,6 +68,10 @@ def ready(request: Request) -> ReadyResponse | JSONResponse:
             phi_live=phi_live,
             oidc_configured=oidc_configured,
             seed_on_startup=seed_on_startup,
+            mode=deployment["mode"],
+            trial_site_org_code=deployment["trial_site_org_code"],
+            trial_end_date=deployment["trial_end_date"],
+            banner=deployment["banner"],
         )
     except Exception as exc:  # noqa: BLE001 — surface connectivity for ops
         return JSONResponse(
@@ -81,5 +87,6 @@ def ready(request: Request) -> ReadyResponse | JSONResponse:
                 "phi_live": phi_live,
                 "oidc_configured": oidc_configured,
                 "seed_on_startup": seed_on_startup,
+                **deployment,
             },
         )
