@@ -5,12 +5,18 @@ Do not store full clinical note text in the audit trail.
 
 from __future__ import annotations
 
+import logging
 from uuid import uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import AuditEvent
+from app.services.observability import bump_counter
+
+logger = logging.getLogger("healthevidence.audit")
+
+AUDIT_DURABLE_FAILURE_COUNTER = "audit_durable_write_failures_total"
 
 
 def record_audit(
@@ -71,8 +77,17 @@ def record_audit_durable(
         )
         audit_session.commit()
         return event
-    except Exception:  # noqa: BLE001 — never block the forbid path
+    except Exception as exc:  # noqa: BLE001 — never block the forbid path
         audit_session.rollback()
+        # No PHI: identifiers and detail text are deliberately left out of the log line.
+        logger.warning(
+            "durable audit write failed action=%s resource_type=%s status=%s error=%s",
+            action,
+            resource_type,
+            status,
+            type(exc).__name__,
+        )
+        bump_counter(AUDIT_DURABLE_FAILURE_COUNTER)
         return None
     finally:
         audit_session.close()
