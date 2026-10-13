@@ -38,6 +38,7 @@ Canonical design and operations docs for HealthEvidence AI.
 | [clinical-product-roadmap.md](clinical-product-roadmap.md) | Safety boundary and org programs |
 | [opd-ingest-roadmap.md](opd-ingest-roadmap.md) | OPD/FHIR change control |
 | [data-privacy.md](data-privacy.md) | Patient vs care-team privacy notes |
+| [CONSENT_AND_RIGHTS.md](CONSENT_AND_RIGHTS.md) | Consent records, DPDP/HIPAA rights mapping, erasure vs retention |
 
 ## Related root files
 
