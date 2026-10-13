@@ -33,6 +33,10 @@ jobs:
         run: |
           uv run coverage run -m pytest -q
           uv run coverage report --fail-under=80
+      - name: Gold evaluation gate (rules path)
+        run: uv run python -m evaluation.run_gold --path rules
+      - name: Agent evaluation (HITL pause check)
+        run: uv run python -m evaluation.run_agent
 
   pilot-postgres:
     runs-on: ubuntu-latest

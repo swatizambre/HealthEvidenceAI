@@ -26,18 +26,25 @@ _REASONS = {
     ),
 }
 
-# Prefixed cues that reverse a nearby phrase (scoped to the clause, not the whole note).
+# Prefixed cues that reverse or weaken a nearby phrase (scoped to the clause).
 _NEGATION_PREFIX = re.compile(
     r"(?:"
+    r"\bfamily\s+history\s+of\b|\bfamily\s+hx\s+of\b|\bfh(?:x)?\s+of\b|"
+    r"\brule\s+out\b|\br/o\b|\br\.o\.\b|"
+    r"\bpossible\b|\bprobable\b|\bsuspected\b|\bquestionable\b|\bquery\b|"
     r"\bno\s+history\s+of\b|\bno\s+known\b|\bnegative\s+for\b|\bruled\s+out\b|"
     r"\babsence\s+of\b|\bfree\s+of\b|\bdenies\b|\bdenied\b|\bwithout\b|\bnever\b|"
     r"\bno\b|\bnot\b"
     r")\s+",
     re.I,
 )
-# "diabetes: none" / "Diabetes ruled out" style trailing negation.
+# "diabetes: none" / "Diabetes was excluded" / "diabetes?" trailing cues.
 _TRAILING_NONE = re.compile(
-    r"^\s*(?:[:\-–—]\s*)?(?:none|nil|negative|absent|denies|denied|ruled\s+out)\b",
+    r"^\s*(?:[:\-–—]\s*)?(?:"
+    r"\?|"
+    r"(?:none|nil|negative|absent|denies|denied|"
+    r"ruled\s+out|was\s+ruled\s+out|excluded|was\s+excluded)\b"
+    r")",
     re.I,
 )
 _CLAUSE_BREAK = re.compile(r"[.;\n]|,\s*but\b|\bbut\b|\bhowever\b|\balthough\b", re.I)
@@ -277,7 +284,17 @@ def _evaluate_lab(
             evidence=[evidence],
             reason=_REASONS[STATUS_UNKNOWN],
         )
-    target_unit = _normalize_unit(expected_unit) or _normalize_unit(lab_unit)
+    expected_norm = _normalize_unit(expected_unit)
+    # Policy named a unit but the lab result has none — do not assume they match.
+    if expected_norm and not lab_unit:
+        return Evaluation(
+            criterion_id=criterion.code,
+            criterion=criterion.description,
+            status=STATUS_UNKNOWN,
+            evidence=[evidence],
+            reason=_REASONS[STATUS_UNKNOWN],
+        )
+    target_unit = expected_norm or lab_unit
     converted = _convert_lab_value(measured, lab_unit, target_unit or lab_unit)
     if converted is None:
         return Evaluation(
@@ -287,9 +304,7 @@ def _evaluate_lab(
             evidence=[evidence],
             reason=_REASONS[STATUS_UNKNOWN],
         )
-    if expected_unit and _normalize_unit(expected_unit) and converted[1] != _normalize_unit(
-        expected_unit
-    ):
+    if expected_norm and converted[1] != expected_norm:
         return Evaluation(
             criterion_id=criterion.code,
             criterion=criterion.description,
@@ -483,8 +498,9 @@ def _convert_lab_value(
     dst = _normalize_unit(to_unit)
     if not src and not dst:
         return value, ""
-    if not src:
-        src = dst
+    # Policy unit without a lab unit must not be assumed identical (e.g. 53 vs 53%).
+    if dst and not src:
+        return None
     if not dst:
         dst = src
     if src == dst:

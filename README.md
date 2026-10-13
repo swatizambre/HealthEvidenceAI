@@ -110,6 +110,7 @@ make demo
 make test
 make eval-rag
 make eval-agent
+make eval-gold   # clinical-safety gate (false-SUPPORTED); see evaluation/gold/
 ```
 
 Paths: **Demo** vs **Pilot** vs staging — see [docs/LAUNCH.md](docs/LAUNCH.md) and [docs/PILOT_ROADMAP.md](docs/PILOT_ROADMAP.md).

@@ -1,0 +1,653 @@
+{
+  "version": "criteria_cases.v1",
+  "status": "engineering_seed",
+  "note": "Starter gold for CI. Replace/expand with dual-clinician reconciled labels (target ≥200 judgements / ≥50 charts). status≠clinician_gold until then.",
+  "paths": ["rules"],
+  "cases": [
+    {
+      "id": "dm-family-history-mother",
+      "path": "rules",
+      "tags": ["negation", "family_history"],
+      "notes": ["Family history of diabetes in mother."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-DM",
+        "description": "Diabetes is documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["diabetes"],
+          "negation_any": [],
+          "missing_label": "Diabetes documentation"
+        }
+      },
+      "expected_status": "MISSING",
+      "min_citations": 0
+    },
+    {
+      "id": "dm-rule-out-awaiting",
+      "path": "rules",
+      "tags": ["negation", "uncertainty"],
+      "notes": ["Rule out diabetes; awaiting HbA1c."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-DM",
+        "description": "Diabetes is documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["diabetes"],
+          "negation_any": [],
+          "missing_label": "Diabetes documentation"
+        }
+      },
+      "expected_status": "MISSING",
+      "min_citations": 0
+    },
+    {
+      "id": "dm-possible-to-confirm",
+      "path": "rules",
+      "tags": ["negation", "uncertainty"],
+      "notes": ["Possible diabetes, to confirm."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-DM",
+        "description": "Diabetes is documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["diabetes"],
+          "negation_any": [],
+          "missing_label": "Diabetes documentation"
+        }
+      },
+      "expected_status": "MISSING",
+      "min_citations": 0
+    },
+    {
+      "id": "dm-was-excluded",
+      "path": "rules",
+      "tags": ["negation", "exclusion"],
+      "notes": ["Diabetes was excluded after GTT."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-DM",
+        "description": "Diabetes is documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["diabetes"],
+          "negation_any": [],
+          "missing_label": "Diabetes documentation"
+        }
+      },
+      "expected_status": "MISSING",
+      "min_citations": 0
+    },
+    {
+      "id": "dm-r-o-pending",
+      "path": "rules",
+      "tags": ["negation", "uncertainty"],
+      "notes": ["r/o diabetes pending labs"],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-DM",
+        "description": "Diabetes is documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["diabetes"],
+          "negation_any": [],
+          "missing_label": "Diabetes documentation"
+        }
+      },
+      "expected_status": "MISSING",
+      "min_citations": 0
+    },
+    {
+      "id": "dm-question-mark",
+      "path": "rules",
+      "tags": ["negation", "uncertainty"],
+      "notes": ["diabetes?"],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-DM",
+        "description": "Diabetes is documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["diabetes"],
+          "negation_any": [],
+          "missing_label": "Diabetes documentation"
+        }
+      },
+      "expected_status": "MISSING",
+      "min_citations": 0
+    },
+    {
+      "id": "dm-no-history",
+      "path": "rules",
+      "tags": ["negation"],
+      "notes": ["Patient has no history of diabetes or hyperglycemia."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-DM",
+        "description": "Diabetes is documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["diabetes"],
+          "negation_any": [],
+          "missing_label": "Diabetes documentation"
+        }
+      },
+      "expected_status": "MISSING",
+      "min_citations": 0
+    },
+    {
+      "id": "dm-denies",
+      "path": "rules",
+      "tags": ["negation"],
+      "notes": ["Patient denies diabetes."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-DM",
+        "description": "Diabetes is documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["diabetes"],
+          "negation_any": [],
+          "missing_label": "Diabetes documentation"
+        }
+      },
+      "expected_status": "MISSING",
+      "min_citations": 0
+    },
+    {
+      "id": "dm-negative-for",
+      "path": "rules",
+      "tags": ["negation"],
+      "notes": ["Workup negative for diabetes."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-DM",
+        "description": "Diabetes is documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["diabetes"],
+          "negation_any": [],
+          "missing_label": "Diabetes documentation"
+        }
+      },
+      "expected_status": "MISSING",
+      "min_citations": 0
+    },
+    {
+      "id": "dm-ruled-out",
+      "path": "rules",
+      "tags": ["negation", "exclusion"],
+      "notes": ["Diabetes ruled out in clinic."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-DM",
+        "description": "Diabetes is documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["diabetes"],
+          "negation_any": [],
+          "missing_label": "Diabetes documentation"
+        }
+      },
+      "expected_status": "MISSING",
+      "min_citations": 0
+    },
+    {
+      "id": "dm-colon-none",
+      "path": "rules",
+      "tags": ["negation"],
+      "notes": ["diabetes: none"],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-DM",
+        "description": "Diabetes is documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["diabetes"],
+          "negation_any": [],
+          "missing_label": "Diabetes documentation"
+        }
+      },
+      "expected_status": "MISSING",
+      "min_citations": 0
+    },
+    {
+      "id": "dm-clause-scoped-positive",
+      "path": "rules",
+      "tags": ["positive", "clause"],
+      "notes": ["No asthma. Patient has diabetes and hypertension."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-DM",
+        "description": "Diabetes is documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["diabetes"],
+          "negation_any": [],
+          "missing_label": "Diabetes documentation"
+        }
+      },
+      "expected_status": "SUPPORTED",
+      "min_citations": 1
+    },
+    {
+      "id": "dm-positive-documented",
+      "path": "rules",
+      "tags": ["positive"],
+      "notes": ["Past medical history: type 2 diabetes mellitus on metformin."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-DM",
+        "description": "Diabetes is documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["diabetes"],
+          "negation_any": [],
+          "missing_label": "Diabetes documentation"
+        }
+      },
+      "expected_status": "SUPPORTED",
+      "min_citations": 1
+    },
+    {
+      "id": "dm-empty-chart",
+      "path": "rules",
+      "tags": ["missing"],
+      "notes": ["Routine wellness visit. No chronic conditions discussed."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-DM",
+        "description": "Diabetes is documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["diabetes"],
+          "negation_any": [],
+          "missing_label": "Diabetes documentation"
+        }
+      },
+      "expected_status": "MISSING",
+      "min_citations": 0
+    },
+    {
+      "id": "pt-failed-conservative",
+      "path": "rules",
+      "tags": ["positive"],
+      "notes": ["Patient has documented failed conservative therapy for 12 weeks."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-PT",
+        "description": "Failed conservative therapy",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["conservative therapy"],
+          "missing_label": "Failed therapy note"
+        }
+      },
+      "expected_status": "SUPPORTED",
+      "min_citations": 1
+    },
+    {
+      "id": "pt-missing-therapy",
+      "path": "rules",
+      "tags": ["missing"],
+      "notes": ["No therapy documented."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-PT",
+        "description": "Failed conservative therapy",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["conservative therapy"],
+          "missing_label": "Failed therapy note"
+        }
+      },
+      "expected_status": "MISSING",
+      "min_citations": 0
+    },
+    {
+      "id": "a1c-above-percent",
+      "path": "rules",
+      "tags": ["lab", "positive"],
+      "notes": [],
+      "labs": [
+        {
+          "test_name": "HbA1c",
+          "content": "HbA1c: 8.1 %",
+          "value": "8.1",
+          "unit": "%"
+        }
+      ],
+      "criterion": {
+        "code": "CRIT-A1C",
+        "description": "HbA1c > 7%.",
+        "rule": {
+          "type": "lab_test",
+          "test_name": "HbA1c",
+          "comparator": ">",
+          "threshold": 7.0,
+          "unit": "%",
+          "missing_label": "HbA1c > 7%"
+        }
+      },
+      "expected_status": "SUPPORTED",
+      "min_citations": 1
+    },
+    {
+      "id": "a1c-below-percent",
+      "path": "rules",
+      "tags": ["lab", "not_supported"],
+      "notes": [],
+      "labs": [
+        {
+          "test_name": "HbA1c",
+          "content": "HbA1c: 6.7 %",
+          "value": "6.7",
+          "unit": "%"
+        }
+      ],
+      "criterion": {
+        "code": "CRIT-A1C",
+        "description": "HbA1c > 7%.",
+        "rule": {
+          "type": "lab_test",
+          "test_name": "HbA1c",
+          "comparator": ">",
+          "threshold": 7.0,
+          "unit": "%",
+          "missing_label": "HbA1c > 7%"
+        }
+      },
+      "expected_status": "NOT_SUPPORTED",
+      "min_citations": 1
+    },
+    {
+      "id": "a1c-mmol-mol-converts",
+      "path": "rules",
+      "tags": ["lab", "unit_conversion"],
+      "notes": [],
+      "labs": [
+        {
+          "test_name": "HbA1c",
+          "content": "HbA1c: 64 mmol/mol",
+          "value": "64",
+          "unit": "mmol/mol"
+        }
+      ],
+      "criterion": {
+        "code": "CRIT-A1C",
+        "description": "HbA1c > 7%.",
+        "rule": {
+          "type": "lab_test",
+          "test_name": "HbA1c",
+          "comparator": ">",
+          "threshold": 7.0,
+          "unit": "%",
+          "missing_label": "HbA1c > 7%"
+        }
+      },
+      "expected_status": "SUPPORTED",
+      "min_citations": 1
+    },
+    {
+      "id": "a1c-missing-unit-unknown",
+      "path": "rules",
+      "tags": ["lab", "unit_safety"],
+      "notes": [],
+      "labs": [
+        {
+          "test_name": "HbA1c",
+          "content": "HbA1c: 53",
+          "value": "53",
+          "unit": ""
+        }
+      ],
+      "criterion": {
+        "code": "CRIT-A1C",
+        "description": "HbA1c > 7%.",
+        "rule": {
+          "type": "lab_test",
+          "test_name": "HbA1c",
+          "comparator": ">",
+          "threshold": 7.0,
+          "unit": "%",
+          "missing_label": "HbA1c > 7%"
+        }
+      },
+      "expected_status": "UNKNOWN",
+      "min_citations": 0
+    },
+    {
+      "id": "a1c-unreadable-unknown",
+      "path": "rules",
+      "tags": ["lab", "unknown"],
+      "notes": [],
+      "labs": [
+        {
+          "test_name": "HbA1c",
+          "content": "HbA1c: hemolyzed / not reported",
+          "value": "hemolyzed",
+          "unit": "%"
+        }
+      ],
+      "criterion": {
+        "code": "CRIT-A1C",
+        "description": "HbA1c > 7%.",
+        "rule": {
+          "type": "lab_test",
+          "test_name": "HbA1c",
+          "comparator": ">",
+          "threshold": 7.0,
+          "unit": "%",
+          "missing_label": "HbA1c > 7%"
+        }
+      },
+      "expected_status": "UNKNOWN",
+      "min_citations": 0
+    },
+    {
+      "id": "a1c-lab-absent-missing",
+      "path": "rules",
+      "tags": ["lab", "missing"],
+      "notes": ["Clinic follow-up. Labs deferred."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-A1C",
+        "description": "HbA1c > 7%.",
+        "rule": {
+          "type": "lab_test",
+          "test_name": "HbA1c",
+          "comparator": ">",
+          "threshold": 7.0,
+          "unit": "%",
+          "missing_label": "HbA1c > 7%"
+        }
+      },
+      "expected_status": "MISSING",
+      "min_citations": 0
+    },
+    {
+      "id": "dm-no-diabetes-but-clause",
+      "path": "rules",
+      "tags": ["negation", "clause"],
+      "notes": ["No diabetes, but has hypertension."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-DM",
+        "description": "Diabetes is documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["diabetes"],
+          "negation_any": [],
+          "missing_label": "Diabetes documentation"
+        }
+      },
+      "expected_status": "MISSING",
+      "min_citations": 0
+    },
+    {
+      "id": "htn-positive",
+      "path": "rules",
+      "tags": ["positive"],
+      "notes": ["Assessment: essential hypertension, controlled on lisinopril."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-HTN",
+        "description": "Hypertension is documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["hypertension"],
+          "missing_label": "Hypertension documentation"
+        }
+      },
+      "expected_status": "SUPPORTED",
+      "min_citations": 1
+    },
+    {
+      "id": "htn-family-only",
+      "path": "rules",
+      "tags": ["negation", "family_history"],
+      "notes": ["Family history of hypertension in father."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-HTN",
+        "description": "Hypertension is documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["hypertension"],
+          "missing_label": "Hypertension documentation"
+        }
+      },
+      "expected_status": "MISSING",
+      "min_citations": 0
+    },
+    {
+      "id": "mi-positive",
+      "path": "rules",
+      "tags": ["positive"],
+      "notes": ["History of myocardial infarction in 2019 with stent placement."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-MI",
+        "description": "Prior MI documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["myocardial infarction", "mi"],
+          "missing_label": "MI documentation"
+        }
+      },
+      "expected_status": "SUPPORTED",
+      "min_citations": 1
+    },
+    {
+      "id": "mi-rule-out",
+      "path": "rules",
+      "tags": ["negation", "uncertainty"],
+      "notes": ["Rule out MI; troponin pending."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-MI",
+        "description": "Prior MI documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["mi", "myocardial infarction"],
+          "missing_label": "MI documentation"
+        }
+      },
+      "expected_status": "MISSING",
+      "min_citations": 0
+    },
+    {
+      "id": "ckd-positive",
+      "path": "rules",
+      "tags": ["positive"],
+      "notes": ["Chronic kidney disease stage 3, eGFR 48."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-CKD",
+        "description": "CKD documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["chronic kidney disease", "ckd"],
+          "missing_label": "CKD documentation"
+        }
+      },
+      "expected_status": "SUPPORTED",
+      "min_citations": 1
+    },
+    {
+      "id": "ckd-possible",
+      "path": "rules",
+      "tags": ["negation", "uncertainty"],
+      "notes": ["Possible CKD, to confirm with repeat labs."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-CKD",
+        "description": "CKD documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["ckd", "chronic kidney disease"],
+          "missing_label": "CKD documentation"
+        }
+      },
+      "expected_status": "MISSING",
+      "min_citations": 0
+    },
+    {
+      "id": "pt-negation-not-attempted",
+      "path": "rules",
+      "tags": ["negation"],
+      "notes": ["No physical therapy was documented due to acute flare."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-PT2",
+        "description": "Physical therapy documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["physical therapy"],
+          "negation_any": [],
+          "missing_label": "PT note"
+        }
+      },
+      "expected_status": "MISSING",
+      "min_citations": 0
+    },
+    {
+      "id": "imaging-mri-documented",
+      "path": "rules",
+      "tags": ["positive"],
+      "notes": ["MRI lumbar spine demonstrates L4-L5 disc herniation."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-MRI",
+        "description": "MRI documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["mri"],
+          "missing_label": "MRI report"
+        }
+      },
+      "expected_status": "SUPPORTED",
+      "min_citations": 1
+    },
+    {
+      "id": "imaging-mri-ordered-only",
+      "path": "rules",
+      "tags": ["uncertainty"],
+      "notes": ["MRI ordered; results pending."],
+      "labs": [],
+      "criterion": {
+        "code": "CRIT-MRI",
+        "description": "MRI documented.",
+        "rule": {
+          "type": "keyword",
+          "required_any": ["mri demonstrates", "mri shows", "mri reveals"],
+          "missing_label": "MRI report"
+        }
+      },
+      "expected_status": "MISSING",
+      "min_citations": 0
+    }
+  ]
+}
