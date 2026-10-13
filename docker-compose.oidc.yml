@@ -1,4 +1,6 @@
-# Local Keycloak IdP for pilot OIDC (P1.9).
+# Local Keycloak IdP for pilot OIDC (P1.9) — LOCAL / CI ONLY.
+# start-dev + admin/admin + change-me users must never be network-exposed or used with
+# real patient data. Production checklist: docs/OIDC_PILOT.md#production-keycloak-checklist
 # Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.pilot.yml -f docker-compose.oidc.yml up --build
 #

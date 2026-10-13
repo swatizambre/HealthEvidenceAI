@@ -3,6 +3,12 @@
 **Order:** Pilot (Phase 1) → **Production foundations (this doc)** → Demo polish (Phase 3).  
 This checklist is for accountable operators. Completing repo items does **not** certify clinical use.
 
+**Real patient data:** follow [GO_LIVE.md](GO_LIVE.md) (real-data trial runbook) and run
+`make go-live-check MODE=trial`. When `ALLOW_PHI` + `PHI_PROGRAM_ATTESTED` are true the API also
+requires `TRIAL_ETHICS_APPROVAL_REF`, `DPO_CONTACT`, `SECURITY_ASSESSMENT_REF`,
+`BREACH_RUNBOOK_URL`, a concrete `DATA_RESIDENCY_REGION`, `TRIAL_SITE_ORG_CODE` and a
+non-past `TRIAL_END_DATE`, in any environment.
+
 See also: [clinical-product-roadmap.md](clinical-product-roadmap.md), [PILOT_ROADMAP.md](PILOT_ROADMAP.md), [OIDC_PILOT.md](OIDC_PILOT.md).
 
 ## Phase 2 epics (repo + org)
@@ -30,6 +36,10 @@ When `ENVIRONMENT` is `staging`, `production`, `prod`, or `kubernetes`:
 - `ENFORCE_ORG_SCOPE` on (or unset for auto-on)
 - `ALLOW_PHI=true` requires `PHI_PROGRAM_ATTESTED=true`
 - Hospital simulator off for attested PHI live (and by default in staging compose)
+
+When `ALLOW_PHI` **and** `PHI_PROGRAM_ATTESTED` are true (any `ENVIRONMENT`): never
+`local`/`test`, OIDC, PostgreSQL, org scope on, seed off, synthetic lifelong off, plus the
+trial attestations listed in [GO_LIVE.md §2.3](GO_LIVE.md#23-configuration).
 
 Go-live runbook: [LIVE_READY.md](LIVE_READY.md).
 
@@ -72,6 +82,8 @@ Export: `GET /api/v1/audit/events?action=break_glass` (admin).
 - [ ] Backup / restore drill for Postgres
 - [ ] On-call / SLA contacts listed in ops runbook
 - [ ] Clinical / legal stakeholders signed non-device decision-support language
+- [ ] `make go-live-check MODE=trial` has no FAIL (WARNs have a written owner decision)
+- [ ] Real-data trial prerequisites in [GO_LIVE.md §2.1](GO_LIVE.md#21-non-code-prerequisites-all-signed-before-allow_phitrue) signed
 
 ## Demo (Phase 3 — only after staging green)
 
