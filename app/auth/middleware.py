@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import hmac
 from collections.abc import Callable
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from app.auth.oidc import validate_bearer_token
+from app.auth.oidc import AuthPrincipal, validate_bearer_token
 from app.auth.rbac import normalize_roles
+from app.auth.stream_ticket import verify_stream_ticket
 from app.core.config import Settings
 from app.core.exceptions import AppError
 
@@ -27,6 +29,8 @@ _DOCS_PREFIXES = (
     "/openapi.json",
     "/redoc",
 )
+
+_STREAM_PATH = "/api/v1/events/stream"
 
 # Any of these (or their aliases) may sign into the local desk UI.
 _PRODUCT_ROLES = frozenset(
@@ -74,27 +78,29 @@ class AuthMiddleware(BaseHTTPMiddleware):
             and self.settings.meta_public()
         ):
             return await call_next(request)
-        # HIS/FHIR interface engine: shared API key (machine-to-machine).
+        # HIS/FHIR interface engine: per-org API key (machine-to-machine).
         if path.startswith("/api/v1/hospital/pipeline"):
-            interface_key = (self.settings.hospital_interface_api_key or "").strip()
             presented = (request.headers.get("x-hospital-api-key") or "").strip()
-            if interface_key and presented and presented == interface_key:
-                from app.auth.oidc import AuthPrincipal
-
-                request.state.principal = AuthPrincipal(
-                    subject="hospital-interface",
-                    email="",
-                    roles=("staff", "resident"),
-                    raw_claims={"auth": "hospital_api_key"},
-                )
+            interface_principal = hospital_interface_principal(presented, self.settings)
+            if interface_principal is not None:
+                request.state.principal = interface_principal
                 return await call_next(request)
         auth_header = request.headers.get("authorization", "")
         token = ""
         if auth_header.lower().startswith("bearer "):
             token = auth_header.split(" ", 1)[1].strip()
-        elif path.startswith("/api/v1/events/stream"):
-            # EventSource cannot set Authorization — accept access_token query.
-            token = (request.query_params.get("access_token") or "").strip()
+        elif path == _STREAM_PATH:
+            # EventSource cannot set Authorization: accept a short-lived, single-purpose
+            # stream ticket (POST /events/stream-ticket) — never the bearer token itself.
+            ticket = (request.query_params.get("ticket") or "").strip()
+            if ticket:
+                try:
+                    principal = verify_stream_ticket(ticket, self.settings)
+                    self._enforce_roles(principal, mode)
+                except AppError as exc:
+                    return _error_response(request, exc)
+                request.state.principal = principal
+                return await call_next(request)
         if not token:
             return JSONResponse(
                 status_code=401,
@@ -109,14 +115,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             self._enforce_roles(principal, mode)
             request.state.principal = principal
         except AppError as exc:
-            return JSONResponse(
-                status_code=exc.status_code,
-                content={
-                    "error_code": exc.error_code,
-                    "message": exc.message,
-                    "request_id": getattr(request.state, "request_id", ""),
-                },
-            )
+            return _error_response(request, exc)
         return await call_next(request)
 
     def _enforce_roles(self, principal: object, mode: str) -> None:
@@ -150,3 +149,52 @@ class AuthMiddleware(BaseHTTPMiddleware):
             "Signed-in role is not allowed for this environment.",
             403,
         )
+
+
+def _error_response(request: Request, exc: AppError) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error_code": exc.error_code,
+            "message": exc.message,
+            "request_id": getattr(request.state, "request_id", ""),
+        },
+    )
+
+
+def _key_matches(presented: str, expected: str) -> bool:
+    """Constant-time comparison so key bytes cannot be recovered via response timing."""
+    return hmac.compare_digest(presented.encode("utf-8"), expected.encode("utf-8"))
+
+
+def hospital_interface_principal(presented: str, settings: Settings) -> AuthPrincipal | None:
+    """Map an X-Hospital-Api-Key value to an org-bound machine principal (or None).
+
+    Per-org keys (HOSPITAL_INTERFACE_KEYS) bind the principal to that organization. The
+    legacy single key (HOSPITAL_INTERFACE_API_KEY) has no org and is only honoured while
+    org scope is off (laptop / single-tenant UAT).
+    """
+    if not presented:
+        return None
+    matched_org: str | None = None
+    # Compare against every configured key (no early exit) to keep timing uniform.
+    for org_code, key in settings.hospital_interface_key_map():
+        if _key_matches(presented, key) and matched_org is None:
+            matched_org = org_code
+    if matched_org is not None:
+        return AuthPrincipal(
+            subject=f"hospital-interface:{matched_org}",
+            email="",
+            roles=("staff", "resident"),
+            raw_claims={"auth": "hospital_api_key", "org_code": matched_org},
+            org_code=matched_org,
+        )
+    legacy = (settings.hospital_interface_api_key or "").strip()
+    if legacy and not settings.org_scope_enforced() and _key_matches(presented, legacy):
+        return AuthPrincipal(
+            subject="hospital-interface",
+            email="",
+            roles=("staff", "resident"),
+            raw_claims={"auth": "hospital_api_key"},
+        )
+    return None

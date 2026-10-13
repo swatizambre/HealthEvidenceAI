@@ -759,6 +759,11 @@ class DevTokenRequest(APIModel):
     org_code: str | None = Field(default=None, max_length=32)
 
 
+class StreamTicketResponse(ResponseModel):
+    ticket: str
+    expires_in: int
+
+
 class DevTokenResponse(ResponseModel):
     access_token: str
     token_type: str = "bearer"

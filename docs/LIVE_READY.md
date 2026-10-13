@@ -15,7 +15,15 @@ Default remains **synthetic / practice**. The product is evidence-pack decision 
 ## Hospital interface (completed platform pieces)
 
 - Durable runs: `hospital_pipeline_runs` (status survives restart)
-- Machine auth: `HOSPITAL_INTERFACE_API_KEY` → header `X-Hospital-Api-Key`
+- Machine auth: `HOSPITAL_INTERFACE_KEYS=ORG-000001:<key>,...` (each ≥32 chars) → header
+  `X-Hospital-Api-Key`; the caller authenticates as `hospital-interface:ORG-xxxxxx` bound to that
+  org. The legacy single `HOSPITAL_INTERFACE_API_KEY` has no org and is refused while org scope is on.
+- SSE: the desk calls `POST /api/v1/events/stream-ticket` (bearer) and opens
+  `/api/v1/events/stream?ticket=…` (60 s, single-use, signed with `STREAM_TICKET_SECRET`).
+  `?access_token=` is no longer accepted.
+- Rate limiting (`RATE_LIMIT_*`): in-process sliding window **per replica** — auth 20/min per IP,
+  OPD + hospital pipeline 120/min and evidence search + tool invoke 120/min per principal (or IP).
+  429 responses carry `Retry-After`. A shared Redis-backed limiter is future work.
 - Multi-replica desk: `REDIS_URL` + `uv sync --extra realtime`
 - Pack export: `GET /api/v1/authorization/cases/{case_id}/export.pdf`
 - SLA: `PACKET_SLA_MINUTES` (default 240) on Today / ops metrics

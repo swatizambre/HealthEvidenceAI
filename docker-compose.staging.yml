@@ -12,6 +12,8 @@ services:
       AUTH_MODE: oidc
       DATABASE_URL: postgresql+psycopg://healthevidence:healthevidence@postgres:5432/healthevidence
       OIDC_ISSUER: ${OIDC_ISSUER:?Set OIDC_ISSUER for staging}
+      STREAM_TICKET_SECRET: ${STREAM_TICKET_SECRET:?Set STREAM_TICKET_SECRET (>= 32 chars) for staging}
+      HOSPITAL_INTERFACE_KEYS: ${HOSPITAL_INTERFACE_KEYS:-}
       OIDC_JWKS_URL: ${OIDC_JWKS_URL:?Set OIDC_JWKS_URL for staging}
       OIDC_AUDIENCE: ${OIDC_AUDIENCE:-healthevidence-api}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-healthevidence-api}

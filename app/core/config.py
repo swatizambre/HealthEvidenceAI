@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -80,8 +81,24 @@ class Settings(BaseSettings):
     # Hospital interface simulator (POST /hospital/pipeline/simulate).
     # Unset → allowed only on local/test/pilot practice desks; off in shared live.
     hospital_allow_simulate: bool | None = None
-    # Shared secret for HIS/FHIR machine clients (header X-Hospital-Api-Key).
+    # Legacy single shared secret for HIS/FHIR machine clients (header X-Hospital-Api-Key).
+    # Carries no org binding, so it is only accepted while org scope is NOT enforced.
     hospital_interface_api_key: str = ""
+    # Per-org interface keys: "ORG-000001:key1,ORG-000002:key2" (each key >= 32 chars).
+    # A matched key authenticates as subject "hospital-interface:<ORG>" bound to that org.
+    hospital_interface_keys: str = ""
+    # HMAC secret for short-lived SSE stream tickets (>= 32 chars; required in pilot/live).
+    # Empty → falls back to the dev-JWT secret on local/test laptops only.
+    stream_ticket_secret: str = ""
+    stream_ticket_ttl_seconds: int = 60
+    # In-process (per-replica) sliding-window rate limiting. Unset → on everywhere except
+    # ENVIRONMENT=test. Limits are requests per minute per client IP or principal.
+    rate_limit_enabled: bool | None = None
+    rate_limit_auth_per_minute: int = 20
+    rate_limit_ingest_per_minute: int = 120
+    rate_limit_search_per_minute: int = 120
+    # Behind a trusted ingress: key anonymous clients by the last X-Forwarded-For hop.
+    rate_limit_trust_proxy_headers: bool = False
     # Desk SLA for open evidence packs (minutes). Breach flags Today / ops metrics.
     packet_sla_minutes: int = 240
 
@@ -108,6 +125,46 @@ class Settings(BaseSettings):
         if not self.hospital_practice_mode():
             return False
         return self.env_name() in {"local", "test", "pilot"}
+
+    def rate_limit_active(self) -> bool:
+        """Rate limiting: on by default, off for ENVIRONMENT=test unless explicitly enabled."""
+        if self.rate_limit_enabled is not None:
+            return bool(self.rate_limit_enabled)
+        return self.env_name() != "test"
+
+    def hospital_interface_key_map(self) -> list[tuple[str, str]]:
+        """Parse HOSPITAL_INTERFACE_KEYS into (org_code, key) pairs; malformed entries skipped."""
+        pairs: list[tuple[str, str]] = []
+        for entry in self.hospital_interface_keys.split(","):
+            org_code, sep, key = entry.strip().partition(":")
+            org_code = org_code.strip().upper()
+            key = key.strip()
+            if sep and _ORG_CODE.fullmatch(org_code) and key:
+                pairs.append((org_code, key))
+        return pairs
+
+    def resolve_stream_ticket_secret(self) -> str:
+        """HMAC key for SSE stream tickets — dev-JWT fallback only on laptops / CI harness."""
+        secret = (self.stream_ticket_secret or "").strip()
+        if secret:
+            if len(secret) < 32:
+                raise AppError(
+                    "STREAM_TICKET_SECRET_REQUIRED",
+                    "STREAM_TICKET_SECRET must be at least 32 characters.",
+                    503,
+                )
+            return secret
+        # Laptop / CI desks (local, test, docker compose) reuse the dev-JWT HMAC. Pilot and
+        # shared live must configure a dedicated secret (enforced at startup as well).
+        live = self.env_name() == "pilot" or self.is_shared_live_env()
+        if not live or self.pilot_postgres_harness():
+            return self.require_dev_jwt_secret()
+        raise AppError(
+            "STREAM_TICKET_SECRET_REQUIRED",
+            "STREAM_TICKET_SECRET (at least 32 characters) is required to issue SSE stream "
+            "tickets in this environment.",
+            503,
+        )
 
     def org_scope_enforced(self) -> bool:
         """Tenant isolation: on by default outside local/test UAT."""
@@ -361,6 +418,53 @@ class Settings(BaseSettings):
                     "LLM_PHI_EGRESS_ALLOWED (or use LLM_PROVIDER=local/ollama).",
                     503,
                 )
+        if env == "pilot" or self.is_shared_live_env():
+            self._validate_machine_secrets()
+
+    def _validate_machine_secrets(self) -> None:
+        """Pilot / shared live: SSE ticket secret and HIS interface keys must be strong."""
+        if not self.pilot_postgres_harness():
+            ticket_secret = (self.stream_ticket_secret or "").strip()
+            if len(ticket_secret) < 32:
+                raise AppError(
+                    "LIVE_CONFIG_INVALID",
+                    "STREAM_TICKET_SECRET must be set and at least 32 characters in pilot, "
+                    "staging, and production (SSE stream tickets).",
+                    503,
+                )
+        raw_entries = [item.strip() for item in self.hospital_interface_keys.split(",") if item.strip()]
+        pairs = self.hospital_interface_key_map()
+        if len(pairs) != len(raw_entries):
+            raise AppError(
+                "LIVE_CONFIG_INVALID",
+                "HOSPITAL_INTERFACE_KEYS must be comma-separated ORG-NNNNNN:key entries.",
+                503,
+            )
+        if any(len(key) < 32 for _, key in pairs):
+            raise AppError(
+                "LIVE_CONFIG_INVALID",
+                "Each HOSPITAL_INTERFACE_KEYS key must be at least 32 characters.",
+                503,
+            )
+        legacy = (self.hospital_interface_api_key or "").strip()
+        if legacy:
+            if self.org_scope_enforced() and not pairs:
+                raise AppError(
+                    "LIVE_CONFIG_INVALID",
+                    "HOSPITAL_INTERFACE_API_KEY has no organization binding and is rejected "
+                    "while org scope is enforced. Use HOSPITAL_INTERFACE_KEYS "
+                    "(ORG-NNNNNN:key,...) instead.",
+                    503,
+                )
+            if len(legacy) < 32:
+                raise AppError(
+                    "LIVE_CONFIG_INVALID",
+                    "HOSPITAL_INTERFACE_API_KEY must be at least 32 characters.",
+                    503,
+                )
+
+
+_ORG_CODE = re.compile(r"^ORG-\d{6}$")
 
 
 def _looks_like_ollama_tag(value: str) -> bool:
