@@ -424,6 +424,10 @@ export interface DeploymentInfo {
 
 /** Text shown in the always-visible top banner for each deployment mode. */
 export function deploymentBannerText(info: DeploymentInfo): string {
+  // Server text is authoritative (it knows when a real-data trial has ended).
+  if (info.banner) {
+    return info.banner;
+  }
   if (info.mode === "trial") {
     const site = info.trial_site_org_code || "unconfigured site";
     const until = info.trial_end_date || "unset date";

@@ -92,6 +92,9 @@ class Settings(BaseSettings):
     # Empty → falls back to the dev-JWT secret on local/test laptops only.
     stream_ticket_secret: str = ""
     stream_ticket_ttl_seconds: int = 60
+    # HMAC key for patient-facing staff pseudonyms in access logs (>= 32 chars in real-data
+    # trials). Keyed so a patient cannot recover a staff email by hashing guesses.
+    staff_pseudonym_secret: str = ""
     # In-process (per-replica) sliding-window rate limiting. Unset → on everywhere except
     # ENVIRONMENT=test. Limits are requests per minute per client IP or principal.
     rate_limit_enabled: bool | None = None
@@ -146,7 +149,9 @@ class Settings(BaseSettings):
         mode = self.deployment_mode()
         site = self.trial_site_org_code.strip() if mode == "trial" else ""
         end = self.trial_end_date.strip() if mode == "trial" else ""
-        if mode == "trial":
+        if mode == "trial" and self.trial_expired():
+            text = f"REAL-DATA TRIAL ENDED ({end or 'unset date'}) — new patient records are blocked"
+        elif mode == "trial":
             text = f"REAL-DATA TRIAL — {site or 'unconfigured site'} until {end or 'unset date'}"
         elif mode == "demo":
             text = "DEMO — synthetic data"
@@ -201,6 +206,11 @@ class Settings(BaseSettings):
         ):
             if not value.strip():
                 problems.append(env_var)
+        pseudonym_key = self.staff_pseudonym_secret.strip()
+        if len(pseudonym_key) < 32:
+            problems.append("STAFF_PSEUDONYM_SECRET (>= 32 chars) for patient access-log references")
+        elif pseudonym_key == self.stream_ticket_secret.strip():
+            problems.append("STAFF_PSEUDONYM_SECRET must differ from STREAM_TICKET_SECRET")
         region = self.data_residency_region.strip().lower()
         if not region or region == "global":
             problems.append("DATA_RESIDENCY_REGION (a concrete region, not 'global')")
@@ -214,6 +224,18 @@ class Settings(BaseSettings):
             if end < current:
                 problems.append(f"TRIAL_END_DATE {end.isoformat()} is in the past")
         return problems
+
+    def trial_expired(self, today: date | None = None) -> bool:
+        """Real-data mode past TRIAL_END_DATE (checked at runtime, not only at boot).
+
+        A missing date is not "expired" here: the boot gate already refuses real-data
+        environments without TRIAL_END_DATE, and unit suites run PHI mode without one.
+        """
+        if not self.real_data_mode():
+            return False
+        end = self.trial_end()
+        current = today or datetime.now(UTC).date()
+        return end is not None and end < current
 
     def validate_real_data_trial(self, today: date | None = None) -> None:
         problems = self.real_data_trial_problems(today)
@@ -525,9 +547,10 @@ class Settings(BaseSettings):
                     "LLM_PHI_EGRESS_ALLOWED (or use LLM_PROVIDER=local/ollama).",
                     503,
                 )
+        # Real-data trial checklist first so operators see every missing attestation at once.
+        self.validate_real_data_trial()
         if env == "pilot" or self.is_shared_live_env():
             self._validate_machine_secrets()
-        self.validate_real_data_trial()
 
     def _validate_machine_secrets(self) -> None:
         """Pilot / shared live: SSE ticket secret and HIS interface keys must be strong."""

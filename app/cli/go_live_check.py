@@ -126,13 +126,12 @@ def check_llm_egress(settings: Settings, mode: Mode) -> CheckResult:
 
 def check_hospital_keys(settings: Settings, mode: Mode) -> CheckResult:
     name = "hospital.interface_keys"
-    if not hasattr(settings, "hospital_interface_keys"):
-        return _warn(name, "HOSPITAL_INTERFACE_KEYS not available in this build")
-    per_org = str(getattr(settings, "hospital_interface_keys", "") or "").strip()
+    per_org = settings.hospital_interface_keys.strip()
     shared = settings.hospital_interface_api_key.strip()
     if per_org:
         site = settings.trial_site_org_code.strip().upper()
-        if mode == "trial" and site and site not in per_org.upper():
+        orgs = {org.upper() for org, _ in settings.hospital_interface_key_map()}
+        if mode == "trial" and site and site not in orgs:
             return _warn(name, f"per-org keys set but none mention TRIAL_SITE_ORG_CODE={site}")
         return _ok(name, "per-org HOSPITAL_INTERFACE_KEYS configured")
     if shared:
@@ -148,9 +147,7 @@ def check_hospital_keys(settings: Settings, mode: Mode) -> CheckResult:
 
 def check_stream_ticket_secret(settings: Settings, mode: Mode) -> CheckResult:
     name = "realtime.stream_ticket_secret"
-    if not hasattr(settings, "stream_ticket_secret"):
-        return _warn(name, "STREAM_TICKET_SECRET not available in this build")
-    secret = str(getattr(settings, "stream_ticket_secret", "") or "").strip()
+    secret = settings.stream_ticket_secret.strip()
     if len(secret) >= MIN_SECRET_LENGTH:
         return _ok(name, "set (length ok)")
     detail = "unset" if not secret else f"shorter than {MIN_SECRET_LENGTH} characters"
@@ -161,13 +158,11 @@ def check_stream_ticket_secret(settings: Settings, mode: Mode) -> CheckResult:
 
 def check_rate_limiting(settings: Settings, mode: Mode) -> CheckResult:
     name = "api.rate_limiting"
-    if not hasattr(settings, "rate_limit_enabled"):
-        return _warn(name, "RATE_LIMIT_ENABLED not available in this build")
-    if bool(getattr(settings, "rate_limit_enabled", False)):
-        return _ok(name, "RATE_LIMIT_ENABLED=true")
+    if settings.rate_limit_active():
+        return _ok(name, "rate limiting active")
     if mode == "trial":
-        return _fail(name, "RATE_LIMIT_ENABLED is false")
-    return _warn(name, "RATE_LIMIT_ENABLED is false")
+        return _fail(name, "rate limiting is off (RATE_LIMIT_ENABLED=false)")
+    return _warn(name, "rate limiting is off (RATE_LIMIT_ENABLED=false)")
 
 
 def check_idp_not_dev(settings: Settings, mode: Mode) -> CheckResult:

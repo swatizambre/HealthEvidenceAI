@@ -67,6 +67,7 @@ services:
       # Owned by parallel workstreams; required for the trial (go-live check enforces).
       HOSPITAL_INTERFACE_KEYS: ${HOSPITAL_INTERFACE_KEYS:-}
       STREAM_TICKET_SECRET: ${STREAM_TICKET_SECRET:?Set STREAM_TICKET_SECRET (>=32 chars)}
+      STAFF_PSEUDONYM_SECRET: ${STAFF_PSEUDONYM_SECRET:?Set STAFF_PSEUDONYM_SECRET (>=32 chars, not equal to STREAM_TICKET_SECRET)}
       RATE_LIMIT_ENABLED: "true"
     # API reachable only from the host; put a TLS-terminating reverse proxy in front.
     ports: !override

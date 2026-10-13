@@ -88,6 +88,13 @@ def ingest_opd_packet(
             400,
         )
     phi_mode = not settings.hospital_practice_mode()
+    if phi_mode and settings.trial_expired():
+        raise AppError(
+            "TRIAL_ENDED",
+            "The approved real-data trial period (TRIAL_END_DATE) has ended; new patient "
+            "records are not accepted. Extend the approved trial or switch to practice mode.",
+            403,
+        )
     has_consent_ref = bool(payload.consent_id or payload.consent is not None)
     if phi_mode and not has_consent_ref:
         raise consent_required_error(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -37,6 +38,7 @@ from app.api.routes import (
 )
 from app.auth.middleware import AuthMiddleware
 from app.core.config import get_settings
+from app.core.exceptions import AppError
 from app.core.logging import configure_logging
 from app.core.safety import DISCLAIMER, PROTOTYPE_BANNER
 from app.db.session import create_db_engine, create_session_factory, init_db, prepare_sqlite_path
@@ -55,6 +57,14 @@ def create_app() -> FastAPI:
     configure_logging(settings.log_level)
     if settings.environment.strip().lower() not in {"test"}:
         settings.validate_live_configuration()
+    elif settings.real_data_mode() and "pytest" not in sys.modules:
+        # ENVIRONMENT=test skips live gates for unit suites only; never with real patient data.
+        raise AppError(
+            "LIVE_CONFIG_INVALID",
+            "ENVIRONMENT=test cannot run with ALLOW_PHI + PHI_PROGRAM_ATTESTED outside pytest. "
+            "Use ENVIRONMENT=pilot with the real-data trial gate.",
+            503,
+        )
     prepare_sqlite_path(settings.database_url)
     engine = create_db_engine(settings.database_url)
     session_factory = create_session_factory(engine)

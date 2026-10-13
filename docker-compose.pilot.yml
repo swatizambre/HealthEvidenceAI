@@ -8,5 +8,7 @@ services:
       AUTH_MODE: ${AUTH_MODE:-oidc}
       DATABASE_URL: postgresql+psycopg://healthevidence:healthevidence@postgres:5432/healthevidence
       # Required for ENVIRONMENT=pilot (>= 32 chars): export STREAM_TICKET_SECRET=$(openssl rand -hex 32)
+      # Empty default keeps the demo overlay (ENVIRONMENT=local) bootable; pilot boot fails closed
+      # in validate_live_configuration and `make pilot-up` checks it first.
       STREAM_TICKET_SECRET: ${STREAM_TICKET_SECRET:-}
       HOSPITAL_INTERFACE_KEYS: ${HOSPITAL_INTERFACE_KEYS:-}

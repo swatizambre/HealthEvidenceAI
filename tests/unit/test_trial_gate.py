@@ -26,6 +26,8 @@ def _trial(**overrides: Any) -> Settings:
         "hospital_allow_simulate": False,
         "allow_phi": True,
         "phi_program_attested": True,
+        "stream_ticket_secret": "s" * 40,
+        "staff_pseudonym_secret": "p" * 40,
         "synthetic_lifelong": None,
         "trial_ethics_approval_ref": "IEC/2026/HE-014",
         "dpo_contact": "dpo@hospital.example",
@@ -33,7 +35,7 @@ def _trial(**overrides: Any) -> Settings:
         "breach_runbook_url": "https://wiki.hospital.example/he/breach",
         "data_residency_region": "ap-south-1",
         "trial_site_org_code": "ORG-000001",
-        "trial_end_date": "2026-12-31",
+        "trial_end_date": "2999-12-31",
     }
     values.update(overrides)
     return Settings(**values)
@@ -175,3 +177,18 @@ def test_trial_end_parsing() -> None:
 
 def test_deployment_mode_practice_for_shared_synthetic() -> None:
     assert _trial(allow_phi=False, environment="staging").deployment_mode() == "practice"
+
+
+def test_staff_pseudonym_secret_required_and_distinct() -> None:
+    missing = _trial(staff_pseudonym_secret="")
+    assert any("STAFF_PSEUDONYM_SECRET" in p for p in missing.real_data_trial_problems())
+    reused = _trial(staff_pseudonym_secret="s" * 40, stream_ticket_secret="s" * 40)
+    assert any("must differ" in p for p in reused.real_data_trial_problems())
+    assert _trial().real_data_trial_problems() == []
+
+
+def test_trial_expired_is_checked_at_runtime() -> None:
+    settings = _trial(trial_end_date="2026-10-31")
+    assert settings.trial_expired(today=date(2026, 10, 31)) is False
+    assert settings.trial_expired(today=date(2026, 11, 1)) is True
+    assert _trial(allow_phi=False).trial_expired(today=date(2999, 1, 1)) is False

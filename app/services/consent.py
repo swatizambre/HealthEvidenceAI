@@ -7,7 +7,6 @@ Rows are never deleted — withdrawal stamps ``revoked_at`` so past processing s
 
 from __future__ import annotations
 
-import hashlib
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
@@ -19,6 +18,7 @@ from app.db.repository import next_public_code
 from app.models import ConsentRecord, Patient
 from app.schemas.api import ConsentCreate, ConsentListResponse, ConsentOut
 from app.services.audit import record_audit
+from app.services.pseudonym import staff_reference
 
 CONSENT_PURPOSES: tuple[str, ...] = ("prior_auth_evidence", "continuity_of_care", "research_trial")
 CONSENT_METHODS: tuple[str, ...] = ("written", "electronic", "verbal_witnessed")
@@ -104,8 +104,7 @@ def mask_staff_subject(subject: str | None) -> str:
         return ""
     if raw.upper().startswith("PAT-") or raw == "practice-attestation":
         return raw
-    digest = hashlib.sha256(raw.lower().encode("utf-8")).hexdigest()[:8]
-    return f"Care team · ref {digest}"
+    return f"Care team · ref {staff_reference(raw)}"
 
 
 def consent_out(

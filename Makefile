@@ -69,9 +69,11 @@ HE_API_BASE ?= http://127.0.0.1:8000
 HE_WEB_BASE ?= http://127.0.0.1:3000
 
 pilot-up:
+	@test -n "$$STREAM_TICKET_SECRET" || grep -Eq '^STREAM_TICKET_SECRET=.{32,}' .env 2>/dev/null || (echo "Set STREAM_TICKET_SECRET (>=32 chars) in your shell or .env before pilot-up — e.g. export STREAM_TICKET_SECRET=\$$(openssl rand -hex 24)" && exit 1)
 	docker compose -f docker-compose.yml -f docker-compose.pilot.yml up --build -d
 
 pilot-oidc-up:
+	@test -n "$$STREAM_TICKET_SECRET" || grep -Eq '^STREAM_TICKET_SECRET=.{32,}' .env 2>/dev/null || (echo "Set STREAM_TICKET_SECRET (>=32 chars) in your shell or .env before pilot-oidc-up — e.g. export STREAM_TICKET_SECRET=\$$(openssl rand -hex 24)" && exit 1)
 	docker compose -f docker-compose.yml -f docker-compose.pilot.yml -f docker-compose.oidc.yml up --build -d
 
 pilot-gate:
@@ -80,7 +82,7 @@ pilot-gate:
 	@echo "Pilot gate OK — see docs/PILOT_ROADMAP.md and docs/OIDC_PILOT.md"
 
 demo-up:
-	@test -n "$$DEV_JWT_SECRET" || (echo "Set DEV_JWT_SECRET (≥32 chars) before demo-up — e.g. export DEV_JWT_SECRET=\$$(openssl rand -hex 24)" && exit 1)
+	@test -n "$$DEV_JWT_SECRET" || grep -Eq '^DEV_JWT_SECRET=.{32,}' .env 2>/dev/null || (echo "Set DEV_JWT_SECRET (>=32 chars) in your shell or .env before demo-up — e.g. export DEV_JWT_SECRET=\$$(openssl rand -hex 24)" && exit 1)
 	docker compose -f docker-compose.yml -f docker-compose.pilot.yml -f docker-compose.demo.yml up --build -d
 
 demo-gate:

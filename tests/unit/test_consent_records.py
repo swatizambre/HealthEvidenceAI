@@ -461,3 +461,10 @@ def test_consent_migration_upgrade_and_downgrade(monkeypatch, tmp_path) -> None:
     finally:
         engine.dispose()
         get_settings.cache_clear()
+
+
+def test_phi_ingest_blocked_after_trial_end(monkeypatch) -> None:
+    with make_client(monkeypatch, TRIAL_END_DATE="2000-01-01", **PHI_ENV) as client:
+        response = client.post("/api/v1/opd/ingest", json=_packet(consent=_consent()))
+        assert response.status_code == 403, response.text
+        assert response.json()["error_code"] == "TRIAL_ENDED"

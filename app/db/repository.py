@@ -27,8 +27,6 @@ _CODE = re.compile(r"^([A-Z]+)-(\d+)$")
 
 def next_public_code(session: Session, column: InstrumentedAttribute[str], prefix: str) -> str:
     """Allocate the next zero-padded public code (serialized per prefix on PostgreSQL)."""
-    import secrets
-
     if _dialect_name(session) == "postgresql":
         # Transaction-scoped advisory lock keyed on the prefix: concurrent allocators for
         # the same prefix (e.g. two OPD ingests minting NOTE-xxxxxx) queue here until the
@@ -38,20 +36,14 @@ def next_public_code(session: Session, column: InstrumentedAttribute[str], prefi
     # SQLite serializes writers at the database level; a plain read is sufficient there.
     values = list(session.scalars(select(column).where(column.like(f"{prefix}-%"))).all())
     highest = 0
-    existing = set()
     for value in values:
         if not isinstance(value, str):
             continue
-        existing.add(value)
         match = _CODE.fullmatch(value)
         if match and match.group(1) == prefix:
             highest = max(highest, int(match.group(2)))
-    for offset in range(0, 64):
-        candidate = f"{prefix}-{highest + 1 + offset:06d}"
-        if candidate not in existing:
-            return candidate
-    # Extremely unlikely fallback — still unique within the prefix namespace.
-    return f"{prefix}-{highest + 1:06d}-{secrets.token_hex(3).upper()}"
+    # max + 1 is never taken, and always matches the PREFIX-NNNNNN schema patterns.
+    return f"{prefix}-{highest + 1:06d}"
 
 
 def _dialect_name(session: Session) -> str:

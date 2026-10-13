@@ -10,7 +10,6 @@ state-law retention), so resolution must record either the legal-hold reason or 
 
 from __future__ import annotations
 
-import hashlib
 import re
 from datetime import UTC, datetime
 from typing import Literal
@@ -49,6 +48,7 @@ from app.schemas.api import (
 )
 from app.services.audit import record_audit
 from app.services.consent import consent_out, list_consents_for_patient, mask_staff_subject
+from app.services.pseudonym import staff_reference
 
 _PATIENT_CODE = re.compile(r"^PAT-\d{6}$")
 
@@ -110,15 +110,6 @@ def _as_utc(value: datetime | None) -> datetime | None:
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
     return value
-
-
-def staff_reference(subject: str) -> str:
-    """Stable pseudonymous reference for a staff subject (never the email itself).
-
-    Same digest as ``mask_staff_subject`` so a patient can quote it to the grievance officer.
-    """
-    digest = hashlib.sha256(subject.strip().lower().encode("utf-8")).hexdigest()
-    return digest[:8]
 
 
 def classify_actor(actor: str, patient_code: str, detail: str) -> tuple[ActorCategory, str]:

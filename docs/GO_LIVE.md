@@ -108,7 +108,7 @@ not that they are valid. Do not enter placeholder values to get past the boot ga
   admin and senior roles. Tokens must carry `org_code` = `TRIAL_SITE_ORG_CODE`. See the
   [production Keycloak checklist](OIDC_PILOT.md#production-keycloak-checklist).
 - **Secrets:** a secrets manager or Kubernetes Secrets (`DATABASE_URL`, `OIDC_CLIENT_SECRET`,
-  `STREAM_TICKET_SECRET`, `HOSPITAL_INTERFACE_KEYS`, `DPO_CONTACT`). Never commit them to git, put them in the image, or set them in a ConfigMap.
+  `STREAM_TICKET_SECRET`, `STAFF_PSEUDONYM_SECRET`, `HOSPITAL_INTERFACE_KEYS`, `DPO_CONTACT`). Never commit them to git, put them in the image, or set them in a ConfigMap.
 - **LLM:** `LLM_PROVIDER=local` or on-host `ollama`. Cloud providers are blocked under PHI
   unless `LLM_BAA_ATTESTED` and `LLM_PHI_EGRESS_ALLOWED` are both true and covered by item 4.
 - **Logs and backups** stay in the same region. Application logs carry no note text, but they do carry IDs.
@@ -137,8 +137,9 @@ not that they are valid. Do not enter placeholder values to get past the boot ga
 | `TRIAL_SITE_ORG_CODE` | Single org in the trial, for example `ORG-000001` |
 | `TRIAL_END_DATE` | `YYYY-MM-DD`. Boot fails once it has passed |
 | `HOSPITAL_INTERFACE_KEYS` | Per-org HIS keys, if a machine feed is used (interface-keys workstream) |
-| `STREAM_TICKET_SECRET` | ≥32 chars, for SSE stream tickets (realtime workstream) |
-| `RATE_LIMIT_ENABLED` | `true` (rate-limit workstream) |
+| `STREAM_TICKET_SECRET` | ≥32 chars, for SSE stream tickets |
+| `STAFF_PSEUDONYM_SECRET` | ≥32 chars, different from `STREAM_TICKET_SECRET`; keys the "Care team member · ref …" pseudonyms in patient access logs so staff identities cannot be recovered by hashing guessed emails |
+| `RATE_LIMIT_ENABLED` | `true` (default when unset outside tests). Limits are **per replica** and per client/principal; all traffic from one hospital interface key shares one bucket (`RATE_LIMIT_INGEST_PER_MINUTE`, default 120/min) — raise it for busy HIS feeds before go-live |
 | `CORS_ORIGINS` | The trial UI's https origin only |
 | `POSTGRES_PASSWORD` | Required if using the bundled Postgres container (no default) |
 

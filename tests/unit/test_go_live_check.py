@@ -41,6 +41,8 @@ def _trial(**overrides: Any) -> Settings:
         "hospital_allow_simulate": False,
         "allow_phi": True,
         "phi_program_attested": True,
+        "stream_ticket_secret": "s" * 40,
+        "staff_pseudonym_secret": "p" * 40,
         "trial_ethics_approval_ref": "IEC/2026/HE-014",
         "dpo_contact": "dpo@hospital.example",
         "security_assessment_ref": "VAPT-2026-09-HE",
@@ -120,10 +122,7 @@ def test_trial_passes_when_fully_configured(tmp_path: Path, monkeypatch: pytest.
     results = glc.run_checks(
         _trial(), "trial", db_probe=_at_head, oidc_fetcher=_discovery, gold_result=_gold(tmp_path)
     )
-    # Settings owned by parallel workstreams are checked separately below (they may be
-    # absent → WARN, or present with empty defaults → FAIL until configured).
-    parallel = {"realtime.stream_ticket_secret", "api.rate_limiting", "hospital.interface_keys"}
-    failures = [r for r in results if r.status == "FAIL" and r.name not in parallel]
+    failures = [r for r in results if r.status == "FAIL"]
     assert not failures, glc.format_table(results)
 
 
@@ -183,63 +182,34 @@ def test_synthetic_lifelong_must_be_off_for_trial() -> None:
     assert glc.check_synthetic_lifelong(_demo(), "demo").status == "PASS"
 
 
-def test_tolerant_when_parallel_settings_missing() -> None:
-    class _Bare:
-        """Settings stand-in without the parallel-workstream attributes."""
-
-        hospital_interface_api_key = ""
-        trial_site_org_code = "ORG-000001"
-
-    bare: Any = _Bare()
-    assert glc.check_stream_ticket_secret(bare, "trial").status == "WARN"
-    assert glc.check_rate_limiting(bare, "trial").status == "WARN"
-    assert glc.check_hospital_keys(bare, "trial").status == "WARN"
-
-
-class _ShimSettings:
-    """Duck-typed Settings with the parallel-workstream attributes present."""
-
-    def __init__(self, base: Settings, **extra: Any) -> None:
-        self._base = base
-        for key, value in extra.items():
-            setattr(self, key, value)
-
-    def __getattr__(self, item: str) -> Any:
-        return getattr(self._base, item)
-
-
-def _shim(base: Settings, **extra: Any) -> Any:
-    return _ShimSettings(base, **extra)
-
-
-def test_stream_ticket_secret_checked_when_present() -> None:
-    base = _trial()
-    short = _shim(base, stream_ticket_secret="abc")
-    good = _shim(base, stream_ticket_secret="s" * 40)
+def test_stream_ticket_secret_checked() -> None:
+    short = _trial(stream_ticket_secret="abc")
+    good = _trial(stream_ticket_secret="s" * 40)
     assert glc.check_stream_ticket_secret(short, "trial").status == "FAIL"
     assert glc.check_stream_ticket_secret(short, "demo").status == "WARN"
     assert glc.check_stream_ticket_secret(good, "trial").status == "PASS"
 
 
-def test_rate_limit_checked_when_present() -> None:
-    base = _trial()
-    off = _shim(base, rate_limit_enabled=False)
-    on = _shim(base, rate_limit_enabled=True)
+def test_rate_limit_checked() -> None:
+    off = _trial(rate_limit_enabled=False)
+    on = _trial(rate_limit_enabled=True)
+    default_on = _trial(rate_limit_enabled=None)  # unset → active outside ENVIRONMENT=test
     assert glc.check_rate_limiting(off, "trial").status == "FAIL"
     assert glc.check_rate_limiting(off, "demo").status == "WARN"
     assert glc.check_rate_limiting(on, "trial").status == "PASS"
+    assert glc.check_rate_limiting(default_on, "trial").status == "PASS"
 
 
-def test_hospital_keys_checked_when_present() -> None:
-    base = _trial()
-    per_org = _shim(base, hospital_interface_keys="ORG-000001:secret-value")
-    other_org = _shim(base, hospital_interface_keys="ORG-000009:secret-value")
-    none = _shim(base, hospital_interface_keys="")
-    shared = _shim(
-        _trial(hospital_interface_api_key="shared-secret"), hospital_interface_keys=""
-    )
+def test_hospital_keys_checked() -> None:
+    key = "k" * 40
+    per_org = _trial(hospital_interface_keys=f"ORG-000001:{key}")
+    other_org = _trial(hospital_interface_keys=f"ORG-000009:{key}")
+    prefix_only = _trial(hospital_interface_keys=f"ORG-0000011:{key}")
+    none = _trial(hospital_interface_keys="")
+    shared = _trial(hospital_interface_api_key="shared-secret", hospital_interface_keys="")
     assert glc.check_hospital_keys(per_org, "trial").status == "PASS"
     assert glc.check_hospital_keys(other_org, "trial").status == "WARN"
+    assert glc.check_hospital_keys(prefix_only, "trial").status == "WARN"
     assert glc.check_hospital_keys(none, "trial").status == "PASS"
     assert glc.check_hospital_keys(shared, "trial").status == "FAIL"
     assert glc.check_hospital_keys(shared, "demo").status == "WARN"
