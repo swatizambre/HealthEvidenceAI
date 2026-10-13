@@ -325,9 +325,15 @@ def main() -> int:
         )
 
     st, body, err = review("PA-000001", "PAT-000001")
-    summary = (body or {}).get("report_summary", "") if isinstance(body, dict) else ""
-    criteria = (body or {}).get("criteria") or []
-    statuses = [c.get("status") for c in criteria if isinstance(c, dict)]
+    body1 = body if isinstance(body, dict) else {}
+    summary = str(body1.get("report_summary") or "")
+    raw_criteria = body1.get("criteria")
+    criteria = raw_criteria if isinstance(raw_criteria, list) else []
+    statuses = [
+        str(c.get("status"))
+        for c in criteria
+        if isinstance(c, dict) and c.get("status") is not None
+    ]
     ok = (
         st == 200
         and isinstance(body, dict)
@@ -339,7 +345,7 @@ def main() -> int:
         "AI review PA-000001",
         ok,
         (
-            f"status={st} coverage={body.get('evidence_coverage') if isinstance(body, dict) else None} "
+            f"status={st} coverage={body1.get('evidence_coverage')} "
             f"supported={statuses.count('SUPPORTED')}/{len(statuses)} "
             f"untrusted={'BEGIN_UNTRUSTED' in summary}"
         ),
@@ -347,9 +353,15 @@ def main() -> int:
     print("  summary:", summary[:320].replace("\n", " "))
 
     st, body, err = review("PA-000002", "PAT-000002")
-    summary2 = (body or {}).get("report_summary", "") if isinstance(body, dict) else ""
-    criteria2 = (body or {}).get("criteria") or []
-    statuses2 = [c.get("status") for c in criteria2 if isinstance(c, dict)]
+    body2 = body if isinstance(body, dict) else {}
+    summary2 = str(body2.get("report_summary") or "")
+    raw_criteria2 = body2.get("criteria")
+    criteria2 = raw_criteria2 if isinstance(raw_criteria2, list) else []
+    statuses2 = [
+        str(c.get("status"))
+        for c in criteria2
+        if isinstance(c, dict) and c.get("status") is not None
+    ]
     ok2 = (
         st == 200
         and "BEGIN_UNTRUSTED" not in summary2
@@ -360,7 +372,7 @@ def main() -> int:
         "AI review PA-000002",
         ok2,
         (
-            f"status={st} coverage={body.get('evidence_coverage') if isinstance(body, dict) else None} "
+            f"status={st} coverage={body2.get('evidence_coverage')} "
             f"statuses={counts} untrusted={'BEGIN_UNTRUSTED' in summary2}"
         ),
     )

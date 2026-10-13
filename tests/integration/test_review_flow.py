@@ -27,11 +27,14 @@ def test_synthetic_patient_policy_and_review(client: TestClient) -> None:
     assert policy.status_code == 200
     assert search.status_code == 200
     assert isinstance(body, dict)
-    assert body["criteria"]
+    criteria = body["criteria"]
+    assert isinstance(criteria, list) and criteria
     assert body["disclaimer"] == DISCLAIMER
     assert "human_review_required" in body
     assert body["awaiting_human_review"] is False
-    assert any(item["evidence"] for item in body["criteria"])
+    assert any(
+        isinstance(item, dict) and bool(item.get("evidence")) for item in criteria
+    )
     assert body["missing_evidence"] == []
     assert body["run_id"]
     assert body["trace_id"]

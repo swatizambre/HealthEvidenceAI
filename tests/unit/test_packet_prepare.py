@@ -1,6 +1,7 @@
 """Evidence packet preparation for procedure readiness."""
 
 from fastapi.testclient import TestClient
+from tests.helpers import json_dict
 
 
 def test_prepare_packet_for_complete_patient(client: TestClient) -> None:
@@ -12,7 +13,7 @@ def test_prepare_packet_for_complete_patient(client: TestClient) -> None:
         },
     )
     assert response.status_code == 200, response.text
-    body = response.json()
+    body = json_dict(response)
     assert body["patient_id"] == "PAT-000001"
     assert body["case_id"].startswith("PA-")
     assert body["readiness_percent"] == 100
@@ -20,8 +21,9 @@ def test_prepare_packet_for_complete_patient(client: TestClient) -> None:
     assert body["human_review_required"] is False
     assert body["packet_summary"]
     assert "Evidence pack" in body["packet_summary"]
-    assert body["criteria"]
-    assert all(item["plain_status"] for item in body["criteria"])
+    criteria = body["criteria"]
+    assert isinstance(criteria, list) and criteria
+    assert all(isinstance(item, dict) and item["plain_status"] for item in criteria)
     assert body["next_steps"]
     assert body["next_best_action"] is None
     assert body["estimated_prep_minutes"] >= 1

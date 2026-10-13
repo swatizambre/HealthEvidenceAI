@@ -111,10 +111,16 @@ def test_policy_retrieval(client: TestClient) -> None:
     assert listing.json()["total"] == 20
     detail = client.get("/api/v1/policies/POL-000001")
     assert detail.status_code == 200
-    body = detail.json()
+    from tests.helpers import json_dict
+
+    body = json_dict(detail)
     assert body["policy_id"] == "POL-000001"
     assert "POLICY_MARKER_DYNAMIC_REVIEW" in body["content"]
-    codes = [item["criterion_id"] for item in body["criteria"]]
+    criteria = body["criteria"]
+    assert isinstance(criteria, list)
+    codes = [
+        item["criterion_id"] for item in criteria if isinstance(item, dict)
+    ]
     assert codes == [
         "CRIT-DYN-01",
         "CRIT-DYN-02",
@@ -287,9 +293,15 @@ def test_stats(client: TestClient) -> None:
 def test_patient_search_filters_catalog(client: TestClient) -> None:
     response = client.get("/api/v1/patients", params={"q": "PAT-000001", "limit": 10})
     assert response.status_code == 200
-    body = response.json()
+    from tests.helpers import json_dict
+
+    body = json_dict(response)
     assert body["total"] >= 1
-    assert any(item["patient_id"] == "PAT-000001" for item in body["patients"])
+    patients = body["patients"]
+    assert isinstance(patients, list)
+    assert any(
+        isinstance(item, dict) and item["patient_id"] == "PAT-000001" for item in patients
+    )
 
 
 def test_disclaimer_constant_matches_the_safety_copy() -> None:

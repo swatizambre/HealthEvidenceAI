@@ -14,6 +14,7 @@ import json
 import os
 import sys
 import time
+from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -22,17 +23,19 @@ WEB = os.environ.get("HE_WEB_BASE", "http://127.0.0.1:5173").rstrip("/")
 results: list[tuple[str, bool, str]] = []
 stamp = time.strftime("%Y%m%d%H%M%S")
 
+JsonPayload = dict[str, Any] | list[Any] | str | None
+
 
 def call(
     method: str,
     path: str,
-    body=None,
+    body: dict[str, Any] | list[Any] | None = None,
     token: str | None = None,
     *,
     base: str = BASE,
     timeout: int = 90,
     accept: str = "application/json",
-):
+) -> tuple[int, JsonPayload, str | None]:
     data = None if body is None else json.dumps(body).encode()
     headers = {"Accept": accept}
     if body is not None:
@@ -43,18 +46,22 @@ def call(
     try:
         with urlopen(req, timeout=timeout) as resp:
             raw = resp.read().decode("utf-8", errors="replace")
+            payload: JsonPayload
             try:
-                payload = json.loads(raw) if raw else None
+                parsed = json.loads(raw) if raw else None
+                payload = parsed if isinstance(parsed, (dict, list, str)) or parsed is None else str(parsed)
             except json.JSONDecodeError:
                 payload = raw[:400]
-            return resp.status, payload, None
+            return int(resp.status), payload, None
     except HTTPError as e:
         raw = e.read().decode("utf-8", errors="replace")
+        payload: JsonPayload
         try:
-            payload = json.loads(raw) if raw else None
+            parsed = json.loads(raw) if raw else None
+            payload = parsed if isinstance(parsed, (dict, list, str)) or parsed is None else str(parsed)
         except json.JSONDecodeError:
             payload = raw[:400]
-        return e.code, payload, str(e)
+        return int(e.code), payload, str(e)
     except TimeoutError:
         return 0, None, "timeout"
     except URLError as e:
@@ -83,7 +90,8 @@ def mint(
     st, tok, _ = call("POST", "/api/v1/auth/dev-token", body)
     if st != 200 or not isinstance(tok, dict):
         return None
-    return tok.get("access_token")
+    access = tok.get("access_token")
+    return access if isinstance(access, str) else None
 
 
 def his_visit(
@@ -99,8 +107,8 @@ def his_visit(
     labs: list | None = None,
     meds: list | None = None,
     diagnoses: list | None = None,
-) -> tuple[int, dict | None, str | None]:
-    body = {
+) -> tuple[int, dict[str, Any] | None, str | None]:
+    body: dict[str, Any] = {
         "external_patient_id": f"UHID-BIG-{encounter_suffix}",
         "encounter_id": f"OPD-BIG-{stamp}-{encounter_suffix}",
         "patient_id": patient_id,
@@ -119,7 +127,10 @@ def his_visit(
         "consent_attested": True,
         "auto_prepare": auto_prepare,
     }
-    return call("POST", "/api/v1/hospital/pipeline/visit", body, token=token, timeout=120)
+    status, payload, err = call(
+        "POST", "/api/v1/hospital/pipeline/visit", body, token=token, timeout=120
+    )
+    return status, payload if isinstance(payload, dict) else None, err
 
 
 def fhir_bundle(encounter_id: str, mrn: str) -> dict:
@@ -208,6 +219,8 @@ def main() -> int:
     )
     if not all([staff, resident, senior, admin, patient]):
         return 1
+    assert staff is not None and resident is not None and senior is not None
+    assert admin is not None and patient is not None
 
     # --- Campus specialty catalog ---
     st, specs, err = call("GET", "/api/v1/specialties", token=staff)
@@ -386,7 +399,7 @@ def main() -> int:
     run_id = review.get("run_id") if isinstance(review, dict) else None
     check(
         "Senior opens interactive review",
-        st == 200 and (awaiting or run_id),
+        st == 200 and (awaiting or bool(run_id)),
         f"status={st} awaiting={awaiting}",
     )
     if run_id:

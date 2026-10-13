@@ -5,13 +5,13 @@ import re
 from app.core.safety import DISCLAIMER
 from app.services.synthetic import get_demo_procedure
 from fastapi.testclient import TestClient
-from tests.helpers import assert_quotes_sources, review
+from tests.helpers import JsonDict, assert_quotes_sources, review
 
 _DECISION = re.compile(r"\b(APPROVE|DENY|DIAGNOSE|PRESCRIBE)\b")
 _PROCEDURE = get_demo_procedure()
 
 
-def _criterion(body: dict[str, object], code: str) -> dict[str, object]:
+def _criterion(body: JsonDict, code: str) -> JsonDict:
     criteria = body["criteria"]
     assert isinstance(criteria, list)
     match = next(

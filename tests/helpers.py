@@ -2,10 +2,22 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from app.services.synthetic import get_demo_procedure
 from fastapi.testclient import TestClient
 
 DEMO_PROCEDURE = get_demo_procedure()
+
+# JSON response bodies from the API (values are not uniformly typed).
+JsonDict = dict[str, Any]
+
+
+def json_dict(response: object) -> JsonDict:
+    """Parse a TestClient/HTTP response body as a JSON object."""
+    payload = getattr(response, "json", lambda: None)()
+    assert isinstance(payload, dict)
+    return payload
 
 
 def review(
@@ -16,7 +28,7 @@ def review(
     policy_id: str = "POL-000001",
     procedure: str | None = None,
     decision: str = "acknowledged",
-) -> dict[str, object]:
+) -> JsonDict:
     """Run review and complete mandatory senior HITL (tests simulate senior sign-off)."""
     payload: dict[str, str] = {
         "patient_id": patient_id,
@@ -42,7 +54,7 @@ def review(
     return body
 
 
-def assert_quotes_sources(client: TestClient, body: dict[str, object]) -> None:
+def assert_quotes_sources(client: TestClient, body: JsonDict) -> None:
     criteria = body["criteria"]
     assert isinstance(criteria, list)
     for criterion in criteria:

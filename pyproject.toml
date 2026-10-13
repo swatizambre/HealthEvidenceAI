@@ -93,6 +93,27 @@ select = ["E", "F", "I", "UP", "B"]
 pythonVersion = "3.12"
 venvPath = "."
 venv = ".venv"
+extraPaths = ["."]
+# JSON API bodies are loosely shaped; use Any-friendly checking for tests/scripts.
+typeCheckingMode = "standard"
+reportMissingImports = true
+reportUnusedImport = "warning"
+
+[[tool.basedpyright.executionEnvironments]]
+root = "tests"
+extraPaths = ["."]
+reportAny = false
+reportUnknownMemberType = false
+reportUnknownArgumentType = false
+reportUnknownVariableType = false
+
+[[tool.basedpyright.executionEnvironments]]
+root = "scripts"
+extraPaths = ["."]
+reportAny = false
+reportUnknownMemberType = false
+reportUnknownArgumentType = false
+reportUnknownVariableType = false
 
 [tool.mypy]
 python_version = "3.12"

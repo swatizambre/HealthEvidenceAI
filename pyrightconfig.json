@@ -1,0 +1,28 @@
+{
+  "pythonVersion": "3.12",
+  "venvPath": ".",
+  "venv": ".venv",
+  "extraPaths": ["."],
+  "typeCheckingMode": "standard",
+  "executionEnvironments": [
+    {
+      "root": "tests",
+      "extraPaths": ["."],
+      "reportAny": false,
+      "reportUnknownMemberType": false,
+      "reportUnknownArgumentType": false,
+      "reportUnknownVariableType": false
+    },
+    {
+      "root": "scripts",
+      "extraPaths": ["."],
+      "reportAny": false,
+      "reportUnknownMemberType": false,
+      "reportUnknownArgumentType": false,
+      "reportUnknownVariableType": false
+    },
+    {
+      "root": "."
+    }
+  ]
+}
