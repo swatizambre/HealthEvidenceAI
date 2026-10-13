@@ -1,0 +1,22 @@
+# Demo overlay (Phase 3) — sales / stakeholder walkthrough
+# Same Postgres + auth path as pilot; synthetic data only (no PHI).
+#
+# One command:
+#   docker compose -f docker-compose.yml -f docker-compose.pilot.yml -f docker-compose.demo.yml up --build
+#
+# Then open http://127.0.0.1:3000 and follow docs/LAUNCH.md (Demo path).
+# Before a live demo on a shared tenant: run personas against the pilot URL
+#   HE_API_BASE=http://127.0.0.1:8000 python scripts/_smoke_web_api.py
+
+services:
+  backend:
+    environment:
+      ENVIRONMENT: pilot
+      AUTH_MODE: ${AUTH_MODE:-dev-jwt}
+      ALLOW_PHI: "false"
+      PHI_PROGRAM_ATTESTED: "false"
+      ENFORCE_ORG_SCOPE: "false"
+      SEED_ON_STARTUP: "true"
+      LLM_PROVIDER: ${LLM_PROVIDER:-local}
+      LLM_FALLBACK_PROVIDERS: ${LLM_FALLBACK_PROVIDERS:-local}
+      DATABASE_URL: postgresql+psycopg://healthevidence:healthevidence@postgres:5432/healthevidence

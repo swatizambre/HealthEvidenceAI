@@ -1,0 +1,122 @@
+{
+  "realm": "healthevidence",
+  "enabled": true,
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "sslRequired": "external",
+  "roles": {
+    "realm": [
+      { "name": "staff", "description": "PA / records staff" },
+      { "name": "senior_clinician", "description": "Senior clinician HITL" },
+      { "name": "resident", "description": "Resident / junior doctor" },
+      { "name": "admin", "description": "Facility admin" },
+      { "name": "patient", "description": "Patient self-access" },
+      { "name": "reviewer", "description": "Legacy alias → senior" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "healthevidence-api",
+      "name": "HealthEvidence AI API",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "http://127.0.0.1:5173/*",
+        "http://localhost:5173/*",
+        "http://127.0.0.1:3000/*",
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": ["+"],
+      "attributes": {
+        "access.token.lifespan": "3600"
+      },
+      "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "email"],
+      "optionalClientScopes": ["address", "phone", "offline_access"]
+    }
+  ],
+  "users": [
+    {
+      "username": "staff",
+      "enabled": true,
+      "email": "staff@example.com",
+      "emailVerified": true,
+      "firstName": "PA",
+      "lastName": "Staff",
+      "credentials": [{ "type": "password", "value": "change-me", "temporary": false }],
+      "realmRoles": ["staff"]
+    },
+    {
+      "username": "senior",
+      "enabled": true,
+      "email": "senior@example.com",
+      "emailVerified": true,
+      "firstName": "Senior",
+      "lastName": "Clinician",
+      "credentials": [{ "type": "password", "value": "change-me", "temporary": false }],
+      "realmRoles": ["senior_clinician"]
+    },
+    {
+      "username": "resident",
+      "enabled": true,
+      "email": "resident@example.com",
+      "emailVerified": true,
+      "firstName": "Junior",
+      "lastName": "Doctor",
+      "credentials": [{ "type": "password", "value": "change-me", "temporary": false }],
+      "realmRoles": ["resident"]
+    },
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@example.com",
+      "emailVerified": true,
+      "firstName": "Facility",
+      "lastName": "Admin",
+      "credentials": [{ "type": "password", "value": "change-me", "temporary": false }],
+      "realmRoles": ["admin"]
+    },
+    {
+      "username": "patient1",
+      "enabled": true,
+      "email": "patient1@example.com",
+      "emailVerified": true,
+      "firstName": "Synthetic",
+      "lastName": "Patient",
+      "attributes": { "patient_id": ["PAT-000001"] },
+      "credentials": [{ "type": "password", "value": "change-me", "temporary": false }],
+      "realmRoles": ["patient"]
+    }
+  ],
+  "clientScopes": [
+    {
+      "name": "healthevidence-patient",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "true" },
+      "protocolMappers": [
+        {
+          "name": "patient_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "patient_id",
+            "claim.name": "patient_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ]
+}

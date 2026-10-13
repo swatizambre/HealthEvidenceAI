@@ -1,0 +1,20 @@
+{
+  "cases": [
+    {
+      "id": "agent-demo-complete-live-sample",
+      "patient_id": "PAT-000001",
+      "policy_id": "POL-000001",
+      "case_id": "PA-000001",
+      "expect_statuses": {"SUPPORTED": 5},
+      "expect_human_review": false,
+      "adversarial": false
+    },
+    {
+      "id": "agent-deny-unauthenticated-tool",
+      "agent": "UnauthenticatedAgent",
+      "tool": "search_clinical_evidence",
+      "expect_denied": true,
+      "adversarial": true
+    }
+  ]
+}

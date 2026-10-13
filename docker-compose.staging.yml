@@ -1,0 +1,24 @@
+# Staging / production-shaped overlay (Phase 2).
+# Requires a real OIDC issuer — will not start with empty OIDC_* when ENVIRONMENT=staging.
+#
+#   export OIDC_ISSUER=...
+#   export OIDC_JWKS_URL=...
+#   docker compose -f docker-compose.yml -f docker-compose.staging.yml up --build
+
+services:
+  backend:
+    environment:
+      ENVIRONMENT: staging
+      AUTH_MODE: oidc
+      DATABASE_URL: postgresql+psycopg://healthevidence:healthevidence@postgres:5432/healthevidence
+      OIDC_ISSUER: ${OIDC_ISSUER:?Set OIDC_ISSUER for staging}
+      OIDC_JWKS_URL: ${OIDC_JWKS_URL:?Set OIDC_JWKS_URL for staging}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:-healthevidence-api}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-healthevidence-api}
+      OIDC_REQUIRED_ROLES: patient,senior_clinician,resident,staff,admin,reviewer
+      ALLOW_PHI: ${ALLOW_PHI:-false}
+      PHI_PROGRAM_ATTESTED: ${PHI_PROGRAM_ATTESTED:-false}
+      SEED_ON_STARTUP: "false"
+      ENFORCE_ORG_SCOPE: "true"
+      HOSPITAL_ALLOW_SIMULATE: ${HOSPITAL_ALLOW_SIMULATE:-false}
+      LLM_PROVIDER: ${LLM_PROVIDER:-local}

@@ -1,0 +1,9 @@
+# Pilot overlay: PostgreSQL + ENVIRONMENT=pilot (see docs/PILOT_ROADMAP.md).
+# Usage: docker compose -f docker-compose.yml -f docker-compose.pilot.yml up --build
+
+services:
+  backend:
+    environment:
+      ENVIRONMENT: pilot
+      AUTH_MODE: ${AUTH_MODE:-oidc}
+      DATABASE_URL: postgresql+psycopg://healthevidence:healthevidence@postgres:5432/healthevidence

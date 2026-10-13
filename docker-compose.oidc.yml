@@ -1,0 +1,41 @@
+# Local Keycloak IdP for pilot OIDC (P1.9).
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.pilot.yml -f docker-compose.oidc.yml up --build
+#
+# After Keycloak is healthy:
+#   uv run python -m app.cli.oidc_discover http://127.0.0.1:8080/realms/healthevidence
+# Set AUTH_MODE=oidc + printed OIDC_ISSUER / OIDC_JWKS_URL on the API.
+# Dev users (password: change-me): staff / senior / resident / admin / patient1
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: "8080"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./deploy/keycloak/realm-healthevidence.json:/opt/keycloak/data/import/realm-healthevidence.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+  backend:
+    environment:
+      ENVIRONMENT: pilot
+      AUTH_MODE: ${AUTH_MODE:-oidc}
+      OIDC_ISSUER: ${OIDC_ISSUER:-http://keycloak:8080/realms/healthevidence}
+      OIDC_JWKS_URL: ${OIDC_JWKS_URL:-http://keycloak:8080/realms/healthevidence/protocol/openid-connect/certs}
+      OIDC_AUDIENCE: healthevidence-api
+      OIDC_CLIENT_ID: healthevidence-api
+      OIDC_REQUIRED_ROLES: patient,senior_clinician,resident,staff,admin,reviewer
+      DATABASE_URL: postgresql+psycopg://healthevidence:healthevidence@postgres:5432/healthevidence
+    depends_on:
+      keycloak:
+        condition: service_started

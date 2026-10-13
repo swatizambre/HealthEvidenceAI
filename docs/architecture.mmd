@@ -1,0 +1,21 @@
+flowchart TD
+  UI["React UI"] --> API["FastAPI /api/v1"]
+  API --> OIDC["OIDC / JWT auth"]
+  API --> Orch["LangGraph orchestrator"]
+  Orch --> Pol["Policy Agent"]
+  Orch --> Clin["Clinical Evidence Agent"]
+  Orch --> Ver["Evidence Verifier"]
+  Orch --> Img["Imaging Agent A2A"]
+  Pol --> MCP["MCP client"]
+  Clin --> MCP
+  Ver --> MCP
+  Img --> MONAI["MONAI isolated imaging"]
+  MCP --> Tools["Healthcare MCP server"]
+  Tools --> Perm["Permission engine"]
+  Perm --> Dom["Domain services"]
+  Dom --> RAG["Hybrid RAG dense+lexical+RRF"]
+  Dom --> DB["PostgreSQL"]
+  Orch --> LLM["Live LLM openai|anthropic|ollama"]
+  Orch --> HITL["Human-in-the-loop"]
+  Orch --> Obs["Observability"]
+  Seed["Synthea / catalog seed"] --> DB

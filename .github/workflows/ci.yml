@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.26"
+      - name: Sync environment
+        run: uv sync --all-extras --frozen
+      - name: Lint
+        run: uv run ruff check .
+      - name: Type check
+        run: uv run mypy .
+      - name: Test
+        run: uv run pytest -q
+      - name: Coverage
+        run: |
+          uv run coverage run -m pytest -q
+          uv run coverage report --fail-under=80
+
+  pilot-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: healthevidence
+          POSTGRES_PASSWORD: healthevidence
+          POSTGRES_DB: healthevidence
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U healthevidence -d healthevidence"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://healthevidence:healthevidence@localhost:5432/healthevidence
+      PILOT_POSTGRES_TEST: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.26"
+      - name: Sync environment
+        run: uv sync --all-extras --frozen
+      - name: Pilot PostgreSQL tests
+        run: uv run pytest tests/pilot -v --tb=short
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install and build
+        run: |
+          npm ci
+          npm run build
+
+  e2e-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.26"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Sync Python
+        run: uv sync --all-extras --frozen
+      - name: Install frontend + Playwright
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Desk smoke
+        working-directory: frontend
+        env:
+          CI: "1"
+          ENVIRONMENT: local
+          AUTH_MODE: dev-jwt
+          LLM_PROVIDER: local
+          SEED_ON_STARTUP: "true"
+        run: npm run e2e:smoke

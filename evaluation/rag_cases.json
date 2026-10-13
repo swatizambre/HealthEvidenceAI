@@ -1,0 +1,22 @@
+{
+  "cases": [
+    {
+      "id": "rag-pass-demo-patient",
+      "query": "authorization evidence criteria laboratory medication",
+      "patient_id": "PAT-000001",
+      "expected_document_prefix": "DOC-",
+      "expected_chunk_prefix": "DOC-",
+      "expected_criterion": null,
+      "adversarial": false
+    },
+    {
+      "id": "rag-fail-empty-query-filter",
+      "query": "zzzznonexistenttokenxyz",
+      "patient_id": "PAT-000001",
+      "expected_document_prefix": null,
+      "expected_chunk_prefix": null,
+      "expected_criterion": null,
+      "adversarial": true
+    }
+  ]
+}

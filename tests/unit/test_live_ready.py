@@ -1,0 +1,115 @@
+"""Live-ready gates: shared env, seed ban, hospital simulate, PHI synthesize forbid."""
+
+from __future__ import annotations
+
+import pytest
+from app.core.config import Settings, get_settings
+from app.core.exceptions import AppError
+from fastapi.testclient import TestClient
+from tests.conftest import make_client
+
+
+def test_ready_exposes_live_surface(client: TestClient) -> None:
+    response = client.get("/ready")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["database"] == "ok"
+    assert "environment" in body
+    assert "hospital_mode" in body
+    assert "org_scope" in body
+    assert "phi_live" in body
+
+
+def test_shared_live_rejects_seed_on() -> None:
+    settings = Settings(
+        ENVIRONMENT="staging",
+        AUTH_MODE="oidc",
+        OIDC_ISSUER="https://idp.example/realms/he",
+        OIDC_JWKS_URL="https://idp.example/realms/he/protocol/openid-connect/certs",
+        DATABASE_URL="postgresql+psycopg://u:p@localhost/he",
+        LLM_PROVIDER="local",
+        SEED_ON_STARTUP="true",
+        ENFORCE_ORG_SCOPE="true",
+    )
+    with pytest.raises(AppError) as exc:
+        settings.validate_live_configuration()
+    assert exc.value.error_code == "LIVE_CONFIG_INVALID"
+    assert "SEED_ON_STARTUP" in exc.value.message
+
+
+def test_kubernetes_requires_oidc_like_production() -> None:
+    settings = Settings(
+        ENVIRONMENT="kubernetes",
+        AUTH_MODE="dev-jwt",
+        DATABASE_URL="postgresql+psycopg://u:p@localhost/he",
+        LLM_PROVIDER="local",
+        SEED_ON_STARTUP="false",
+        ENFORCE_ORG_SCOPE="true",
+    )
+    with pytest.raises(AppError) as exc:
+        settings.validate_live_configuration()
+    assert "oidc" in exc.value.message.lower()
+
+
+def test_shared_live_ok_when_hardened() -> None:
+    settings = Settings(
+        ENVIRONMENT="production",
+        AUTH_MODE="oidc",
+        OIDC_ISSUER="https://idp.example/realms/he",
+        OIDC_JWKS_URL="https://idp.example/realms/he/protocol/openid-connect/certs",
+        DATABASE_URL="postgresql+psycopg://u:p@localhost/he",
+        LLM_PROVIDER="local",
+        SEED_ON_STARTUP="false",
+        ENFORCE_ORG_SCOPE="true",
+        ALLOW_PHI="false",
+        HOSPITAL_ALLOW_SIMULATE="false",
+    )
+    settings.validate_live_configuration()
+    assert settings.is_shared_live_env()
+    assert settings.hospital_practice_mode()
+    assert not settings.hospital_simulate_allowed()
+    assert settings.org_scope_enforced()
+
+
+def test_hospital_simulate_disabled_on_live_desk(monkeypatch) -> None:
+    with make_client(
+        monkeypatch,
+        AUTH_MODE="dev-jwt",
+        ENVIRONMENT="local",
+        HOSPITAL_ALLOW_SIMULATE="false",
+    ) as client:
+        get_settings.cache_clear()
+        token = client.post(
+            "/api/v1/auth/dev-token",
+            json={"subject": "sim-off", "roles": ["staff", "resident"]},
+        ).json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        status = client.get("/api/v1/hospital/pipeline/status", headers=headers)
+        assert status.status_code == 200
+        assert status.json()["simulate_allowed"] is False
+
+        blocked = client.post(
+            "/api/v1/hospital/pipeline/simulate",
+            headers=headers,
+            json={"patient_id": "PAT-000001", "policy_id": "POL-000001"},
+        )
+        assert blocked.status_code == 403
+        assert blocked.json()["error_code"] == "HOSPITAL_SIMULATE_DISABLED"
+
+
+def test_desk_catalog_requires_auth_when_jwt_on(monkeypatch) -> None:
+    with make_client(monkeypatch, AUTH_MODE="dev-jwt", ENVIRONMENT="local") as client:
+        get_settings.cache_clear()
+        anon = client.get("/api/v1/specialties")
+        assert anon.status_code == 401
+        token = client.post(
+            "/api/v1/auth/dev-token",
+            json={"subject": "desk-staff", "roles": ["staff"]},
+        ).json()["access_token"]
+        ok = client.get(
+            "/api/v1/specialties",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert ok.status_code == 200
+        assert len(ok.json()["specialties"]) >= 8
