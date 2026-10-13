@@ -37,6 +37,47 @@ def record_audit(
     return event
 
 
+def record_audit_durable(
+    session: Session | None,
+    *,
+    action: str,
+    actor: str,
+    resource_type: str,
+    resource_id: str,
+    status: str,
+    detail: str = "",
+) -> AuditEvent | None:
+    """Commit an audit row on its own transaction so 403 rollbacks cannot erase it."""
+    if session is None:
+        return None
+    from sqlalchemy.orm import sessionmaker
+
+    factory = sessionmaker(
+        bind=session.get_bind(),
+        autoflush=False,
+        autocommit=False,
+        expire_on_commit=False,
+    )
+    audit_session = factory()
+    try:
+        event = record_audit(
+            audit_session,
+            action=action,
+            actor=actor,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            status=status,
+            detail=detail,
+        )
+        audit_session.commit()
+        return event
+    except Exception:  # noqa: BLE001 — never block the forbid path
+        audit_session.rollback()
+        return None
+    finally:
+        audit_session.close()
+
+
 def list_audit_events(
     session: Session,
     *,

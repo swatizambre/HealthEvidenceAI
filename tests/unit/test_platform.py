@@ -40,7 +40,10 @@ def test_monai_isolated_backend_without_package() -> None:
     assert result.human_review_required is True
     assert result.confidence == 0.0
     assert "diagnosis" in result.disclaimer.lower() or "Not for clinical use" in result.disclaimer
-    assert result.backend in {"monai", "monai-numpy-bridge"}
+    assert result.backend in {"monai-metadata-only", "metadata-only"}
+    joined = " ".join(result.observations).lower()
+    assert "no image" in joined or "dicom" in joined
+    assert "tensor" not in joined
 
 
 def test_dev_jwt_roundtrip() -> None:
@@ -93,7 +96,8 @@ def test_imaging_monai_mode_via_api(monkeypatch: pytest.MonkeyPatch) -> None:
         assert response.status_code == 200
         body = response.json()
         assert body["human_review_required"] is True
-        assert body["backend"] in {"monai", "monai-numpy-bridge"}
+        assert body["backend"] in {"monai-metadata-only", "metadata-only"}
+        assert not any("tensor" in str(item).lower() for item in body["observations"])
         observations = body["observations"]
         disclaimer = body["disclaimer"]
         assert (

@@ -342,8 +342,9 @@ def _find_patient_by_external(
         if patient is None:
             continue
         patient_org = getattr(patient, "org_id", None)
-        # Never merge Hospital A's MRN into Hospital B's chart.
-        if org_id and patient_org and patient_org != org_id:
+        # Only merge when the chart is already stamped to this org.
+        # Orphans (org_id null) and other-org charts must not share an MRN → patient ID.
+        if not org_id or patient_org != org_id:
             continue
         return patient
     return None

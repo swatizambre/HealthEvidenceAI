@@ -18,13 +18,29 @@ from app.services.rag.rerank import rerank
 from app.services.rag.types import ChunkRecord, RetrievalHit
 
 
-def load_corpus(session: Session) -> list[ChunkRecord]:
-    rows = session.execute(
+def load_corpus(
+    session: Session,
+    *,
+    patient_code: str | None = None,
+    policy_id: str | None = None,
+) -> list[ChunkRecord]:
+    """Load chunks for retrieval.
+
+    When patient_code / policy_id are set, restrict the SQL result set before any
+    ranking so other patients' text never enters dense/lexical fusion.
+    """
+    stmt = (
         select(DocumentChunk, Document, Patient, InsurancePolicy)
         .join(Document, DocumentChunk.document_id == Document.id)
         .outerjoin(Patient, Document.patient_id == Patient.id)
         .outerjoin(InsurancePolicy, InsurancePolicy.document_id == Document.id)
-    ).all()
+    )
+    if patient_code:
+        code = patient_code.strip().upper()
+        stmt = stmt.where(Patient.patient_code == code)
+    if policy_id:
+        stmt = stmt.where(InsurancePolicy.policy_code == policy_id.strip().upper())
+    rows = session.execute(stmt).all()
     corpus: list[ChunkRecord] = []
     for chunk, document, patient, policy in rows:
         corpus.append(
@@ -58,7 +74,10 @@ def hybrid_search(
     query_tokens = set(tokenize(query))
     if not query_tokens:
         return []
-    corpus = load_corpus(session)
+    # Scope the corpus first — never rank the full multi-patient store then filter.
+    corpus = load_corpus(session, patient_code=patient_code, policy_id=policy_id)
+    if not corpus:
+        return []
     filters = RetrievalFilters(
         patient_id=patient_code,
         document_type=document_type,
