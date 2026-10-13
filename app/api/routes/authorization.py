@@ -24,7 +24,7 @@ from app.auth.rbac import (
 )
 from app.core.exceptions import AppError, NotFoundError
 from app.core.safety import DISCLAIMER
-from app.db.repository import get_case_by_code
+from app.db.repository import get_case_by_code, get_patient_by_code
 from app.schemas.api import (
     AuditEventListResponse,
     AuditEventOut,
@@ -46,6 +46,14 @@ from app.services.realtime import publish_desk_event
 from app.services.records import list_authorization_cases
 
 router = APIRouter(prefix="/authorization", tags=["authorization"])
+
+
+def _patient_org_id(db: Session, patient_code: str | None) -> str | None:
+    """Org of the chart behind a desk event, so SSE fan-out stays tenant-scoped."""
+    if not patient_code:
+        return None
+    patient = get_patient_by_code(db, patient_code)
+    return getattr(patient, "org_id", None) if patient is not None else None
 
 
 @router.get("/cases", response_model=AuthorizationCaseListResponse)
@@ -80,6 +88,7 @@ def prepare_packet(
     )
     publish_desk_event(
         "evidence_pack_prepare",
+        org_id=_patient_org_id(db, result.patient_id),
         case_id=result.case_id,
         patient_id=result.patient_id,
         actor=str(actor),
@@ -154,6 +163,7 @@ def resume_case(
         )
         publish_desk_event(
             "evidence_pack_review",
+            org_id=_patient_org_id(db, patient_id or None),
             case_id=case_id,
             patient_id=patient_id or None,
             actor=str(actor),
@@ -214,6 +224,7 @@ def assign_case(
     )
     publish_desk_event(
         "case_assign",
+        org_id=getattr(patient, "org_id", None) if patient is not None else None,
         case_id=case.case_code,
         patient_id=str(patient_code) if patient_code else None,
         actor=actor,

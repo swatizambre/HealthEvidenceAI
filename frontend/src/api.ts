@@ -244,13 +244,32 @@ export function clearAuthToken(): void {
   tokenPromise = null;
 }
 
-/** Current bearer for SSE EventSource (query param) — mint if needed. */
+/** Current bearer for the signed-in desk — mint if needed. */
 export async function getAccessToken(): Promise<string | null> {
   try {
     return await ensureDevToken();
   } catch {
     return cachedToken;
   }
+}
+
+/**
+ * Short-lived (~60 s), single-use SSE ticket. EventSource cannot send an
+ * Authorization header, so the bearer token never goes into the stream URL.
+ * Returns null when auth is off (the stream then needs no credential).
+ */
+export async function getStreamTicket(): Promise<string | null> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token = await getAccessToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  const response = await fetch("/api/v1/events/stream-ticket", { method: "POST", headers });
+  if (!response.ok) {
+    throw new Error(`Stream ticket request failed (${response.status})`);
+  }
+  const body = (await response.json()) as { ticket?: string };
+  return typeof body.ticket === "string" && body.ticket ? body.ticket : null;
 }
 
 async function ensureDevToken(): Promise<string | null> {

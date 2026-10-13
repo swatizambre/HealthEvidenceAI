@@ -108,6 +108,7 @@ def test_shared_live_ok_when_hardened() -> None:
         ENFORCE_ORG_SCOPE="true",
         ALLOW_PHI="false",
         HOSPITAL_ALLOW_SIMULATE="false",
+        STREAM_TICKET_SECRET="prod-stream-ticket-secret-at-least-32-chars",
     )
     settings.validate_live_configuration()
     assert settings.is_shared_live_env()

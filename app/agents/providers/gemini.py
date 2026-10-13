@@ -117,8 +117,12 @@ class GeminiProvider:
         try:
             response = httpx.post(
                 url,
-                params={"key": self._settings.gemini_api_key},
-                headers={"Content-Type": "application/json"},
+                # API key travels in a header (never the URL) so proxies/access logs
+                # and httpx exception messages cannot capture it.
+                headers={
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": self._settings.gemini_api_key,
+                },
                 json={
                     "contents": [{"role": "user", "parts": [{"text": prompt}]}],
                     "generationConfig": {"temperature": 0},

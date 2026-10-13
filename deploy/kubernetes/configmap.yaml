@@ -23,4 +23,11 @@ data:
   ENABLE_TRACING: "true"
   DEFAULT_LOCALE: "en"
   SUPPORTED_LOCALES: "en,es,fr,de,pt,hi,ar,zh,ja"
+  # In-process limiter is per pod: effective ceiling = limit x replicas.
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_AUTH_PER_MINUTE: "20"
+  RATE_LIMIT_INGEST_PER_MINUTE: "120"
+  RATE_LIMIT_SEARCH_PER_MINUTE: "120"
+  # Ingress appends the client IP to X-Forwarded-For; trust it for anonymous keys.
+  RATE_LIMIT_TRUST_PROXY_HEADERS: "true"
   CORS_ORIGINS: "https://healthevidence.example.com"

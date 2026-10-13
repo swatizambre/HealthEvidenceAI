@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.a2a.handlers import register_default_handlers
 from app.api.errors import register_exception_handlers
 from app.api.middleware import AccessLogMiddleware
+from app.api.rate_limit import RateLimitMiddleware
 from app.api.routes import (
     a2a,
     ai,
@@ -102,6 +103,9 @@ def create_app() -> FastAPI:
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = session_factory
+    # Starlette runs the last-added middleware first: CORS → Auth → AccessLog → RateLimit.
+    # Rate limiting sits inside Auth so per-principal groups can key on the subject.
+    app.add_middleware(RateLimitMiddleware, settings=settings)
     app.add_middleware(AccessLogMiddleware)
     app.add_middleware(AuthMiddleware, settings=settings)
     app.add_middleware(

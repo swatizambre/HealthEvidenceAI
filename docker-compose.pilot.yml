@@ -7,3 +7,6 @@ services:
       ENVIRONMENT: pilot
       AUTH_MODE: ${AUTH_MODE:-oidc}
       DATABASE_URL: postgresql+psycopg://healthevidence:healthevidence@postgres:5432/healthevidence
+      # Required for ENVIRONMENT=pilot (>= 32 chars): export STREAM_TICKET_SECRET=$(openssl rand -hex 32)
+      STREAM_TICKET_SECRET: ${STREAM_TICKET_SECRET:-}
+      HOSPITAL_INTERFACE_KEYS: ${HOSPITAL_INTERFACE_KEYS:-}
