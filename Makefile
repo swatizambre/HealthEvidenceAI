@@ -1,4 +1,4 @@
-.PHONY: setup sync seed demo test coverage lint typecheck frontend launch launch-check eval-rag eval-agent mcp-server pilot-up pilot-oidc-up pilot-gate demo-up demo-gate quality-gate e2e-smoke
+.PHONY: setup sync seed demo test coverage lint typecheck frontend launch launch-check eval-rag eval-agent eval-gold mcp-server pilot-up pilot-oidc-up pilot-gate demo-up demo-gate quality-gate e2e-smoke
 
 setup: sync
 	uv run python -m app.cli.seed
@@ -34,6 +34,9 @@ eval-rag:
 
 eval-agent:
 	uv run python -m evaluation.run_agent
+
+eval-gold:
+	uv run python -m evaluation.run_gold --path rules
 
 mcp-server:
 	uv run python -m app.mcp.server
@@ -84,5 +87,6 @@ quality-gate:
 	uv run mypy .
 	uv run coverage run -m pytest -q
 	uv run coverage report --fail-under=80
+	uv run python -m evaluation.run_gold --path rules
 	cd frontend && npm run build
 	@echo "Quality gate OK (start API then make demo-gate for live API)"

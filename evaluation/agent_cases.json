@@ -6,7 +6,7 @@
       "policy_id": "POL-000001",
       "case_id": "PA-000001",
       "expect_statuses": {"SUPPORTED": 5},
-      "expect_human_review": false,
+      "expect_awaiting_human_review": true,
       "adversarial": false
     },
     {
