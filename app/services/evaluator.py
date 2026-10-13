@@ -405,14 +405,20 @@ def _cite_text(
 ) -> EvidenceItem | None:
     if not chunks or not document_id:
         return None
-    snippet = _snippet(content, phrase)
+    # Cite the affirmed mention, not an earlier negated/hedged one ("No X ... has X").
+    snippet = _snippet(content, phrase, _affirmed_index(content, phrase))
     if not snippet:
         return None
     chunk_id = ""
     for code, chunk_content in chunks:
-        if snippet in chunk_content or phrase.lower() in chunk_content.lower():
+        if snippet in chunk_content and _affirmed_index(chunk_content, phrase) is not None:
             chunk_id = code
             break
+    if not chunk_id:
+        for code, chunk_content in chunks:
+            if snippet in chunk_content or phrase.lower() in chunk_content.lower():
+                chunk_id = code
+                break
     if not chunk_id:
         return None
     return EvidenceItem(
@@ -433,18 +439,26 @@ def find_affirmed_phrase(text: str, phrases: list[str]) -> str | None:
 
 
 def _find_phrase(text: str, phrases: list[str]) -> str | None:
-    lowered = text.lower()
     for phrase in phrases:
-        needle = phrase.lower()
-        start = 0
-        while True:
-            index = lowered.find(needle, start)
-            if index < 0:
-                break
-            if not _is_negated(lowered, index, len(needle)):
-                return phrase
-            start = index + len(needle)
+        if _affirmed_index(text, phrase) is not None:
+            return phrase
     return None
+
+
+def _affirmed_index(text: str, phrase: str) -> int | None:
+    """Index of the first occurrence of ``phrase`` that is not negated/hedged/familial."""
+    lowered = text.lower()
+    needle = phrase.lower()
+    if not needle:
+        return None
+    start = 0
+    while True:
+        index = lowered.find(needle, start)
+        if index < 0:
+            return None
+        if not _is_negated(lowered, index, len(needle)):
+            return index
+        start = index + len(needle)
 
 
 def _clause_span(text: str, match_index: int) -> tuple[int, int]:
@@ -606,9 +620,8 @@ def _compare_lab(measured: float, comparator: str, threshold: float) -> bool:
     return False
 
 
-def _snippet(text: str, phrase: str) -> str:
-    lowered = text.lower()
-    index = lowered.find(phrase.lower())
+def _snippet(text: str, phrase: str, at: int | None = None) -> str:
+    index = at if at is not None else text.lower().find(phrase.lower())
     if index < 0:
         return text.strip()[:240]
     line_start = text.rfind("\n", 0, index) + 1
