@@ -33,6 +33,8 @@ _NEGATION_PREFIX = re.compile(
     r"\bfamily\s+history\s+of\b|\bfamily\s+hx\s+of\b|\bfh(?:x)?\s+of\b|"
     r"\brule\s+out\b|\br/o\b|\br\.o\.\b|"
     r"\bpossible\b|\bprobable\b|\bsuspected\b|\bquestionable\b|\bquery\b|"
+    r"\bunlikely\b|\bdoubtful\b|"
+    r"\bevaluate\s+for\b|\bevaluation\s+for\b|\bscreen(?:ing)?\s+for\b|"
     r"\bno\s+history\s+of\b|\bno\s+known\b|\bnegative\s+for\b|\bruled\s+out\b|"
     r"\babsence\s+of\b|\bfree\s+of\b|\bdenies\b|\bdenied\b|\bwithout\b|\bnever\b|"
     r"\bno\b|\bnot\b"
@@ -46,6 +48,35 @@ _TRAILING_NONE = re.compile(
     r"(?:none|nil|negative|absent|denies|denied|"
     r"ruled\s+out|was\s+ruled\s+out|excluded|was\s+excluded)\b"
     r")",
+    re.I,
+)
+# Hedges that directly follow the phrase: "Diabetes unlikely", "Diabetes (?)",
+# "Diabetes - not confirmed", "Diabetes to be ruled out".
+_TRAILING_HEDGE = re.compile(
+    r"^\s*(?:[,:(\-–—]\s*)*(?:is\s+|was\s+|remains\s+)?(?:"
+    r"\?|"
+    r"(?:unlikely|doubtful|questionable|uncertain|unconfirmed|"
+    r"not\s+(?:confirmed|established|likely)|"
+    r"to\s+be\s+(?:ruled\s+out|excluded|confirmed))\b"
+    r")",
+    re.I,
+)
+# A "?" directly before the phrase: "?diabetes", "? diabetes".
+_LEADING_QUERY = re.compile(r"(?:^|\s|[(:])\?\s?$")
+# Someone other than the patient is the experiencer (family history).
+_RELATIVE = (
+    r"(?:mother|mom|father|dad|sister|brother|siblings?|aunt|uncle|cousin|son|daughter|"
+    r"grandmother|grandfather|grandparents?|parents?|"
+    r"family(?!\s+(?:physician|doctor|medicine|practice|practitioner|planning|meeting)))"
+)
+_EXPERIENCER_BEFORE = re.compile(
+    rf"\b{_RELATIVE}(?:'s)?\b|\bfhx\b|\bfh\s*:|\bfamily\s+hx\b", re.I
+)
+# Mentioning the patient again resets the experiencer ("Mother reports patient has ...").
+_PATIENT_SUBJECT = re.compile(r"\b(?:patient|pt)\b", re.I)
+# "diabetes in mother", "diabetes (father)", "h/o diabetes in family".
+_EXPERIENCER_AFTER = re.compile(
+    rf"^\s*(?:[(:\-–—]\s*)?(?:in\s+(?:(?:his|her|their|the|patient's)\s+)?)?{_RELATIVE}\b",
     re.I,
 )
 _CLAUSE_BREAK = re.compile(r"[.;\n]|,\s*but\b|\bbut\b|\bhowever\b|\balthough\b", re.I)
@@ -392,6 +423,15 @@ def _cite_text(
     )
 
 
+def find_affirmed_phrase(text: str, phrases: list[str]) -> str | None:
+    """Return the first phrase affirmed about the patient in ``text``, else None.
+
+    A mention that is negated, hedged, or about a family member does not count.
+    Public so citation verification reuses the exact assertion logic of the rules path.
+    """
+    return _find_phrase(text, phrases)
+
+
 def _find_phrase(text: str, phrases: list[str]) -> str | None:
     lowered = text.lower()
     for phrase in phrases:
@@ -422,22 +462,42 @@ def _clause_span(text: str, match_index: int) -> tuple[int, int]:
 
 
 def _is_negated(lowered: str, match_index: int, match_len: int) -> bool:
-    """Negation applies only within the same clause / nearby window."""
+    """True when the mention is not an affirmed finding about the patient.
+
+    Covers negation, hedging/uncertainty, and family-history experiencers. Every check
+    is scoped to the clause that contains the mention so cues in neighbouring
+    sentences ("Diabetes. No history of hypertension.") do not leak across.
+    """
     clause_start, clause_end = _clause_span(lowered, match_index)
-    before = lowered[clause_start:match_index]
+    clause_before = lowered[clause_start:match_index]
     after = lowered[match_index + match_len : clause_end]
+    return (
+        _negated_or_hedged(clause_before, after)
+        or _other_experiencer(clause_before, after)
+    )
+
+
+def _negated_or_hedged(clause_before: str, after: str) -> bool:
     # Keep only the last ~40 chars before the phrase inside the clause.
-    before = before[-40:]
-    if _NEGATION_PREFIX.search(before):
-        # Ensure no clause-breaking word sits between the cue and the phrase.
-        last = None
-        for match in _NEGATION_PREFIX.finditer(before):
-            last = match
-        if last is not None and not _CLAUSE_BREAK.search(before[last.end() :]):
-            return True
-    if _TRAILING_NONE.match(after):
+    before = clause_before[-40:]
+    last = None
+    for match in _NEGATION_PREFIX.finditer(before):
+        last = match
+    # Ensure no clause-breaking word sits between the cue and the phrase.
+    if last is not None and not _CLAUSE_BREAK.search(before[last.end() :]):
         return True
-    return False
+    if _LEADING_QUERY.search(before):
+        return True
+    return bool(_TRAILING_NONE.match(after) or _TRAILING_HEDGE.match(after))
+
+
+def _other_experiencer(clause_before: str, after: str) -> bool:
+    last = None
+    for match in _EXPERIENCER_BEFORE.finditer(clause_before):
+        last = match
+    if last is not None and not _PATIENT_SUBJECT.search(clause_before[last.end() :]):
+        return True
+    return bool(_EXPERIENCER_AFTER.match(after))
 
 
 def _optional_float(raw: Any) -> float | None:

@@ -368,6 +368,70 @@ def test_negation_is_clause_scoped() -> None:
     assert mixed.status == "MISSING"
 
 
+_DM_CRITERION = CriterionInput(
+    code="CRIT-DM",
+    description="Diabetes is documented.",
+    rule={
+        "type": "keyword",
+        "required_any": ["diabetes"],
+        "negation_any": [],
+        "missing_label": "Diabetes documentation",
+    },
+)
+
+
+def test_family_member_and_hedged_mentions_are_not_patient_evidence() -> None:
+    cases = [
+        # Experiencer is a relative, not the patient.
+        "Mother has diabetes.",
+        "FHx: diabetes (father).",
+        "FH: diabetes",
+        "Father with diabetes",
+        "Sister diagnosed with diabetes",
+        "Grandmother had diabetes.",
+        "Diabetes in mother",
+        "h/o diabetes in family",
+        # Hedged / unconfirmed.
+        "Diabetes unlikely given normal HbA1c.",
+        "Diabetes (?) - to evaluate.",
+        "Diabetes not confirmed",
+        "Diabetes doubtful.",
+        "Diabetes to be ruled out.",
+        "?diabetes",
+        "Evaluate for diabetes.",
+    ]
+    for text in cases:
+        result = evaluate_criterion(_DM_CRITERION, [_note(text)], [])
+        assert result.status == "MISSING", text
+        assert result.evidence == [], text
+
+
+def test_assertion_cues_do_not_over_negate_real_positives() -> None:
+    cases = [
+        "Known diabetes on metformin.",
+        "Type 2 diabetes, no complications.",
+        "Diabetes. No history of hypertension.",
+        "Diabetes confirmed, HbA1c 8.1%; no neuropathy.",
+        "Patient's diabetes is well controlled; mother has hypertension.",
+        "Diabetes since 2015",
+        "Mother reports patient has diabetes.",
+        "Family physician documents diabetes on metformin.",
+    ]
+    for text in cases:
+        result = evaluate_criterion(_DM_CRITERION, [_note(text)], [])
+        assert result.status == "SUPPORTED", text
+        assert result.evidence, text
+        assert "diabetes" in result.evidence[0].text_reference.lower()
+
+
+def test_find_affirmed_phrase_is_public_alias() -> None:
+    from app.services.evaluator import find_affirmed_phrase
+
+    assert find_affirmed_phrase("Known diabetes on metformin.", ["diabetes"]) == "diabetes"
+    assert find_affirmed_phrase("Mother has diabetes.", ["diabetes"]) is None
+    assert find_affirmed_phrase("", ["diabetes"]) is None
+
+
 def test_unknown_rule_cannot_be_evaluated() -> None:
     result = evaluate_criterion(
         CriterionInput(code="CRIT-X", description="Mystery", rule={"type": "free_text"}),
