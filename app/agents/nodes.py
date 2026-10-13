@@ -416,35 +416,61 @@ def evaluate_criteria_node(
 
 
 def verify_evidence(state: dict[str, Any], session: Session, settings: Settings) -> dict[str, Any]:
-    del session, settings
+    """Check that every SUPPORTED item cites stored text that affirms the criterion.
+
+    Lexical stand-in for entailment: see app/services/citation_check.py.
+    """
+    del settings
+    from app.services.citation_check import (
+        DOWNGRADE_REASON,
+        chunk_texts_from_hits,
+        cited_chunk_ids,
+        load_chunk_texts,
+        verify_citations,
+    )
+
     with span_timer(
         trace_id=state["trace_id"],
         run_id=state["run_id"],
         agent="EvidenceVerificationAgent",
         node="verify_evidence",
     ):
-        results = list(state.get("criterion_results") or [])
+        results = [dict(item) for item in state.get("criterion_results") or []]
         errors: list[str] = []
-        known_chunks = {str(item.get("chunk_id")) for item in state.get("evidence") or []}
         for item in results:
-            if item["status"] == "SUPPORTED":
-                if not item.get("evidence"):
-                    item["status"] = "UNKNOWN"
-                    item["reason"] = "Verification rejected a supported claim without citations."
-                    errors.append(f"hallucinated_or_uncited:{item['criterion_id']}")
-                for ev in item.get("evidence") or []:
-                    # Citations must reference real chunk ids when retrieval ran.
-                    if known_chunks and ev.get("chunk_id") and ev["chunk_id"] not in known_chunks:
-                        # Evaluator citations come from notes/labs; allow non-retrieval chunk codes.
-                        pass
+            if item["status"] == "SUPPORTED" and not item.get("evidence"):
+                item["status"] = "UNKNOWN"
+                item["reason"] = "Verification rejected a supported claim without citations."
+                errors.append(f"hallucinated_or_uncited:{item['criterion_id']}")
+
+        # Resolve cited chunk ids to stored text: retrieved hits first, then the DB
+        # (patient-scoped) for evaluator citations that came straight from notes/labs.
+        chunks = chunk_texts_from_hits(state.get("evidence") or [])
+        unresolved = cited_chunk_ids(results) - set(chunks)
+        if unresolved:
+            patient = require_patient(session, state["patient_id"])
+            chunks.update(load_chunk_texts(session, unresolved, patient_pk=patient.id))
+
+        check = verify_citations(results, state.get("criteria") or [], chunks)
+        results = check.criterion_results
+        errors.extend(f"citation_unsupported:{cid}" for cid in check.downgraded)
         needs_review = bool(state.get("human_review_required")) or bool(errors)
-        return {
+        update: dict[str, Any] = {
             "criterion_results": results,
+            "citations": _citation_dicts(results),
+            "citation_check_notes": check.notes,
             "human_review_required": needs_review,
             "errors": errors,
             "status": "verify_evidence",
-            "agent_trace": [_trace("EvidenceVerificationAgent", "verify_evidence")],
+            "agent_trace": [
+                _trace("EvidenceVerificationAgent", "verify_evidence", check.summary())
+            ],
         }
+        if check.downgraded:
+            # critic_reflect merges citation_check_notes into critic_notes.
+            update["human_review_reason"] = DOWNGRADE_REASON
+            update["evidence_coverage"] = _coverage_from_results(results)
+        return update
 
 
 def check_contradictions(
@@ -544,9 +570,11 @@ def critic_reflect_node(
         needs = bool(state.get("human_review_required")) or bool(
             outcome.get("human_review_required_boost")
         )
+        # Keep this pass's citation-verification notes alongside the critic's own.
+        citation_notes = [str(note) for note in state.get("citation_check_notes") or []]
         return {
             "criterion_results": outcome["criterion_results"],
-            "critic_notes": outcome["critic_notes"],
+            "critic_notes": [*citation_notes, *outcome["critic_notes"]],
             "critic_summary": outcome["critic_summary"],
             "human_review_required": needs,
             "status": "critic_reflect",
@@ -801,6 +829,40 @@ def _criterion_dict(item: Evaluation) -> dict[str, Any]:
         "contradiction": item.contradiction,
         "missing_label": item.missing_label,
     }
+
+
+def _coverage_from_results(results: list[dict[str, Any]]) -> str:
+    """Same rule as safety_net.evidence_coverage, over criterion-result dicts."""
+    if not results or not any(item.get("evidence") for item in results):
+        return "NONE"
+    if all(item.get("status") == "SUPPORTED" and item.get("evidence") for item in results):
+        return "COMPLETE"
+    return "AVAILABLE"
+
+
+def _citation_dicts(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Deduplicated citations from criterion-result dicts (after verification)."""
+    citations: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for item in results:
+        for entry in item.get("evidence") or []:
+            key = (
+                str(entry.get("document_id") or ""),
+                str(entry.get("chunk_id") or ""),
+                str(entry.get("text_reference") or ""),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            citations.append(
+                {
+                    "document_id": key[0],
+                    "chunk_id": key[1],
+                    "source": entry.get("source") or "",
+                    "text_reference": key[2],
+                }
+            )
+    return citations
 
 
 def _citations(items: list[Evaluation]) -> list[dict[str, Any]]:

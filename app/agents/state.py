@@ -29,6 +29,8 @@ class ReviewState(TypedDict, total=False):
     a2a_correlation_id: str
     scoring_path: str
     critic_notes: list[str]
+    # Notes from the latest verify_evidence pass (merged into critic_notes by the critic).
+    citation_check_notes: list[str]
     critic_summary: str
     documentation_pathway: list[dict[str, Any]]
     pathway_summary: str
