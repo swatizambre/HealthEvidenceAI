@@ -51,10 +51,10 @@ def create_opd_ingest(
     elif scoped and not payload.patient_id:
         payload = payload.model_copy(update={"patient_id": scoped})
     org_id = _ingest_org_id(request, db)
-    result = ingest_opd_packet(db, payload, org_id=org_id)
-    response.status_code = status.HTTP_201_CREATED if result.created else status.HTTP_200_OK
     principal = get_principal(request)
     actor = getattr(principal, "subject", None) if principal else "care-team"
+    result = ingest_opd_packet(db, payload, org_id=org_id, actor=str(actor or "care-team"))
+    response.status_code = status.HTTP_201_CREATED if result.created else status.HTTP_200_OK
     publish_desk_event(
         "visit_note_saved",
         org_id=org_id,
@@ -80,9 +80,9 @@ def create_opd_ingest_fhir(
     if scoped:
         mapped = mapped.model_copy(update={"patient_id": scoped})
     org_id = _ingest_org_id(request, db)
-    result = ingest_opd_packet(db, mapped, org_id=org_id)
-    response.status_code = status.HTTP_201_CREATED if result.created else status.HTTP_200_OK
     actor = getattr(get_principal(request), "subject", None) if get_principal(request) else "care-team"
+    result = ingest_opd_packet(db, mapped, org_id=org_id, actor=str(actor or "care-team"))
+    response.status_code = status.HTTP_201_CREATED if result.created else status.HTTP_200_OK
     publish_desk_event(
         "visit_note_saved",
         org_id=org_id,

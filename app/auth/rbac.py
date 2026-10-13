@@ -25,6 +25,10 @@ ROLES_CHART_WRITE = (ROLE_PATIENT, ROLE_STAFF, ROLE_RESIDENT, ROLE_SENIOR)
 ROLES_PACKET_PREP = (ROLE_STAFF, ROLE_RESIDENT, ROLE_SENIOR)
 ROLES_EVIDENCE_CHECK = (ROLE_STAFF, ROLE_RESIDENT, ROLE_SENIOR)
 ROLES_HITL = (ROLE_SENIOR,)
+# Recording consent is a care-team desk act (patients withdraw, they do not self-record).
+ROLES_CONSENT_RECORD = (ROLE_STAFF, ROLE_RESIDENT, ROLE_SENIOR)
+# Facility privacy / grievance desk (admin always passes has_any_role).
+ROLES_PRIVACY_DESK = (ROLE_STAFF, ROLE_ADMIN)
 
 _ALIASES: dict[str, str] = {
     "patient": ROLE_PATIENT,

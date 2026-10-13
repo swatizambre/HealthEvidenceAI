@@ -19,6 +19,8 @@ Cross-patient reads by a patient role return `403 PATIENT_SCOPE_FORBIDDEN`. Char
 3. **Directory lock** — Patient list returns only self; worklist / cases / ops metrics are care-team only.
 4. **UI hard stops** — Patient cannot open `/patients` directory, other chart URLs, or pick another MRN on Visit note.
 5. **PHI gate** — Live non-synthetic ingest still requires `ALLOW_PHI` + `PHI_PROGRAM_ATTESTED` (see clinical roadmap).
+6. **Stored consent** — Every OPD/FHIR ingest is linked to a `ConsentRecord` (`CNS-######`). In PHI mode an active consent for the patient + purpose is mandatory (`403 CONSENT_REQUIRED`); withdrawal blocks further ingest. See [CONSENT_AND_RIGHTS.md](CONSENT_AND_RIGHTS.md).
+7. **Patient rights self-service** — Access log (who opened my record), JSON export, and correction / erasure / grievance / nominee requests with an org-scoped privacy desk. Staff personal identifiers are masked in patient views.
 
 ## Legal / compliance aspects (program outside pure code)
 
@@ -27,7 +29,8 @@ Cross-patient reads by a patient role return `403 PATIENT_SCOPE_FORBIDDEN`. Char
 | **Confidentiality** | Treat charts as confidential health information; access only for care / PA documentation readiness / patient self-access |
 | **Minimum necessary** | Care-team open chart is acceptable for this demo desk; production should add panel, encounter, or facility assignment |
 | **Right of access** | Patient sees *own* lifelong record; not other patients |
-| **Consent / purpose** | Visit notes require consent attestation; synthetic default until PHI program attested |
+| **Consent / purpose** | Stored, purpose-specific consent records (notice version, method, signer, expiry, withdrawal); PHI ingest requires an active consent; practice mode records a `synthetic-practice` consent |
+| **Data-subject rights** | Access log, export, correction / erasure / grievance / nominee requests; erasure is a documented workflow because medical-record retention law applies |
 | **Auditability** | Retain access and denial logs for investigations and accountability |
 | **Breach readiness** | Encryption in transit (TLS), at rest (DB/volume), IdP SSO, retention & delete-on-request policies |
 | **Cross-border** | `DATA_RESIDENCY_REGION` + org contracts before multi-country PHI |
@@ -39,7 +42,11 @@ Cross-patient reads by a patient role return `403 PATIENT_SCOPE_FORBIDDEN`. Char
 - [ ] TLS everywhere; secrets out of repo; PostgreSQL; `AUTH_MODE=oidc`
 - [ ] Care-team scoped by facility / panel (narrow beyond “any staff sees any chart”)
 - [ ] BAA / DPA with processors; workforce training; break-glass with extra audit
-- [ ] Retention, export, and erasure workflows
+- [x] Stored consent records with purpose, notice version, withdrawal; consent enforced on PHI ingest
+- [x] Patient access log (accounting of access), self-service export, and rights-request workflow
+- [x] Erasure as a documented request workflow (no hard delete; legal-hold outcome recorded)
+- [ ] Retention scheduler for deletion after legal hold expires; facility retention policy sign-off
+- [ ] Consent-manager / ABDM consent-artefact integration; notice-version registry
 - [ ] Independent security assessment
 
 ## Demo caveat

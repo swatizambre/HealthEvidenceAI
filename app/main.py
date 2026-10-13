@@ -31,6 +31,7 @@ from app.api.routes import (
     opd,
     patients,
     policies,
+    privacy,
     security,
     tools,
 )
@@ -135,6 +136,7 @@ def create_app() -> FastAPI:
         ai.router,
         meta.router,
         opd.router,
+        privacy.router,
         help.router,
     )
     for router in api_routers:

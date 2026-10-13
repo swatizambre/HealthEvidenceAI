@@ -23,6 +23,7 @@ from app.db.repository import (
 from app.models import (
     AuthorizationCase,
     ClinicalNote,
+    ConsentRecord,
     Document,
     LabResult,
     Medication,
@@ -31,6 +32,13 @@ from app.models import (
 )
 from app.schemas.api import OpdIngestRequest, OpdIngestResponse
 from app.services.audit import record_audit
+from app.services.consent import (
+    INGEST_PURPOSES,
+    consent_required_error,
+    ensure_practice_consent,
+    record_consent,
+    require_ingest_consent,
+)
 from app.services.embeddings import EMBEDDING_METHOD
 from app.services.indexing import index_document
 from app.services.organizations import ensure_default_organization
@@ -43,8 +51,14 @@ def ingest_opd_packet(
     payload: OpdIngestRequest,
     *,
     org_id: str | None = None,
+    actor: str | None = None,
 ) -> OpdIngestResponse:
-    """Ingest one outpatient packet for a single patient."""
+    """Ingest one outpatient packet for a single patient.
+
+    Consent: PHI mode requires a stored, active consent (``consent_id``) or, for a chart
+    created by this ingest, an inline ``consent`` stored in the same transaction.
+    Practice mode keeps the checkbox but still writes a ConsentRecord for the trail.
+    """
     from app.core.config import get_settings
 
     settings = get_settings()
@@ -73,11 +87,24 @@ def ingest_opd_packet(
             "Send real consented encounter payloads with synthetic=false.",
             400,
         )
-    if not payload.consent_attested:
+    phi_mode = not settings.hospital_practice_mode()
+    has_consent_ref = bool(payload.consent_id or payload.consent is not None)
+    if phi_mode and not has_consent_ref:
+        raise consent_required_error(
+            "PHI mode: reference an active consent (consent_id) for this patient with purpose "
+            "prior_auth_evidence or continuity_of_care, or include an inline consent when "
+            "registering a new patient."
+        )
+    if not phi_mode and not payload.consent_attested and not has_consent_ref:
         raise AppError(
             "OPD_CONSENT_REQUIRED",
             "consent_attested must be true before an OPD packet is stored.",
             400,
+        )
+    if payload.consent is not None and payload.consent.purpose not in INGEST_PURPOSES:
+        raise consent_required_error(
+            f"Inline consent purpose '{payload.consent.purpose}' does not cover storing visit "
+            "records. Use prior_auth_evidence or continuity_of_care."
         )
 
     existing = _find_encounter(session, payload.encounter_id, org_id=org_id)
@@ -88,7 +115,16 @@ def ingest_opd_packet(
     if now.tzinfo is None:
         now = now.replace(tzinfo=UTC)
 
-    patient = _resolve_patient(session, payload, now, org_id=org_id)
+    patient, patient_created = _resolve_patient(session, payload, now, org_id=org_id)
+    consent = _resolve_ingest_consent(
+        session,
+        payload,
+        patient,
+        patient_created=patient_created,
+        phi_mode=phi_mode,
+        org_id=org_id,
+        actor=actor or "OpdIngest",
+    )
     ingest_id = str(uuid4())
     document_ids: list[str] = []
 
@@ -99,7 +135,10 @@ def ingest_opd_packet(
         document_type="clinical_note",
         source=payload.source,
         content=note_text,
-        metadata=_base_metadata(payload, ingest_id, role="clinical_note"),
+        metadata={
+            **_base_metadata(payload, ingest_id, role="clinical_note"),
+            "consent_id": consent.consent_code,
+        },
         now=now,
     )
     document_ids.append(note_doc.document_code)
@@ -235,7 +274,8 @@ def ingest_opd_packet(
         detail=(
             f"ingest={ingest_id};encounter={payload.encounter_id};"
             f"external={payload.external_patient_id};docs={len(document_ids)};"
-            f"case={case_code or '-'};source={payload.source};synthetic=true"
+            f"case={case_code or '-'};source={payload.source};synthetic=true;"
+            f"consent={consent.consent_code}"
         ),
     )
     return OpdIngestResponse(
@@ -247,8 +287,41 @@ def ingest_opd_packet(
         case_id=case_code,
         created=True,
         source=payload.source,
+        consent_id=consent.consent_code,
         disclaimer=DISCLAIMER,
     )
+
+
+def _resolve_ingest_consent(
+    session: Session,
+    payload: OpdIngestRequest,
+    patient: Patient,
+    *,
+    patient_created: bool,
+    phi_mode: bool,
+    org_id: str | None,
+    actor: str,
+) -> ConsentRecord:
+    """Return the consent row that authorises storing this packet (creating it when allowed)."""
+    if payload.consent_id:
+        return require_ingest_consent(session, patient, payload.consent_id, org_id=org_id)
+    if payload.consent is not None:
+        if phi_mode and not patient_created:
+            raise consent_required_error(
+                f"Patient {patient.patient_code} already has a chart. Record consent via "
+                f"POST /api/v1/patients/{patient.patient_code}/consents and send its consent_id; "
+                "inline consent is only accepted when this ingest registers a new patient."
+            )
+        return record_consent(
+            session,
+            patient,
+            payload.consent,
+            recorded_by=actor,
+            org_id=org_id,
+            via="opd_ingest_inline",
+        )
+    # Practice / synthetic desk: checkbox attestation stored as a consent row.
+    return ensure_practice_consent(session, patient, recorded_by=actor, org_id=org_id)
 
 
 def _resolve_patient(
@@ -257,7 +330,7 @@ def _resolve_patient(
     now: datetime,
     *,
     org_id: str | None = None,
-) -> Patient:
+) -> tuple[Patient, bool]:
     org = None
     if org_id:
         from app.models import Organization
@@ -274,7 +347,7 @@ def _resolve_patient(
         if getattr(patient, "org_id", None) is None:
             patient.org_id = org.id
         patient.updated_at = now
-        return patient
+        return patient, False
     existing = _find_patient_by_external(
         session, payload.external_patient_id, org_id=org.id
     )
@@ -289,7 +362,7 @@ def _resolve_patient(
         if getattr(existing, "org_id", None) is None:
             existing.org_id = org.id
         existing.updated_at = now
-        return existing
+        return existing, False
     birth = payload.birth_date or date(2000, 1, 1)
     display = payload.display_name.strip() or f"OPD Patient {payload.external_patient_id}"
     patient = Patient(
@@ -305,7 +378,7 @@ def _resolve_patient(
     )
     session.add(patient)
     session.flush()
-    return patient
+    return patient, True
 
 
 def _merge_conditions(patient: Patient, payload: OpdIngestRequest) -> None:
@@ -405,6 +478,7 @@ def _find_encounter(
         case_id=case_code,
         created=False,
         source=str(meta.get("source") or "opd_manual"),
+        consent_id=str(meta["consent_id"]) if meta.get("consent_id") else None,
         disclaimer=DISCLAIMER,
     )
 

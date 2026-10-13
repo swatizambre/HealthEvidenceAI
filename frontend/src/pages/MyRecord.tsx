@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { getLifelongSummary, type LifelongEvent, type LifelongSummary } from "../api";
+import { PrivacyRights } from "../components/PrivacyRights";
 import { useRole } from "../roleContext";
 
 function yearLabel(value: string | null): string {
@@ -231,6 +232,10 @@ export function MyRecordPage() {
             </ul>
           )}
         </div>
+      ) : null}
+
+      {isPatient && /^PAT-\d{6}$/.test(myPatientId) ? (
+        <PrivacyRights patientId={myPatientId} />
       ) : null}
     </section>
   );

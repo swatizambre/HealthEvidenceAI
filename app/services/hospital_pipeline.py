@@ -276,7 +276,7 @@ def run_his_visit(
 
     try:
 
-        ingest = ingest_opd_packet(session, payload, org_id=org_id)
+        ingest = ingest_opd_packet(session, payload, org_id=org_id, actor=actor)
 
         readiness: int | None = None
 
