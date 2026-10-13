@@ -33,3 +33,8 @@ secrets.json
 Thumbs.db
 .idea/
 .vscode/
+
+data/*.db-shm
+data/*.db-wal
+frontend/test-results/
+
