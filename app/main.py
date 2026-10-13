@@ -60,13 +60,12 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        from app.agents.checkpoints import close_checkpointer, setup_checkpointer
         from app.services.realtime import (
             get_hub,
             start_redis_subscriber,
             stop_redis_subscriber,
         )
-
-        from app.agents.checkpoints import close_checkpointer, setup_checkpointer
 
         init_db(engine)
         try:

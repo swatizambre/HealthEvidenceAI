@@ -14,29 +14,16 @@ API replica's SSE clients see the same desk mutations.
 
 from __future__ import annotations
 
-
-
 import asyncio
-
 import json
-
 import logging
-
 import threading
-
 import time
-
 from collections.abc import AsyncIterator
-
 from dataclasses import asdict, dataclass, field
-
 from threading import Lock
-
 from typing import Any
-
 from uuid import uuid4
-
-
 
 logger = logging.getLogger("healthevidence.realtime")
 
@@ -262,28 +249,17 @@ def get_hub() -> RealtimeHub:
 
 
 
-def _redis_client():
-
+def _redis_client() -> Any:
     from app.core.config import get_settings
 
-
-
     url = (get_settings().redis_url or "").strip()
-
     if not url:
-
         return None
-
     try:
-
-        import redis  # type: ignore[import-untyped]
-
+        import redis
     except ImportError:
-
         logger.warning("REDIS_URL set but redis package not installed; desk stays in-process")
-
         return None
-
     return redis.Redis.from_url(url, decode_responses=True)
 
 

@@ -176,8 +176,8 @@ def prepare_evidence_packet(session: Session, payload: PacketPrepareRequest) -> 
     ai_drafts = sum(
         1 for gap in gaps if str(getattr(gap, "draft_source", "") or "").startswith("ai:")
     )
-    from app.services.ai_scope import describe_ai_scope
     from app.core.config import get_settings
+    from app.services.ai_scope import describe_ai_scope
 
     ai_assist = {
         "scoring_path": review.scoring_path or "",

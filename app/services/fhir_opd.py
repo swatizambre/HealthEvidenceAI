@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 
 from app.core.exceptions import AppError
 from app.schemas.api import (
@@ -350,7 +350,9 @@ def _class_department(encounter: dict[str, Any] | None) -> str:
     return ""
 
 
-def _visit_type(encounter: dict[str, Any] | None) -> str:
+def _visit_type(
+    encounter: dict[str, Any] | None,
+) -> Literal["outpatient", "ambulatory", "telehealth", "day_care"]:
     """Map FHIR Encounter.class into OpdIngestRequest.visit_type literals."""
     if not encounter:
         return "outpatient"

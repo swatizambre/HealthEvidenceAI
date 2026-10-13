@@ -84,15 +84,21 @@ _FAQ: tuple[tuple[str, tuple[str, ...], str, list[str]], ...] = (
         ),
         (
             "India desks — rural referral ladder and city hospitals:\n"
-            "PHC / sub-centre: MO or ANM documents the visit; prepare a thin pack before referral up.\n"
-            "CHC / taluk / district: close gaps from lower facilities; clerks assemble cashless / TPA checklists.\n"
-            "Urban multispecialty / medical college: records desk preps; PG/resident drafts; consultant uses Reviews.\n"
+            "PHC / sub-centre: MO or ANM documents the visit; "
+            "prepare a thin pack before referral up.\n"
+            "CHC / taluk / district: close gaps from lower facilities; "
+            "clerks assemble cashless / TPA checklists.\n"
+            "Urban multispecialty / medical college: records desk preps; "
+            "PG/resident drafts; consultant uses Reviews.\n"
             "Records / TPA desk clerk:\n"
             "1) Patients → chart → Must-have items → Prepare evidence pack.\n"
-            "2) Visit note with correct facility + department (Medicine, Ortho, Casualty…).\n"
+            "2) Visit note with correct facility + department "
+            "(Medicine, Ortho, Casualty…).\n"
             "3) Re-check pack → hand to senior MO / consultant.\n"
-            "Junior doctor / PG / MO (junior): same prep; cannot final-sign — ask consultant / senior MO.\n"
-            "Consultant / senior MO: Today → Needs clinician review / Reviews → confirm citations or send back.\n"
+            "Junior doctor / PG / MO (junior): same prep; "
+            "cannot final-sign — ask consultant / senior MO.\n"
+            "Consultant / senior MO: Today → Needs clinician review / Reviews → "
+            "confirm citations or send back.\n"
             "Set Facility in the top bar (PHC → city hospital). Still documentation only — "
             "never approves, denies, or diagnoses."
         ),
@@ -105,7 +111,8 @@ _FAQ: tuple[tuple[str, tuple[str, ...], str, list[str]], ...] = (
             "Must-have chart items help every role see what is already on file:\n"
             "conditions, meds, labs, notes, imaging, procedures, plus allergy/vital hints.\n"
             "Missing or thin rows open Visit note or the matching chart section.\n"
-            "Staff/residents then Prepare evidence pack; seniors use this list to see if the file is coherent.\n"
+            "Staff/residents then Prepare evidence pack; "
+            "seniors use this list to see if the file is coherent.\n"
             "This is chart completeness for paperwork — not a clinical exam."
         ),
         ["/patients"],

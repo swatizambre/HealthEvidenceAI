@@ -13,6 +13,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.db.repository import list_documents_for_patient, list_procedures
 from app.schemas.api import LifelongEventOut, LifelongGroupOut, LifelongSummaryResponse
 from app.services.body_sites import infer_body_site, is_filterable_body_site, normalize_body_site
@@ -22,7 +23,6 @@ from app.services.disorders import (
     is_clinical_condition,
     is_clinical_procedure,
 )
-from app.core.config import get_settings
 from app.services.records import require_patient
 from app.services.specialties import normalize_specialty
 

@@ -12,44 +12,23 @@ Runs are persisted so status survives process restart.
 
 from __future__ import annotations
 
-
-
 import time
-
 from dataclasses import asdict, dataclass, field
-
 from datetime import UTC, datetime
-
 from threading import Lock
-
 from typing import Any, Literal
-
 from uuid import uuid4
 
-
-
 from sqlalchemy import select
-
 from sqlalchemy.orm import Session
 
-
-
 from app.core.safety import DISCLAIMER
-
 from app.models import HospitalPipelineRunRow
-
 from app.schemas.api import OpdFhirIngestRequest, OpdIngestRequest, PacketPrepareRequest
-
 from app.services.fhir_opd import fhir_bundle_to_opd_request
-
 from app.services.opd_ingest import ingest_opd_packet
-
 from app.services.packet_prep import prepare_evidence_packet
-
 from app.services.realtime import publish_desk_event
-
-
-
 
 
 @dataclass
@@ -166,7 +145,7 @@ def _row_to_run(row: HospitalPipelineRunRow) -> PipelineRun:
 
         run_id=row.run_id,
 
-        status="ok" if row.status == "ok" else "error",  # type: ignore[arg-type]
+        status="ok" if row.status == "ok" else "error",
 
         source=row.source or "",
 
@@ -233,7 +212,6 @@ def recent_runs(session: Session | None = None, limit: int = 20) -> list[Pipelin
 def pipeline_status(session: Session | None = None) -> dict[str, Any]:
 
     from app.core.config import get_settings
-
     from app.services.ai_scope import describe_ai_scope
 
 
@@ -505,7 +483,6 @@ def simulate_visit(
     """Deterministic practice feed for verifying the live desk pipeline."""
 
     from app.core.config import get_settings
-
     from app.core.exceptions import AppError
 
 

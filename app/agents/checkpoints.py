@@ -151,4 +151,4 @@ def _postgres_saver(database_url: str) -> BaseCheckpointSaver:
         },
     )
     _RESOURCES.append(pool)
-    return PostgresSaver(pool)
+    return PostgresSaver(pool)  # type: ignore[arg-type]

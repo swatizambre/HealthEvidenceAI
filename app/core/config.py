@@ -125,14 +125,26 @@ class Settings(BaseSettings):
             return False
         return self.is_shared_live_env() or self.env_name() == "pilot"
 
+    def pilot_postgres_harness(self) -> bool:
+        """CI/local Postgres pilot gate with mintable tokens — not a shared tenant."""
+        import os
+
+        if self.env_name() != "pilot":
+            return False
+        flag = (os.environ.get("PILOT_POSTGRES_TEST") or "").strip().lower()
+        return flag in {"1", "true", "yes", "on"}
+
     def dev_token_allowed(self) -> bool:
-        """Dev JWT minting only for laptop/local UAT — never pilot or shared live."""
+        """Dev JWT minting only for laptop/local UAT — never shared live or real pilot."""
         mode = self.auth_mode.strip().lower()
         env = self.env_name()
         if mode not in {"dev-jwt", "none"}:
             return False
-        if self.is_shared_live_env() or env == "pilot":
+        if self.is_shared_live_env():
             return False
+        if env == "pilot":
+            # Automated Postgres harness only (PILOT_POSTGRES_TEST=1).
+            return self.pilot_postgres_harness()
         return env in {"local", "test"}
 
     def synthetic_lifelong_enabled(self) -> bool:
@@ -154,7 +166,9 @@ class Settings(BaseSettings):
     def require_dev_jwt_secret(self) -> str:
         """HMAC for dev-jwt — never a hard-coded production-shared secret."""
         secret = (self.dev_jwt_secret or self.oidc_client_secret or "").strip()
-        if self.env_name() == "test" and not secret:
+        if not secret and (
+            self.env_name() == "test" or self.pilot_postgres_harness()
+        ):
             return "test-only-healthevidence-hmac-do-not-reuse"
         if len(secret) < 32:
             raise AppError(
@@ -248,13 +262,16 @@ class Settings(BaseSettings):
                     "SQLite is not allowed in pilot; use PostgreSQL.",
                     503,
                 )
-            if auth != "oidc":
+            harness = self.pilot_postgres_harness()
+            if auth != "oidc" and not (harness and auth == "dev-jwt"):
                 raise AppError(
                     "LIVE_CONFIG_INVALID",
                     "AUTH_MODE=oidc is required in pilot (dev-jwt minting is disabled).",
                     503,
                 )
-            if not self.oidc_issuer.strip() or not self.oidc_jwks_url.strip():
+            if auth == "oidc" and (
+                not self.oidc_issuer.strip() or not self.oidc_jwks_url.strip()
+            ):
                 raise AppError(
                     "LIVE_CONFIG_INVALID",
                     "OIDC_ISSUER and OIDC_JWKS_URL are required when AUTH_MODE=oidc.",

@@ -67,7 +67,13 @@ def check(name: str, ok: bool, detail: str = "") -> None:
     print(line.encode("ascii", errors="replace").decode("ascii"))
 
 
-def mint(roles: list[str], *, subject: str, patient_id: str | None = None, org_code: str | None = None) -> str | None:
+def mint(
+    roles: list[str],
+    *,
+    subject: str,
+    patient_id: str | None = None,
+    org_code: str | None = None,
+) -> str | None:
     body: dict = {"subject": subject, "roles": roles}
     if patient_id:
         body["patient_id"] = patient_id
@@ -206,9 +212,7 @@ def main() -> int:
     # --- Campus specialty catalog ---
     st, specs, err = call("GET", "/api/v1/specialties", token=staff)
     spec_list = (specs or {}).get("specialties") if isinstance(specs, dict) else []
-    needed = {"Cardiology", "Orthopedics", "General medicine", "Emergency"}
-    # catalog may use slightly different labels — soft match
-    joined = " | ".join(str(s) for s in (spec_list or []))
+    # Catalog may use slightly different labels — soft match.
     has_cardio = any("cardio" in str(s).lower() for s in (spec_list or []))
     has_ortho = any("ortho" in str(s).lower() for s in (spec_list or []))
     check(
@@ -434,7 +438,7 @@ def main() -> int:
     )
 
     # --- Lifelong chart (cross-facility continuity) ---
-    st, life, err = call("GET", f"/api/v1/patients/PAT-000001/lifelong", token=staff, timeout=60)
+    st, life, err = call("GET", "/api/v1/patients/PAT-000001/lifelong", token=staff, timeout=60)
     life_ok = st == 200 and isinstance(life, dict)
     check(
         "Lifelong chart for shared patient",
@@ -462,7 +466,11 @@ def main() -> int:
     check(
         "Pipeline status shows campus feeds",
         st == 200 and recent_total >= 2 and recent_ok >= 2,
-        err or f"ok={recent_ok}/{recent_total} mode={status.get('mode') if isinstance(status, dict) else None}",
+        err
+        or (
+            f"ok={recent_ok}/{recent_total} "
+            f"mode={status.get('mode') if isinstance(status, dict) else None}"
+        ),
     )
 
     # --- Stats / ops for admin ---

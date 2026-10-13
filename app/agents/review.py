@@ -5,9 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Literal
 
-from sqlalchemy.orm import Session
-
 from langgraph.types import Command
+from sqlalchemy.orm import Session
 
 from app.agents.checkpoints import get_checkpointer, thread_config
 from app.agents.graph import build_review_graph
@@ -102,7 +101,7 @@ def resume_review(
     settings = get_settings()
     config = thread_config(run_id)
     checkpointer = get_checkpointer()
-    has_checkpoint = checkpointer.get_tuple(config) is not None
+    has_checkpoint = checkpointer.get_tuple(config) is not None  # type: ignore[arg-type]
 
     if has_checkpoint:
         graph = build_review_graph(session, settings)

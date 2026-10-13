@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from app.services.india_desk import (
-    desk_subtitle,
     describe_india_desk,
+    desk_subtitle,
     facility_catalog,
     facility_label,
     india_org_seeds,

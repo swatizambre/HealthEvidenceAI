@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
@@ -36,7 +38,7 @@ async def desk_event_stream(
     finally:
         session.close()
 
-    async def _generate():
+    async def _generate() -> AsyncIterator[Any]:
         async for chunk in event_stream(org_id=org_id):
             if await request.is_disconnected():
                 break

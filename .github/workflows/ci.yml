@@ -7,6 +7,10 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: test
+      AUTH_MODE: none
+      DEV_JWT_SECRET: ci-only-healthevidence-hmac-do-not-reuse-32
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -44,6 +48,7 @@ jobs:
     env:
       DATABASE_URL: postgresql+psycopg://healthevidence:healthevidence@localhost:5432/healthevidence
       PILOT_POSTGRES_TEST: "1"
+      DEV_JWT_SECRET: ci-only-healthevidence-hmac-do-not-reuse-32
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -96,6 +101,7 @@ jobs:
           CI: "1"
           ENVIRONMENT: local
           AUTH_MODE: dev-jwt
+          DEV_JWT_SECRET: ci-only-healthevidence-hmac-do-not-reuse-32
           LLM_PROVIDER: local
           SEED_ON_STARTUP: "true"
         run: npm run e2e:smoke

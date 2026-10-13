@@ -8,6 +8,7 @@ from typing import Any
 from langgraph.graph import END, StateGraph
 from sqlalchemy.orm import Session
 
+from app.agents.checkpoints import get_checkpointer
 from app.agents.nodes import (
     build_pathway_node,
     check_contradictions,
@@ -23,7 +24,6 @@ from app.agents.nodes import (
     targeted_retrieve_evidence,
     verify_evidence,
 )
-from app.agents.checkpoints import get_checkpointer
 from app.agents.state import ReviewState
 from app.agents.supervisor import should_rereetrieve
 from app.core.config import Settings, get_settings
