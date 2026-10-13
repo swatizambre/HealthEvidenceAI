@@ -192,17 +192,24 @@ def retrieve_evidence(state: dict[str, Any], session: Session, settings: Setting
             finally:
                 worker.close()
 
-        workers = min(4, max(1, len(jobs)))
+        # Concurrent SQLite sessions segfault under Linux/CI (pytest exit 139).
+        bind = session.get_bind()
+        is_sqlite = getattr(getattr(bind, "dialect", None), "name", "") == "sqlite"
+        workers = 1 if is_sqlite else min(4, max(1, len(jobs)))
         if jobs:
-            with ThreadPoolExecutor(max_workers=workers) as pool:
-                futures = [pool.submit(_search, job) for job in jobs]
-                for future in as_completed(futures):
-                    for row in future.result():
-                        dedupe = str(row.get("chunk_id") or "") or str(row.get("content") or "")[:80]
-                        if dedupe in seen_chunks:
-                            continue
-                        seen_chunks.add(dedupe)
-                        evidence.append(row)
+            if workers == 1:
+                row_batches = [_search(job) for job in jobs]
+            else:
+                with ThreadPoolExecutor(max_workers=workers) as pool:
+                    futures = [pool.submit(_search, job) for job in jobs]
+                    row_batches = [future.result() for future in as_completed(futures)]
+            for rows in row_batches:
+                for row in rows:
+                    dedupe = str(row.get("chunk_id") or "") or str(row.get("content") or "")[:80]
+                    if dedupe in seen_chunks:
+                        continue
+                    seen_chunks.add(dedupe)
+                    evidence.append(row)
 
         # Patient record on the request session (not a worker) for consistent unit-of-work.
         HealthcareMCPClient(
