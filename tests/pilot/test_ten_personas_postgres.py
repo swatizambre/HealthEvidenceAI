@@ -40,11 +40,20 @@ def pg_client(monkeypatch: pytest.MonkeyPatch):
         yield client
 
 
-def _token(client, *roles: str, patient_id: str | None = None, subject: str = "pg-persona") -> str:
-    body: dict = {"subject": subject, "roles": list(roles)}
+def _token(
+    client,
+    *roles: str,
+    patient_id: str | None = None,
+    subject: str = "pg-persona",
+    org_code: str = "ORG-000001",
+) -> str:
+    # Pilot env auto-enforces org scope — tokens must carry an org claim.
+    body: dict = {"subject": subject, "roles": list(roles), "org_code": org_code}
     if patient_id:
         body["patient_id"] = patient_id
         body["subject"] = patient_id
+        if "patient" in roles and len(roles) == 1:
+            body.pop("org_code", None)
     response = client.post("/api/v1/auth/dev-token", json=body)
     assert response.status_code == 200, response.text
     return response.json()["access_token"]

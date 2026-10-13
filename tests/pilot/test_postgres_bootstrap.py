@@ -56,7 +56,11 @@ def test_pilot_postgres_seed_and_prepare(monkeypatch: pytest.MonkeyPatch) -> Non
 
         token = client.post(
             "/api/v1/auth/dev-token",
-            json={"subject": "pilot-gate", "roles": ["staff"]},
+            json={
+                "subject": "pilot-gate",
+                "roles": ["staff"],
+                "org_code": "ORG-000001",
+            },
         )
         assert token.status_code == 200, token.text
         headers = {"Authorization": f"Bearer {token.json()['access_token']}"}

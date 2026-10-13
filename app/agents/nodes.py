@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -17,6 +18,16 @@ from app.services.observability import span_timer
 from app.services.prompt_guard import inspect_retrieved_content
 from app.services.records import require_patient
 from app.services.safety_net import evidence_coverage, human_review_required
+
+
+def _prefer_soft_hitl_pause() -> bool:
+    """Prefer ReviewRun soft-pause over LangGraph interrupt when CI-unstable."""
+    flag = (os.environ.get("HE_HITL_SOFT_PAUSE") or "").strip().lower()
+    if flag in {"1", "true", "yes", "on"}:
+        return True
+    if flag in {"0", "false", "no", "off"}:
+        return False
+    return (os.environ.get("CI") or "").strip().lower() in {"1", "true", "yes"}
 
 
 def _trace(agent: str, node: str, detail: str = "") -> dict[str, Any]:
@@ -607,6 +618,16 @@ def human_review_gate(state: dict[str, Any], session: Session, settings: Setting
     )
 
     if not decision:
+        # LangGraph interrupt has segfaulted under GitHub Actions Linux + TestClient
+        # (exit 139). Soft-pause still requires senior resume via ReviewRun JSON.
+        if _prefer_soft_hitl_pause():
+            return {
+                "paused": True,
+                "status": "awaiting_human_review",
+                "human_review_reason": state.get("human_review_reason")
+                or "Clinician checklist acknowledgment required",
+                "agent_trace": [_trace("AuthorizationAgent", "human_review", "paused")],
+            }
         from langgraph.types import interrupt
 
         resume_payload = interrupt(
