@@ -135,7 +135,7 @@ def test_one_good_citation_is_enough() -> None:
 
 
 def test_non_supported_rows_are_untouched() -> None:
-    rows = [
+    rows: list[dict[str, Any]] = [
         {"criterion_id": "CRIT-DM", "status": "MISSING", "evidence": []},
         {"criterion_id": "CRIT-DM", "status": "NOT_SUPPORTED", "evidence": [{"chunk_id": "X"}]},
     ]
@@ -197,7 +197,8 @@ def test_every_gold_rules_citation_passes_the_verifier() -> None:
         if result.status != "SUPPORTED":
             continue
         chunks: dict[str, ChunkText] = {}
-        for record in [*notes, *labs]:
+        records: list[TextRecord | LabRecord] = [*notes, *labs]
+        for record in records:
             for code, text in record.chunks:
                 chunks[code] = ChunkText(record.document_id, text)
         rows = [
