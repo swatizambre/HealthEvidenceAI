@@ -271,3 +271,75 @@ class HospitalPipelineRunRow(IdentityMixin, TimestampMixin, Base):
     detail: Mapped[str] = mapped_column(String(500), default="")
     org_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     actor: Mapped[str] = mapped_column(String(120), default="")
+
+
+class ConsentRecord(IdentityMixin, Base):
+    """Stored consent artefact (DPDP s.6 / HIPAA authorization trail) for one patient + purpose.
+
+    Rows are never deleted: withdrawal sets ``revoked_at`` so the history of what was
+    permitted, when, and on what notice version stays auditable.
+    """
+
+    __tablename__ = "consent_records"
+
+    consent_code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    patient_id: Mapped[str] = mapped_column(
+        ForeignKey("patients.id", ondelete="CASCADE"), index=True
+    )
+    org_id: Mapped[str | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    # prior_auth_evidence | continuity_of_care | research_trial
+    purpose: Mapped[str] = mapped_column(String(40), index=True)
+    scope: Mapped[str] = mapped_column(Text, default="")
+    # written | electronic | verbal_witnessed
+    method: Mapped[str] = mapped_column(String(32))
+    language: Mapped[str] = mapped_column(String(16), default="en")
+    notice_version: Mapped[str] = mapped_column(String(64))
+    granted_by_name: Mapped[str] = mapped_column(String(120))
+    recorded_by: Mapped[str] = mapped_column(String(120))
+    granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_reason: Mapped[str] = mapped_column(String(500), default="")
+    revoked_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    evidence_ref: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+
+class DataSubjectRequest(IdentityMixin, Base):
+    """Patient rights request (correction / erasure / grievance / nominee) — workflow only.
+
+    Erasure never hard-deletes clinical rows: medical-record retention law usually
+    overrides (see docs/CONSENT_AND_RIGHTS.md). Resolution records the outcome.
+    """
+
+    __tablename__ = "data_subject_requests"
+
+    request_code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    patient_id: Mapped[str] = mapped_column(
+        ForeignKey("patients.id", ondelete="CASCADE"), index=True
+    )
+    org_id: Mapped[str | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    # correction | erasure | grievance | nominee
+    request_type: Mapped[str] = mapped_column(String(32), index=True)
+    details: Mapped[str] = mapped_column(Text, default="")
+    # open | in_review | resolved | rejected
+    status: Mapped[str] = mapped_column(String(16), default="open", index=True)
+    submitted_by: Mapped[str] = mapped_column(String(120), default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolution_note: Mapped[str] = mapped_column(Text, default="")
+    # Erasure outcome: retained_legal_hold | restricted_processing | completed_outside_system
+    outcome: Mapped[str] = mapped_column(String(40), default="")
+    handled_by: Mapped[str | None] = mapped_column(String(120), nullable=True)

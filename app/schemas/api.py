@@ -14,6 +14,14 @@ from app.core.safety import AUTONOMOUS_DECISION_VALUES
 PatientPath = Annotated[str, Path(pattern=r"^PAT-\d{6}$")]
 PolicyPath = Annotated[str, Path(pattern=r"^POL-\d{6}$")]
 DocumentPath = Annotated[str, Path(pattern=r"^DOC-[A-Z0-9]+$")]
+ConsentPath = Annotated[str, Path(pattern=r"^CNS-\d{6}$")]
+DataSubjectRequestPath = Annotated[str, Path(pattern=r"^DSR-\d{6}$")]
+
+ConsentPurpose = Literal["prior_auth_evidence", "continuity_of_care", "research_trial"]
+ConsentMethod = Literal["written", "electronic", "verbal_witnessed"]
+DataSubjectRequestType = Literal["correction", "erasure", "grievance", "nominee"]
+DataSubjectRequestStatus = Literal["open", "in_review", "resolved", "rejected"]
+ErasureOutcome = Literal["retained_legal_hold", "restricted_processing", "completed_outside_system"]
 
 
 class APIModel(BaseModel):
@@ -811,6 +819,129 @@ class AuditEventListResponse(ResponseModel):
     events: list[AuditEventOut]
 
 
+class ConsentCreate(APIModel):
+    """Consent captured from the patient (or lawful representative) for one purpose."""
+
+    purpose: ConsentPurpose = "prior_auth_evidence"
+    scope: str = Field(default="", max_length=2000)
+    method: ConsentMethod
+    language: str = Field(default="en", min_length=2, max_length=16)
+    notice_version: str = Field(min_length=1, max_length=64)
+    granted_by_name: str = Field(min_length=1, max_length=120)
+    granted_at: datetime | None = None
+    expires_at: datetime | None = None
+    evidence_ref: str = Field(
+        default="",
+        max_length=64,
+        description="Scanned signed form document id or e-consent transaction reference.",
+    )
+
+
+class ConsentRevokeRequest(APIModel):
+    reason: str = Field(min_length=3, max_length=500)
+
+
+class ConsentOut(ResponseModel):
+    consent_id: str
+    patient_id: str
+    purpose: str
+    scope: str = ""
+    method: str
+    language: str = "en"
+    notice_version: str
+    granted_by_name: str
+    recorded_by: str
+    granted_at: datetime
+    expires_at: datetime | None = None
+    revoked_at: datetime | None = None
+    revoked_reason: str = ""
+    evidence_ref: str = ""
+    created_at: datetime
+    active: bool
+
+
+class ConsentListResponse(ResponseModel):
+    patient_id: str
+    consents: list[ConsentOut]
+    total: int
+
+
+class AccessLogEntryOut(ResponseModel):
+    event_id: str
+    occurred_at: datetime
+    actor_label: str
+    actor_category: Literal[
+        "you", "care_team", "care_team_emergency", "system", "other_patient", "unknown"
+    ]
+    action: str
+    action_label: str
+    outcome: Literal["allowed", "denied"]
+
+
+class AccessLogResponse(ResponseModel):
+    patient_id: str
+    total: int
+    limit: int
+    offset: int
+    entries: list[AccessLogEntryOut]
+    disclaimer: str = ""
+
+
+class ExportDocumentOut(ResponseModel):
+    document_id: str
+    document_type: str
+    source: str
+    created_at: datetime
+    content: str
+
+
+class DataSubjectRequestCreate(APIModel):
+    request_type: DataSubjectRequestType
+    details: str = Field(min_length=3, max_length=4000)
+
+
+class DataSubjectRequestResolve(APIModel):
+    status: Literal["in_review", "resolved", "rejected"]
+    resolution_note: str = Field(default="", max_length=4000)
+    outcome: ErasureOutcome | None = None
+
+
+class DataSubjectRequestOut(ResponseModel):
+    request_id: str
+    patient_id: str
+    request_type: str
+    details: str
+    status: str
+    created_at: datetime
+    resolved_at: datetime | None = None
+    resolution_note: str = ""
+    outcome: str = ""
+    handled_by: str | None = None
+
+
+class DataSubjectRequestListResponse(ResponseModel):
+    total: int
+    requests: list[DataSubjectRequestOut]
+
+
+class PatientExportResponse(ResponseModel):
+    format_version: str = "he-export-1"
+    generated_at: datetime
+    patient_id: str
+    demographics: Demographics
+    conditions: list[str]
+    documents: list[ExportDocumentOut]
+    clinical_notes: list[NoteOut]
+    labs: list[LabOut]
+    medications: list[MedicationOut]
+    procedures: list[ProcedureOut]
+    imaging: list[ImagingOut]
+    consents: list[ConsentOut]
+    requests: list[DataSubjectRequestOut]
+    lifelong_events: list[LifelongEventOut]
+    disclaimer: str = ""
+
+
 class OpdLabIn(APIModel):
     test_name: str = Field(min_length=1, max_length=120)
     value: str = Field(min_length=1, max_length=64)
@@ -893,6 +1024,10 @@ class OpdIngestRequest(APIModel):
     ] = "opd_manual"
     synthetic: bool = True
     consent_attested: bool = False
+    # Stored consent reference (required in PHI mode for an existing chart).
+    consent_id: str | None = Field(default=None, pattern=r"^CNS-\d{6}$")
+    # Inline consent captured at registration (PHI mode: only for a brand-new chart).
+    consent: ConsentCreate | None = None
     sex: str = Field(default="unknown", max_length=16)
     birth_date: date | None = None
     display_name: str = Field(default="", max_length=120)
@@ -936,6 +1071,8 @@ class OpdFhirIngestRequest(APIModel):
     )
     synthetic: bool = True
     consent_attested: bool = False
+    consent_id: str | None = Field(default=None, pattern=r"^CNS-\d{6}$")
+    consent: ConsentCreate | None = None
 
 
 class OpdIngestResponse(ResponseModel):
@@ -947,6 +1084,7 @@ class OpdIngestResponse(ResponseModel):
     case_id: str | None
     created: bool
     source: str = "opd_manual"
+    consent_id: str | None = None
     disclaimer: str
 
 
