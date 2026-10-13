@@ -90,13 +90,13 @@ def care_team_org_filter_id(
 ) -> str | None:
     """Org UUID to filter patient lists, or None for unrestricted (auth off / flag off).
 
-    Admins still filter to their org for list views; cross-org opens require break-glass
-    on the individual chart path.
+    Everyone (including admin) is tenant-filtered on list views when org scope is on.
+    Cross-org chart opens still require break-glass on the individual chart path.
     """
     if principal is None or not org_scope_active(settings):
         return None
     org_id = resolve_org_id(session, principal)
-    if not org_id and ROLE_ADMIN not in principal_roles(principal):
+    if not org_id:
         raise AppError(
             "ORG_SCOPE_REQUIRED",
             "Care-team sign-in requires an organization binding (org_id or org_code claim).",

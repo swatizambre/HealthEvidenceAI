@@ -99,6 +99,17 @@ def test_staff_org_code_limits_list_and_cross_org_chart(monkeypatch) -> None:
         assert other.json()["error_code"] == "ORG_SCOPE_FORBIDDEN"
 
 
+def test_admin_without_org_cannot_list_all_patients(monkeypatch) -> None:
+    with make_client(monkeypatch, AUTH_MODE="dev-jwt", ENFORCE_ORG_SCOPE="true") as client:
+        token = _token(client, "admin")
+        listed = client.get(
+            "/api/v1/patients?limit=200",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert listed.status_code == 403
+        assert listed.json()["error_code"] == "ORG_SCOPE_REQUIRED"
+
+
 def test_admin_cross_org_requires_break_glass(monkeypatch) -> None:
     with make_client(monkeypatch, AUTH_MODE="dev-jwt", ENFORCE_ORG_SCOPE="true") as client:
         from app.services.break_glass import clear_tickets

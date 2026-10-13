@@ -58,6 +58,14 @@ def search_evidence(
     elif not auth_off:
         # Unscoped evidence search is care-team only (minimum necessary).
         ensure_care_team(principal)
+        from app.services.org_scope import org_scope_active
+
+        if org_scope_active(request.app.state.settings):
+            raise AppError(
+                "PATIENT_ID_REQUIRED",
+                "Evidence search requires patient_id when organization scope is enforced.",
+                400,
+            )
 
     try:
         hits = hybrid_search(

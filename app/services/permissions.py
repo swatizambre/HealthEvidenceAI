@@ -140,9 +140,9 @@ def require_permission(
     if decision.allowed:
         return
     if session is not None:
-        from app.services.audit import record_audit
+        from app.services.audit import record_audit_durable
 
-        record_audit(
+        record_audit_durable(
             session,
             action="tool_permission_denied",
             actor=agent,

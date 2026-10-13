@@ -1,6 +1,7 @@
 """MONAI-isolated medical image analysis.
 
-Produces metadata and tensor statistics only. Never generates a clinical diagnosis.
+Without a connected PACS/DICOM source this module only echoes study metadata.
+It never fabricates pixel statistics or a clinical diagnosis.
 """
 
 from __future__ import annotations
@@ -11,9 +12,8 @@ from typing import Protocol
 from app.core.config import Settings, get_settings
 
 _DISCLAIMER = (
-    "Observed image-level metadata or synthetic tensor statistics only. "
-    "No diagnostic interpretation is provided. Clinical interpretation required. "
-    "Not for clinical use."
+    "No image pixels were analyzed. Metadata echo only — not a diagnostic reading. "
+    "Clinical interpretation required. Not for clinical use."
 )
 
 
@@ -52,7 +52,7 @@ class MedicalImageAnalyzer(Protocol):
 
 
 class MonaiIsolatedAnalyzer:
-    """Imaging adapter using MONAI when installed, otherwise a NumPy tensor bridge."""
+    """Imaging adapter: metadata-only until a real volume source is wired."""
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
@@ -65,38 +65,24 @@ class MonaiIsolatedAnalyzer:
             self._monai_available = False
 
     def analyze(self, study_id: str, metadata: dict[str, str]) -> ImagingAnalysis:
-        import numpy as np
-
         modality = metadata.get("modality", "unknown")
         body = metadata.get("body_part", "unspecified")
-        seed = abs(hash(study_id)) % (2**32)
-        rng = np.random.default_rng(seed)
-        volume = rng.random((16, 16, 16), dtype=np.float32)
         observations = [
-            f"Imaging backend engaged for study {study_id}.",
-            f"Metadata modality={modality}; body_part={body}.",
-            f"Tensor shape={tuple(volume.shape)}; mean={float(volume.mean()):.4f}; "
-            f"std={float(volume.std()):.4f}.",
+            f"No image file or DICOM volume was loaded for study {study_id}.",
+            f"Caller metadata: modality={modality}; body_part={body}.",
+            "Imaging analysis is unavailable without a connected PACS/DICOM source.",
             "No clinical diagnosis was generated.",
         ]
         if self._monai_available:
-            try:
-                from monai.transforms import ScaleIntensity
-
-                scaled = ScaleIntensity()(volume)
-                observations.append(
-                    f"MONAI ScaleIntensity applied; post-mean={float(scaled.mean()):.4f}."
-                )
-                backend = "monai"
-            except Exception as exc:
-                observations.append(f"MONAI transform runtime issue: {exc}")
-                backend = "monai-numpy-bridge"
+            observations.append(
+                "MONAI is installed but unused until a real image volume is supplied."
+            )
+            backend = "monai-metadata-only"
         else:
             observations.append(
-                "MONAI package not installed in this image; using NumPy bridge. "
-                "Install optional dependency group 'imaging' for full MONAI transforms."
+                "MONAI package not installed; metadata-only path (no synthetic tensors)."
             )
-            backend = "monai-numpy-bridge"
+            backend = "metadata-only"
         return ImagingAnalysis(
             study_id=study_id,
             observations=tuple(observations),
@@ -128,7 +114,7 @@ class MonaiIsolatedAnalyzer:
             changed=tuple(changed),
             unchanged=tuple(unchanged),
             uncertain=(
-                "Tensor statistics compared only; no pixel diagnosis.",
+                "Metadata compared only; no pixels were read.",
                 f"backend_a={left.backend}; backend_b={right.backend}",
             ),
             human_review_required=True,

@@ -260,34 +260,19 @@ def _audit(
 ) -> None:
     if session is None:
         return
-    from app.services.audit import record_audit
+    from app.services.audit import record_audit, record_audit_durable
 
     # Denied / break attempts must survive request rollback (AppError paths).
     if status in {"denied", "forbidden"}:
-        from sqlalchemy.orm import sessionmaker
-
-        factory = sessionmaker(
-            bind=session.get_bind(),
-            autoflush=False,
-            autocommit=False,
-            expire_on_commit=False,
+        record_audit_durable(
+            session,
+            action=action,
+            actor=actor,
+            resource_type="patient",
+            resource_id=resource_id[:64],
+            status=status,
+            detail=detail,
         )
-        audit_session = factory()
-        try:
-            record_audit(
-                audit_session,
-                action=action,
-                actor=actor,
-                resource_type="patient",
-                resource_id=resource_id[:64],
-                status=status,
-                detail=detail,
-            )
-            audit_session.commit()
-        except Exception:  # noqa: BLE001 — never block the forbid path
-            audit_session.rollback()
-        finally:
-            audit_session.close()
         return
 
     record_audit(
