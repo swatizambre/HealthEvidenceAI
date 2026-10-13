@@ -166,9 +166,8 @@ class Settings(BaseSettings):
     def require_dev_jwt_secret(self) -> str:
         """HMAC for dev-jwt — never a hard-coded production-shared secret."""
         secret = (self.dev_jwt_secret or self.oidc_client_secret or "").strip()
-        if not secret and (
-            self.env_name() == "test" or self.pilot_postgres_harness()
-        ):
+        # Built-in key only for ENVIRONMENT=test unit suites — never for pilot harness.
+        if not secret and self.env_name() == "test":
             return "test-only-healthevidence-hmac-do-not-reuse"
         if len(secret) < 32:
             raise AppError(
@@ -263,6 +262,13 @@ class Settings(BaseSettings):
                     503,
                 )
             harness = self.pilot_postgres_harness()
+            if harness and self.allow_phi:
+                raise AppError(
+                    "LIVE_CONFIG_INVALID",
+                    "PILOT_POSTGRES_TEST cannot be combined with ALLOW_PHI "
+                    "(harness minting must stay synthetic-only).",
+                    503,
+                )
             if auth != "oidc" and not (harness and auth == "dev-jwt"):
                 raise AppError(
                     "LIVE_CONFIG_INVALID",

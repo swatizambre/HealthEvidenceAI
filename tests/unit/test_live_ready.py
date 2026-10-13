@@ -21,6 +21,50 @@ def test_ready_exposes_live_surface(client: TestClient) -> None:
     assert "phi_live" in body
 
 
+def test_pilot_harness_rejects_allow_phi() -> None:
+    settings = Settings(
+        ENVIRONMENT="pilot",
+        AUTH_MODE="dev-jwt",
+        DEV_JWT_SECRET="ci-harness-secret-at-least-32-chars",
+        DATABASE_URL="postgresql+psycopg://u:p@localhost/he",
+        LLM_PROVIDER="local",
+        SEED_ON_STARTUP="false",
+        ALLOW_PHI="true",
+        PHI_PROGRAM_ATTESTED="true",
+    )
+    import os
+
+    os.environ["PILOT_POSTGRES_TEST"] = "1"
+    try:
+        with pytest.raises(AppError) as exc:
+            settings.validate_live_configuration()
+        assert exc.value.error_code == "LIVE_CONFIG_INVALID"
+        assert "PILOT_POSTGRES_TEST" in exc.value.message
+        assert "ALLOW_PHI" in exc.value.message
+    finally:
+        os.environ.pop("PILOT_POSTGRES_TEST", None)
+
+
+def test_pilot_harness_requires_explicit_dev_jwt_secret() -> None:
+    settings = Settings(
+        ENVIRONMENT="pilot",
+        AUTH_MODE="dev-jwt",
+        DEV_JWT_SECRET="",
+        DATABASE_URL="postgresql+psycopg://u:p@localhost/he",
+        LLM_PROVIDER="local",
+        ALLOW_PHI="false",
+    )
+    import os
+
+    os.environ["PILOT_POSTGRES_TEST"] = "1"
+    try:
+        with pytest.raises(AppError) as exc:
+            settings.require_dev_jwt_secret()
+        assert exc.value.error_code == "AUTH_DEV_SECRET_REQUIRED"
+    finally:
+        os.environ.pop("PILOT_POSTGRES_TEST", None)
+
+
 def test_shared_live_rejects_seed_on() -> None:
     settings = Settings(
         ENVIRONMENT="staging",

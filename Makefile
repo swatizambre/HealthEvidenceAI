@@ -65,6 +65,7 @@ pilot-gate:
 	@echo "Pilot gate OK — see docs/PILOT_ROADMAP.md and docs/OIDC_PILOT.md"
 
 demo-up:
+	@test -n "$$DEV_JWT_SECRET" || (echo "Set DEV_JWT_SECRET (≥32 chars) before demo-up — e.g. export DEV_JWT_SECRET=\$$(openssl rand -hex 24)" && exit 1)
 	docker compose -f docker-compose.yml -f docker-compose.pilot.yml -f docker-compose.demo.yml up --build -d
 
 demo-gate:

@@ -183,16 +183,18 @@ def create_human_review(
     patient_id: str,
     reason: str,
     decision: str = "pending",
+    actor: str = "human_reviewer",
 ) -> dict[str, Any]:
     # Tool path cannot finalize senior acknowledgment — HTTP layer enforces RBAC;
     # coerce unexpected decisions to pending so agent callers cannot auto-ack.
     safe_decision = str(decision or "pending").strip().lower()
     if safe_decision not in {"pending", "acknowledged", "needs_documentation"}:
         safe_decision = "pending"
+    audit_actor = str(actor or "human_reviewer").strip()[:64] or "human_reviewer"
     event = record_audit(
         session,
         action="human_review",
-        actor="human_reviewer",
+        actor=audit_actor,
         resource_type="review_run",
         resource_id=run_id,
         status=safe_decision,

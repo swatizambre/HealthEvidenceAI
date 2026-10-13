@@ -37,6 +37,9 @@ cd frontend && npm ci
 Uses the **pilot Postgres path** with synthetic seed and PHI flags off:
 
 ```bash
+# Demo uses ENVIRONMENT=local + AUTH_MODE=dev-jwt (not pilot auth).
+# Set your own signing secret first (≥32 characters):
+export DEV_JWT_SECRET="$(openssl rand -hex 24)"   # Windows: set in .env
 docker compose -f docker-compose.yml -f docker-compose.pilot.yml -f docker-compose.demo.yml up --build
 ```
 
