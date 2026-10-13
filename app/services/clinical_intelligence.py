@@ -63,7 +63,12 @@ def score_criteria_clinical(
                 retrieved_hits=retrieved_hits or [],
             )
             cleaned = apply_safety_net(scored)
-            path = f"ai_clinical:{getattr(provider, 'name', name)}"
+            provider_name = str(getattr(provider, "name", name) or name).strip().lower()
+            # Local provider runs the rule engine only — do not label it as an AI path.
+            if provider_name == "local":
+                path = "rule_check:local"
+            else:
+                path = f"ai_clinical:{provider_name}"
             logger.info("clinical_intelligence_scored path=%s criteria=%s", path, len(cleaned))
             return cleaned, path
         except (LLMUnavailable, ValueError, json.JSONDecodeError) as exc:
@@ -268,10 +273,10 @@ def _evaluations_from_payload(
         if status not in _STATUSES:
             status = STATUS_UNKNOWN
         reason = str(row.get("reason") or "").strip() or (
-            "AI checked the chart excerpts for this checklist item."
+            "Model checked the chart excerpts for this checklist item."
         )
         if any(token in reason.upper() for token in AUTONOMOUS_DECISION_VALUES):
-            reason = "AI summarized chart support without making a care decision."
+            reason = "Model summarized chart support without making a care decision."
         cite_ids = row.get("cite_ids") or row.get("citations") or []
         evidence: list[EvidenceItem] = []
         if isinstance(cite_ids, list):
@@ -296,7 +301,7 @@ def _evaluations_from_payload(
                 criterion=criterion.description,
                 status=status,
                 evidence=evidence,
-                reason=f"AI chart check: {reason}",
+                reason=f"AI check: {reason}",
                 missing_label=missing_label,
             )
         )

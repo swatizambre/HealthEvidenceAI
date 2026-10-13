@@ -13,15 +13,33 @@ export function coverageLabel(value: string | undefined): string {
   }
 }
 
+/** True only when scoring_path names a real LLM (not local/rules). */
+export function isModelScoringPath(path: string | undefined): boolean {
+  const value = (path || "").toLowerCase().trim();
+  if (!value) return false;
+  if (value.startsWith("rules") || value.startsWith("rule_check")) return false;
+  if (value.startsWith("ai_clinical:")) {
+    const provider = value.split(":")[1] || "";
+    return provider !== "" && provider !== "local";
+  }
+  return false;
+}
+
+/** True for draft_source / senior assist that used a real LLM (not ai:local). */
+export function isModelAssistSource(source: string | undefined): boolean {
+  const value = (source || "").toLowerCase().trim();
+  if (value.startsWith("ai:")) {
+    const provider = value.slice(3);
+    return provider !== "" && provider !== "local";
+  }
+  return false;
+}
+
 export function scoringLabel(path: string | undefined): string {
-  const value = (path || "").toLowerCase();
-  if (value.startsWith("ai_clinical") || value.includes("ai")) {
-    return "Prepared with AI assist";
+  if (isModelScoringPath(path)) {
+    return "Prepared with AI check";
   }
-  if (value === "rules_fallback" || value === "rules") {
-    return "Prepared with checklist rules";
-  }
-  return "Prepared with AI assist";
+  return "Prepared with rule check";
 }
 
 export function agentDisplayName(agent: string | undefined): string {
@@ -43,7 +61,7 @@ export function agentDisplayName(agent: string | undefined): string {
     case "AuthorizationAgent":
       return "Senior review";
     default:
-      return (agent || "AI assist").replace(/Agent$/i, "").replace(/([a-z])([A-Z])/g, "$1 $2");
+      return (agent || "Evidence prep").replace(/Agent$/i, "").replace(/([a-z])([A-Z])/g, "$1 $2");
   }
 }
 
@@ -127,6 +145,7 @@ export function productStepDetail(detail: string | undefined): string | null {
     /^ok:/.test(lower) ||
     /^llm_fallback:/.test(lower) ||
     lower.includes("ai_clinical") ||
+    lower.includes("rule_check") ||
     lower.includes("rules_fallback") ||
     lower.includes("monai") ||
     lower.includes("numpy") ||
@@ -147,8 +166,9 @@ export function deskFacingText(value: string | undefined): string {
     return "";
   }
   text = text
-    .replace(/AI clinical intelligence\s*\(local grounded\)\s*:?\s*/gi, "AI chart check: ")
-    .replace(/AI clinical intelligence\s*:?\s*/gi, "AI chart check: ")
+    .replace(/AI clinical intelligence\s*\(local grounded\)\s*:?\s*/gi, "Rule check: ")
+    .replace(/AI clinical intelligence\s*:?\s*/gi, "AI check: ")
+    .replace(/AI chart check\s*:?\s*/gi, "Rule check: ")
     .replace(/Grounded evidence summary:/gi, "Chart check summary:")
     .replace(/\blisted outcomes are SUPPORTED\b/gi, "checklist items were found in the chart")
     .replace(/\boutcomes are SUPPORTED\b/gi, "items were found in the chart")
@@ -160,8 +180,9 @@ export function deskFacingText(value: string | undefined): string {
     .replace(/\bcriteria\b/gi, "checklist items")
     .replace(
       /AI clinical intelligence path used grounded local scoring over synthetic records\./gi,
-      "Prepared with AI assist over the stored chart.",
+      "Prepared with rule check over the stored chart.",
     )
+    .replace(/Prepared with AI assist over the stored chart/gi, "Prepared with rule check over the stored chart")
     .replace(/\s+/g, " ")
     .trim();
   return text;

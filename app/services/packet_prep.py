@@ -142,6 +142,7 @@ def prepare_evidence_packet(session: Session, payload: PacketPrepareRequest) -> 
         estimated_minutes=estimated_minutes,
         doc_risk_label=doc_risk_label,
         cite_label=cite_label,
+        scoring_path=review.scoring_path or "",
     )
 
     next_steps: list[str] = []
@@ -337,7 +338,14 @@ def _make_gap(
     # AI drafts for high-priority gaps only (labs/diagnoses) to keep prepare snappy.
     use_llm = _FOCUS_PRIORITY.get(focus, 3) <= 1
     draft, draft_source = _draft_suggestion(label, focus, snippets, use_llm=use_llm)
-    agent = "AI gap coach" if draft_source.startswith("ai:") else "Chart evidence"
+    from app.services.scoring_labels import is_model_assist_source
+
+    if is_model_assist_source(draft_source):
+        agent = "AI gap coach"
+    elif (draft_source or "").startswith("ai:"):
+        agent = "Rule-assisted draft"
+    else:
+        agent = "Chart evidence"
     return PacketGapOut(
         label=label,
         focus=focus,
@@ -424,11 +432,10 @@ def _build_ai_brief(
     human_review_required: bool,
     doc_risk: str,
 ) -> str:
-    # Surface whether criteria were AI-scored without exposing vendor internals loudly.
-    path = (scoring_path or "").strip()
-    assist = "AI chart assist" if path.startswith("ai_") or path.startswith("ai:") else "Rules assist"
-    if path.startswith("rules"):
-        assist = "Rules assist"
+    # Surface whether criteria were rule-scored or model-scored (local = rules).
+    from app.services.scoring_labels import scoring_assist_label
+
+    assist = scoring_assist_label(scoring_path)
     head = f"{assist} · {readiness}% ready · {gap_count} gap(s) · risk {doc_risk}."
     if next_best:
         head += f" Next: {next_best.action} — {next_best.label} (~{next_best.estimated_minutes} min)."
@@ -530,7 +537,11 @@ def _build_summary(
     estimated_minutes: int,
     doc_risk_label: str,
     cite_label: str,
+    scoring_path: str = "",
 ) -> str:
+    from app.services.scoring_labels import scoring_method_label
+
+    method = scoring_method_label(scoring_path)
     lines = [
         "HealthEvidence AI — Evidence pack (decision support only)",
         f"Patient: {patient_code} · {patient_name}",
@@ -541,7 +552,7 @@ def _build_summary(
         f"Staff prep estimate: ~{estimated_minutes} min",
         f"Documentation risk: {doc_risk_label}",
         f"Citations: {cite_label}",
-        "Prepared with: AI chart check + citation safety net",
+        f"Prepared with: {method} + citation safety net",
     ]
     if specialties:
         lines.append(f"Specialties in file: {', '.join(specialties)}")

@@ -28,10 +28,13 @@ def test_ai_primary_uses_provider_score(monkeypatch) -> None:
         )
     ]
     scored, path = score_criteria_clinical(settings, criteria, notes, [], retrieved_hits=[])
-    assert path.startswith("ai_clinical:")
+    # Local provider is the rule engine — not a model path.
+    assert path == "rule_check:local"
     assert scored[0].status == "SUPPORTED"
     assert scored[0].evidence
-    assert "AI chart check" in scored[0].reason
+    assert "Rule check" in scored[0].reason
+    assert "AI chart check" not in scored[0].reason
+    assert "AI check" not in scored[0].reason
 
 
 def test_rules_mode_skips_ai(monkeypatch) -> None:

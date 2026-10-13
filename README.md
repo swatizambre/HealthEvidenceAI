@@ -1,14 +1,16 @@
 # HealthEvidence AI
 
-**What it is for:** **prior-auth evidence prep** on top of a **lifelong digital health record across hospitals**.
+**What it is for:** **prior-auth evidence prep** (insurance paperwork) on top of a **lifelong digital health record across hospitals**.
+
+It is a **safety-conscious prototype for organizing prior-authorization checklists**, not a clinical AI and not a “perfect model.” In the default setup, evidence checking is **mostly deterministic rules** (keyword/lab matching, negation, units). Optional AI (Ollama or a cloud model) only runs when you turn it on, and cloud models are blocked once real patient data is enabled without attestation. Desk copy labels **rule check** vs **AI check** honestly.
 
 1. **Records / PA staff** prepare evidence packets when payers need documentation readiness — gaps ranked, staff minutes estimated, senior handoff ready.
 2. **Seniors** final-acknowledge Reviews; residents may check evidence but not final-sign.
 3. **Patients** keep **My record**: surgeries, symptoms, injuries, treatments from many facilities so the next doctor sees the full story.
-4. **Any clinician** (physio, surgeon, resident, senior) opens the same lifelong history for more precise care.
+4. **Any clinician** (physio, surgeon, resident, senior) opens the same lifelong history for continuity of care.
 5. **Visit notes** tag hospital + department so new care joins the lifelong chart.
 
-It organizes evidence. **It does not approve, deny, diagnose, or submit prior auth to a payer.**
+It organizes evidence for paperwork. **It does not approve, deny, diagnose, or submit prior auth to a payer.** Clinical data arrives when staff type notes, paste FHIR, or use synthetic seed — there is no live EHR/HIS/ABDM feed yet.
 
 Designed for **clinic → multispecialty → super-specialty → government/teaching** facilities. Set Facility + Role in the top bar — small clinics may switch hats; teaching hospitals keep resident draft / senior sign-off.
 
@@ -31,7 +33,7 @@ Prepare packet never auto-acks clinician HITL. Visit note requires synthetic/con
 
 ## Who this is for (sales)
 
-Sell as **prior-auth evidence prep + lifelong digital health record** — never as an approval engine. Lead with PA cycle-time reduction; lifelong chart is the continuity moat.
+Sell as **prior-auth evidence prep + lifelong digital health record** — never as an approval engine or clinical AI. Lead with PA cycle-time reduction; lifelong chart is the continuity moat. Be explicit that default checklist scoring is rule-based.
 
 | Buyer | Why they buy |
 |-------|----------------|

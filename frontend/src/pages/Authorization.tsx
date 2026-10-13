@@ -23,6 +23,7 @@ import {
   criterionStatusLabel,
   deskFacingText,
   documentTypeLabel,
+  isModelAssistSource,
   procedureDisplayName,
   sourceDisplay,
 } from "../labels";
@@ -1073,9 +1074,11 @@ export function AuthorizationPage() {
                                             Confirm checklist reviewed (after spot-check)
                                           </label>
                                           <p className="hint">
-                                            {seniorAssist.source.startsWith("ai:")
+                                            {isModelAssistSource(seniorAssist.source)
                                               ? "Started from AI assist"
-                                              : "Started from checklist"}
+                                              : seniorAssist.source.startsWith("ai:")
+                                                ? "Started from rule-assisted draft"
+                                                : "Started from checklist"}
                                             {seniorAssistEdited ? " · you overrode it" : ""}
                                           </p>
                                         </fieldset>
