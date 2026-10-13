@@ -98,8 +98,10 @@ def _export_span(span: SpanRecord) -> None:
             if os.environ.get("HE_TRACE_LOG", "").lower() in {"1", "true", "yes"}:
                 logger.info("agent_span_local_only %s", json.dumps(asdict(span), default=str))
             return
-    except Exception:  # noqa: BLE001 — never fail the desk for settings lookup
-        pass
+    except Exception:  # noqa: BLE001 — fail closed: never export when the PHI gate is unknown
+        if os.environ.get("HE_TRACE_LOG", "").lower() in {"1", "true", "yes"}:
+            logger.info("agent_span_local_only %s", json.dumps(asdict(span), default=str))
+        return
     endpoint = (os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT") or "").strip()
     langfuse_host = (os.environ.get("LANGFUSE_HOST") or "").strip()
     payload = asdict(span)

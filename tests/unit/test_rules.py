@@ -244,6 +244,35 @@ def test_lab_converts_mmol_mol_to_percent() -> None:
     assert result.status == "SUPPORTED"
 
 
+def test_lab_missing_unit_when_policy_requires_unit_is_unknown() -> None:
+    # 53 mmol/mol without a unit must not be read as 53% against a %-threshold.
+    lab = LabRecord(
+        test_name="HbA1c",
+        content="HbA1c: 53",
+        document_id="DOC-L000014",
+        chunks=(("DOC-L000014-01", "HbA1c: 53"),),
+        value="53",
+        unit="",
+    )
+    result = evaluate_criterion(
+        CriterionInput(
+            code="CRIT-A1C",
+            description="HbA1c > 7%.",
+            rule={
+                "type": "lab_test",
+                "test_name": "HbA1c",
+                "comparator": ">",
+                "threshold": 7.0,
+                "unit": "%",
+                "missing_label": "HbA1c > 7%",
+            },
+        ),
+        [],
+        [lab],
+    )
+    assert result.status == "UNKNOWN"
+
+
 def test_lab_unreadable_value_is_unknown() -> None:
     lab = LabRecord(
         test_name="HbA1c",
@@ -279,6 +308,12 @@ def test_keyword_respects_negation_cues() -> None:
         "Workup negative for diabetes.",
         "Diabetes ruled out in clinic.",
         "diabetes: none",
+        "Family history of diabetes in mother.",
+        "Rule out diabetes; awaiting HbA1c.",
+        "Possible diabetes, to confirm.",
+        "Diabetes was excluded after GTT.",
+        "r/o diabetes pending labs",
+        "diabetes?",
     ]
     for text in cases:
         result = evaluate_criterion(

@@ -102,7 +102,8 @@ Open [http://127.0.0.1:5173](http://127.0.0.1:5173) (Vite proxies `/api` → `80
 # Local / demo (your .env DATABASE_URL)
 docker compose up --build
 
-# Sales demo on pilot Postgres + synthetic seed
+# Sales demo on Postgres + synthetic seed (needs DEV_JWT_SECRET ≥32 chars)
+export DEV_JWT_SECRET="$(openssl rand -hex 24)"
 docker compose -f docker-compose.yml -f docker-compose.pilot.yml -f docker-compose.demo.yml up --build
 
 make launch-check
