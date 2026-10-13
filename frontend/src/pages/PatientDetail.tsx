@@ -21,6 +21,7 @@ import {
   criterionStatusLabel,
   documentationRiskClass,
   essentialsStatusLabel,
+  isModelAssistSource,
   noteTypeLabel,
   policyOptionLabel,
 } from "../labels";
@@ -723,9 +724,11 @@ export function PatientDetailPage() {
                   </div>
                   {packet.next_best_action.draft_suggestion ? (
                     <p className="hint ai-draft-preview" role="status">
-                      {packet.next_best_action.draft_source?.startsWith("ai:")
+                      {isModelAssistSource(packet.next_best_action.draft_source)
                         ? "AI draft · "
-                        : "Draft · "}
+                        : packet.next_best_action.draft_source?.startsWith("ai:")
+                          ? "Rule-assisted draft · "
+                          : "Draft · "}
                       {packet.next_best_action.draft_suggestion}
                     </p>
                   ) : null}
@@ -735,7 +738,9 @@ export function PatientDetailPage() {
                       to={visitGapHref(packet.patient_id, packet.next_best_action)}
                     >
                       {packet.next_best_action.draft_suggestion
-                        ? "Use AI draft in visit note"
+                        ? isModelAssistSource(packet.next_best_action.draft_source)
+                          ? "Use AI draft in visit note"
+                          : "Use draft in visit note"
                         : "Add visit note"}
                     </Link>
                     <button
@@ -781,7 +786,11 @@ export function PatientDetailPage() {
                           <span>{gap.label}</span>
                           <span className="muted">
                             ~{gap.estimated_minutes ?? 8} min
-                            {gap.draft_source?.startsWith("ai:") ? " · AI draft" : ""}
+                            {isModelAssistSource(gap.draft_source)
+                              ? " · AI draft"
+                              : gap.draft_source?.startsWith("ai:")
+                                ? " · Rule-assisted draft"
+                                : ""}
                           </span>
                         </div>
                         <Link

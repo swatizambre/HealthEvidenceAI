@@ -589,7 +589,7 @@ export function OpdIngestPage() {
         <form className="panel form-grid" onSubmit={onSubmitVisit}>
           {draftHint ? (
             <p className="agent-draft span-2" role="status">
-              AI draft applied from chart evidence — review before save. Not a diagnosis.
+              Draft applied from chart evidence — review before save. Not a diagnosis.
               {focus === "labs" || focus === "meds" || focus === "diagnoses"
                 ? " Draft is in Assessment / plan below."
                 : " Draft is in the visit history field."}
