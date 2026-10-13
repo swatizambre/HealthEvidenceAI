@@ -24,6 +24,7 @@ Canonical design and operations docs for HealthEvidence AI.
 
 | Document | Purpose |
 |----------|---------|
+| [GO_LIVE.md](GO_LIVE.md) | Go-live runbooks: synthetic demo + real-data hospital trial |
 | [LAUNCH.md](LAUNCH.md) | Demo vs pilot vs staging paths |
 | [operations.md](operations.md) | Day-2 ops, locales, imaging, HA/DR stub |
 | [kubernetes.md](kubernetes.md) | Cluster apply notes |

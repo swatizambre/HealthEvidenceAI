@@ -278,6 +278,12 @@ def _resolve_patient(
     existing = _find_patient_by_external(
         session, payload.external_patient_id, org_id=org.id
     )
+    if existing is None and not org_id:
+        # Org scope off: a legacy chart created before org stamping (org_id null)
+        # is still the same facility's patient. Never consulted when an org is bound.
+        existing = _find_patient_by_external(
+            session, payload.external_patient_id, org_id=None
+        )
     if existing is not None:
         _merge_conditions(existing, payload)
         if getattr(existing, "org_id", None) is None:
@@ -341,13 +347,21 @@ def _find_patient_by_external(
         patient = session.get(Patient, document.patient_id)
         if patient is None:
             continue
-        patient_org = getattr(patient, "org_id", None)
-        # Only merge when the chart is already stamped to this org.
-        # Orphans (org_id null) and other-org charts must not share an MRN → patient ID.
-        if not org_id or patient_org != org_id:
+        if not _same_org(getattr(patient, "org_id", None), org_id):
             continue
         return patient
     return None
+
+
+def _same_org(patient_org: str | None, org_id: str | None) -> bool:
+    """MRNs are only unique inside one facility — never merge charts across orgs.
+
+    With an org bound, match only charts stamped to that org. Without one (org scope
+    off / legacy rows), match only charts that are also unbound.
+    """
+    if org_id:
+        return patient_org == org_id
+    return not patient_org
 
 
 def _find_encounter(

@@ -38,3 +38,6 @@ data/*.db-shm
 data/*.db-wal
 frontend/test-results/
 
+
+# Gold gate result read by app.cli.go_live_check (regenerate with make eval-gold-report)
+data/gold_gate_result.json

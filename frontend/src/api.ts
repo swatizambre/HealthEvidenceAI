@@ -409,13 +409,39 @@ export interface AuthMe {
   enforce_org_scope: boolean;
 }
 
-/** Public capabilities for chrome (demo sign-in vs OIDC identity). */
-export async function getAuthCapabilities(): Promise<{
+/** Deployment mode banner contract (server: Settings.deployment_banner). */
+export type DeploymentMode = "demo" | "trial" | "practice";
+
+export interface DeploymentInfo {
+  mode: DeploymentMode;
+  trial_site_org_code: string;
+  trial_end_date: string;
+  banner: string;
+}
+
+/** Text shown in the always-visible top banner for each deployment mode. */
+export function deploymentBannerText(info: DeploymentInfo): string {
+  if (info.mode === "trial") {
+    const site = info.trial_site_org_code || "unconfigured site";
+    const until = info.trial_end_date || "unset date";
+    return `REAL-DATA TRIAL — ${site} until ${until}`;
+  }
+  if (info.mode === "demo") {
+    return "DEMO — synthetic data";
+  }
+  return "PRACTICE — synthetic / consented test data only";
+}
+
+export interface AuthCapabilities {
   auth_mode: string;
   demo_signin_allowed: boolean;
   enforce_org_scope: boolean;
   docs_exposed: boolean;
-}> {
+  deployment: DeploymentInfo | null;
+}
+
+/** Public capabilities for chrome (demo sign-in vs OIDC identity). */
+export async function getAuthCapabilities(): Promise<AuthCapabilities> {
   const response = await fetch("/api/v1/auth/capabilities");
   if (!response.ok) {
     return {
@@ -423,13 +449,16 @@ export async function getAuthCapabilities(): Promise<{
       demo_signin_allowed: true,
       enforce_org_scope: false,
       docs_exposed: true,
+      deployment: null,
     };
   }
-  return (await response.json()) as {
-    auth_mode: string;
-    demo_signin_allowed: boolean;
-    enforce_org_scope: boolean;
-    docs_exposed: boolean;
+  const body = (await response.json()) as Partial<AuthCapabilities>;
+  return {
+    auth_mode: body.auth_mode ?? "dev-jwt",
+    demo_signin_allowed: body.demo_signin_allowed ?? true,
+    enforce_org_scope: body.enforce_org_scope ?? false,
+    docs_exposed: body.docs_exposed ?? false,
+    deployment: body.deployment ?? null,
   };
 }
 

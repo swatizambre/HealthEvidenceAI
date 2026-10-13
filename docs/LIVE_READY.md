@@ -10,6 +10,9 @@ This is the go-live runbook for shared hospital environments (staging / producti
 | Practice feeds | HIS/FHIR webhooks with `synthetic=true` + `consent_attested=true` |
 | Live PHI feeds | `ALLOW_PHI=true` **and** `PHI_PROGRAM_ATTESTED=true` + change-control signed |
 
+Real-data trial runbook (prerequisites, `make go-live-check MODE=trial`, monitoring, stop
+criteria): [GO_LIVE.md](GO_LIVE.md).
+
 Default remains **synthetic / practice**. The product is evidence-pack decision support — not a clinical device.
 
 ## Hospital interface (completed platform pieces)
@@ -76,10 +79,13 @@ Kubernetes ConfigMap (`deploy/kubernetes/configmap.yaml`) uses `ENVIRONMENT=prod
 ## Enabling live PHI (after program sign-off)
 
 1. Complete [OPD change-control](opd-ingest-roadmap.md#change-control-p26--before-any-live-ehr-feed)
-2. Set `ALLOW_PHI=true` and `PHI_PROGRAM_ATTESTED=true`
+   and every prerequisite in [GO_LIVE.md §2.1](GO_LIVE.md#21-non-code-prerequisites-all-signed-before-allow_phitrue)
+2. Set `ALLOW_PHI=true` and `PHI_PROGRAM_ATTESTED=true` plus the trial attestations
+   (`TRIAL_ETHICS_APPROVAL_REF`, `DPO_CONTACT`, `SECURITY_ASSESSMENT_REF`, `BREACH_RUNBOOK_URL`,
+   `DATA_RESIDENCY_REGION`, `TRIAL_SITE_ORG_CODE`, `TRIAL_END_DATE`). Boot fails otherwise
 3. Confirm `HOSPITAL_ALLOW_SIMULATE=false`
 4. Send HIS/FHIR packets with `synthetic=false` and `consent_attested=true`
-5. Re-check `/ready` → `phi_live=true`, `hospital_mode=production_phi`
+5. Re-check `/ready` → `phi_live=true`, `hospital_mode=production_phi`, `mode=trial`
 
 ## Operator checklist
 

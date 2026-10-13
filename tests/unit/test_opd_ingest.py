@@ -1,5 +1,7 @@
 """Phase 1 OPD patient-wise ingest."""
 
+from typing import Any
+
 from app.core.safety import DISCLAIMER
 from fastapi.testclient import TestClient
 
@@ -289,3 +291,96 @@ def test_opd_ingest_merges_multiple_diagnoses(client: TestClient) -> None:
     updated = client.get(f"/api/v1/patients/{body['patient_id']}").json()
     assert "Chronic sinusitis (disorder)" in updated["conditions"]
     assert "Gingivitis (disorder)" in updated["conditions"]
+
+
+def _org(session: Any, code: str) -> str:
+    from app.models import Organization
+    from sqlalchemy import select
+
+    row = session.scalar(select(Organization).where(Organization.org_code == code))
+    if row is None:
+        row = Organization(org_code=code, name=f"Facility {code}", facility_type="clinic", active=True)
+        session.add(row)
+        session.flush()
+    return str(row.id)
+
+
+def _ingest(session: Any, *, org_id: str | None, encounter_id: str, mrn: str) -> Any:
+    from app.schemas.api import OpdIngestRequest
+    from app.services.opd_ingest import ingest_opd_packet
+
+    payload = OpdIngestRequest.model_validate(
+        _packet(external_patient_id=mrn, encounter_id=encounter_id)
+    )
+    result = ingest_opd_packet(session, payload, org_id=org_id)
+    session.commit()
+    return result
+
+
+def test_same_mrn_same_org_reuses_patient(client: TestClient) -> None:
+    session = client.app.state.session_factory()
+    try:
+        org_a = _org(session, "ORG-000071")
+        first = _ingest(session, org_id=org_a, encounter_id="ENC-ORG-A-1", mrn="MRN-SHARED-1")
+        second = _ingest(session, org_id=org_a, encounter_id="ENC-ORG-A-2", mrn="MRN-SHARED-1")
+        assert second.created is True
+        assert second.patient_id == first.patient_id
+    finally:
+        session.close()
+
+
+def test_same_mrn_different_org_never_merges(client: TestClient) -> None:
+    from app.db.repository import get_patient_by_code
+
+    session = client.app.state.session_factory()
+    try:
+        org_a = _org(session, "ORG-000072")
+        org_b = _org(session, "ORG-000073")
+        first = _ingest(session, org_id=org_a, encounter_id="ENC-X-A-1", mrn="MRN-SHARED-2")
+        second = _ingest(session, org_id=org_b, encounter_id="ENC-X-B-1", mrn="MRN-SHARED-2")
+        assert second.patient_id != first.patient_id
+        patient_a = get_patient_by_code(session, first.patient_id)
+        patient_b = get_patient_by_code(session, second.patient_id)
+        assert patient_a is not None and patient_b is not None
+        assert patient_a.org_id == org_a
+        assert patient_b.org_id == org_b
+    finally:
+        session.close()
+
+
+def test_org_scope_off_returning_patient_reuses_chart(client: TestClient) -> None:
+    session = client.app.state.session_factory()
+    try:
+        first = _ingest(session, org_id=None, encounter_id="ENC-NOORG-1", mrn="MRN-NOORG-1")
+        second = _ingest(session, org_id=None, encounter_id="ENC-NOORG-2", mrn="MRN-NOORG-1")
+        assert second.created is True
+        assert second.patient_id == first.patient_id
+    finally:
+        session.close()
+
+
+def test_org_scope_off_reuses_legacy_unstamped_chart(client: TestClient) -> None:
+    from app.db.repository import get_patient_by_code
+
+    session = client.app.state.session_factory()
+    try:
+        first = _ingest(session, org_id=None, encounter_id="ENC-LEGACY-1", mrn="MRN-LEGACY-1")
+        patient = get_patient_by_code(session, first.patient_id)
+        assert patient is not None
+        patient.org_id = None  # chart created before org stamping
+        session.commit()
+        second = _ingest(session, org_id=None, encounter_id="ENC-LEGACY-2", mrn="MRN-LEGACY-1")
+        assert second.patient_id == first.patient_id
+    finally:
+        session.close()
+
+
+def test_find_patient_by_external_org_matching_rules() -> None:
+    from app.services.opd_ingest import _same_org
+
+    assert _same_org("org-a", "org-a") is True
+    assert _same_org("org-b", "org-a") is False
+    assert _same_org(None, "org-a") is False
+    assert _same_org(None, None) is True
+    assert _same_org("", None) is True
+    assert _same_org("org-a", None) is False

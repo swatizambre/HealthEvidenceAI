@@ -45,6 +45,11 @@ class ReadyResponse(ResponseModel):
     phi_live: bool = False
     oidc_configured: bool = False
     seed_on_startup: bool = False
+    # demo | trial | practice — drives the UI banner; never includes secrets.
+    mode: str = ""
+    trial_site_org_code: str = ""
+    trial_end_date: str = ""
+    banner: str = ""
 
 
 class BreakGlassRequest(APIModel):

@@ -98,6 +98,7 @@ def auth_capabilities(request: Request) -> dict[str, object]:
         "enforce_org_scope": settings.org_scope_enforced(),
         "docs_exposed": settings.docs_exposed(),
         "ai": describe_ai_scope(settings),
+        "deployment": settings.deployment_banner(),
     }
 
 

@@ -44,6 +44,7 @@ _COUNTERS: dict[str, float] = {
     "review_runs_error_total": 0.0,
     "agent_span_total": 0.0,
     "agent_span_latency_ms_sum": 0.0,
+    "audit_durable_write_failures_total": 0.0,
 }
 
 
@@ -181,5 +182,9 @@ def prometheus_text() -> str:
         "# HELP healthevidence_review_runs_error_total Agent spans marked error.",
         "# TYPE healthevidence_review_runs_error_total counter",
         f"healthevidence_review_runs_error_total {counters.get('review_runs_error_total', 0.0)}",
+        "# HELP healthevidence_audit_durable_write_failures_total Durable audit rows that failed to commit.",
+        "# TYPE healthevidence_audit_durable_write_failures_total counter",
+        "healthevidence_audit_durable_write_failures_total "
+        f"{counters.get('audit_durable_write_failures_total', 0.0)}",
     ]
     return "\n".join(lines) + "\n"
