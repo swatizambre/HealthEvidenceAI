@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
+  getConsentCapabilities,
   getHospitalPipelineStatus,
   getPatient,
   getPatients,
@@ -15,6 +16,13 @@ import {
   type PatientSummary,
   type PolicySummary,
 } from "../api";
+import {
+  ConsentCapture,
+  consentDraftComplete,
+  emptyConsentDraft,
+  resolveIngestConsent,
+  type ConsentDraft,
+} from "../components/ConsentCapture";
 import { formatLiveAge, useLiveRefresh } from "../hooks/useLiveRefresh";
 import { policyOptionLabel } from "../labels";
 import { printVisitSummary } from "../printSheet";
@@ -122,6 +130,9 @@ export function OpdIngestPage() {
   const [policyId, setPolicyId] = useState(policyParam || "POL-000001");
   const [fhirJson, setFhirJson] = useState(SAMPLE_FHIR);
   const [consentAttested, setConsentAttested] = useState(false);
+  // PHI desks need a stored consent (selector / inline form) instead of the checkbox.
+  const [consentRequired, setConsentRequired] = useState(false);
+  const [consentDraft, setConsentDraft] = useState<ConsentDraft>(emptyConsentDraft);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<OpdIngestResult | null>(null);
@@ -148,6 +159,18 @@ export function OpdIngestPage() {
       intervalMs: 45_000,
       enabled: !isPatient,
     });
+
+  useEffect(() => {
+    let cancelled = false;
+    void getConsentCapabilities().then((caps) => {
+      if (!cancelled) {
+        setConsentRequired(caps.consent_mode === "stored_required");
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const id = window.setInterval(() => setPipeTick((n) => n + 1), 5_000);
@@ -360,6 +383,13 @@ export function OpdIngestPage() {
     });
   }
 
+  // A consent picked for one chart must never carry over to another patient.
+  useEffect(() => {
+    setConsentDraft((draft) => (draft.consentId ? { ...draft, consentId: "" } : draft));
+  }, [selectedPatientId]);
+
+  const consentReady = consentRequired ? consentDraftComplete(consentDraft) : consentAttested;
+
   async function onSubmitVisit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -385,6 +415,10 @@ export function OpdIngestPage() {
           : selectedPatientId && /^PAT-\d{6}$/.test(selectedPatientId)
             ? selectedPatientId
             : undefined;
+
+      const consentFields = consentRequired
+        ? await resolveIngestConsent(consentDraft, boundPatient)
+        : {};
 
       const body = await ingestOpdPacket({
         mrn: isPatient ? myPatientId : mrn.trim(),
@@ -417,8 +451,9 @@ export function OpdIngestPage() {
         procedure: procedure.trim(),
         policy_id: policyId || undefined,
         source: "his_export",
-        synthetic: true,
-        consent_attested: consentAttested,
+        synthetic: !consentRequired,
+        consent_attested: consentRequired ? true : consentAttested,
+        ...consentFields,
       });
       setResult(body);
       pushRecentPatient({
@@ -439,12 +474,19 @@ export function OpdIngestPage() {
     setResult(null);
     try {
       const bundle = JSON.parse(fhirJson) as Record<string, unknown>;
+      const fhirPatient =
+        selectedPatientId && /^PAT-\d{6}$/.test(selectedPatientId) ? selectedPatientId : undefined;
+      const consentFields = consentRequired
+        ? await resolveIngestConsent(consentDraft, fhirPatient)
+        : {};
       const body = await ingestOpdFhir({
         bundle,
         procedure: procedure.trim(),
         policy_id: policyId || undefined,
-        synthetic: true,
-        consent_attested: consentAttested,
+        patient_id: consentRequired ? fhirPatient : undefined,
+        synthetic: !consentRequired,
+        consent_attested: consentRequired ? true : consentAttested,
+        ...consentFields,
       });
       setResult(body);
     } catch (err) {
@@ -861,21 +903,37 @@ export function OpdIngestPage() {
             <input value={procedure} onChange={(e) => setProcedure(e.target.value)} required />
           </label>
 
+          {consentRequired ? (
+            <ConsentCapture
+              patientId={
+                isPatient
+                  ? myPatientId
+                  : selectedPatientId && /^PAT-\d{6}$/.test(selectedPatientId)
+                    ? selectedPatientId
+                    : undefined
+              }
+              draft={consentDraft}
+              onChange={setConsentDraft}
+              canRecord={!isPatient}
+            />
+          ) : null}
           <div className="form-actions span-2 sticky-actions">
-            <label className="consent-check">
-              <input
-                type="checkbox"
-                checked={consentAttested}
-                onChange={(e) => setConsentAttested(e.target.checked)}
-              />
-              <span>
-                I confirm this visit data is synthetic or consented demonstration data (required).
-              </span>
-            </label>
+            {consentRequired ? null : (
+              <label className="consent-check">
+                <input
+                  type="checkbox"
+                  checked={consentAttested}
+                  onChange={(e) => setConsentAttested(e.target.checked)}
+                />
+                <span>
+                  I confirm this visit data is synthetic or consented demonstration data (required).
+                </span>
+              </label>
+            )}
             <button
               className="btn btn-primary"
               type="submit"
-              disabled={busy || !consentAttested}
+              disabled={busy || !consentReady}
             >
               {busy ? "Saving…" : "Save visit note"}
             </button>
@@ -908,21 +966,35 @@ export function OpdIngestPage() {
             <span>Procedure</span>
             <input value={procedure} onChange={(e) => setProcedure(e.target.value)} required />
           </label>
+          {consentRequired ? (
+            <ConsentCapture
+              patientId={
+                selectedPatientId && /^PAT-\d{6}$/.test(selectedPatientId)
+                  ? selectedPatientId
+                  : undefined
+              }
+              draft={consentDraft}
+              onChange={setConsentDraft}
+              canRecord={!isPatient}
+            />
+          ) : null}
           <div className="form-actions span-2">
-            <label className="consent-check">
-              <input
-                type="checkbox"
-                checked={consentAttested}
-                onChange={(e) => setConsentAttested(e.target.checked)}
-              />
-              <span>
-                I confirm this visit data is synthetic or consented demonstration data (required).
-              </span>
-            </label>
+            {consentRequired ? null : (
+              <label className="consent-check">
+                <input
+                  type="checkbox"
+                  checked={consentAttested}
+                  onChange={(e) => setConsentAttested(e.target.checked)}
+                />
+                <span>
+                  I confirm this visit data is synthetic or consented demonstration data (required).
+                </span>
+              </label>
+            )}
             <button
               className="btn btn-primary"
               type="submit"
-              disabled={busy || !consentAttested}
+              disabled={busy || !consentReady}
             >
               {busy ? "Importing…" : "Import FHIR visit"}
             </button>

@@ -371,6 +371,9 @@ function friendlyApiMessage(
   if (errorCode === "ORG_SCOPE_FORBIDDEN") {
     return "This chart belongs to another facility.";
   }
+  if (errorCode === "CONSENT_REQUIRED") {
+    return raw || "A recorded, active patient consent is required before saving this visit.";
+  }
   if (raw) {
     return raw;
   }
@@ -853,6 +856,7 @@ export interface OpdIngestResult {
   case_id: string | null;
   created: boolean;
   source?: string;
+  consent_id?: string | null;
   disclaimer: string;
 }
 
@@ -888,6 +892,8 @@ export type OpdIngestBody = {
   source?: "opd_manual" | "opd_export" | "his_export" | "fhir_r4" | "hl7_mapped";
   synthetic: boolean;
   consent_attested: boolean;
+  consent_id?: string;
+  consent?: ConsentInput;
 };
 
 export function getPolicies(): Promise<{ policies: PolicySummary[]; total: number }> {
@@ -956,6 +962,9 @@ export function ingestOpdFhir(body: {
   policy_id?: string;
   synthetic: boolean;
   consent_attested: boolean;
+  consent_id?: string;
+  consent?: ConsentInput;
+  patient_id?: string;
 }): Promise<OpdIngestResult> {
   return request("/api/v1/opd/ingest/fhir", {
     method: "POST",
@@ -1022,4 +1031,153 @@ export function askHelp(
       policy_id: options?.policy_id,
     }),
   });
+}
+
+/* ---------- Consent records & patient rights (DPDP / HIPAA) ---------- */
+
+export type ConsentPurpose = "prior_auth_evidence" | "continuity_of_care" | "research_trial";
+export type ConsentMethod = "written" | "electronic" | "verbal_witnessed";
+
+export interface ConsentInput {
+  purpose: ConsentPurpose;
+  method: ConsentMethod;
+  notice_version: string;
+  granted_by_name: string;
+  language?: string;
+  scope?: string;
+  evidence_ref?: string;
+  granted_at?: string;
+  expires_at?: string;
+}
+
+export interface ConsentRecord {
+  consent_id: string;
+  patient_id: string;
+  purpose: string;
+  scope: string;
+  method: string;
+  language: string;
+  notice_version: string;
+  granted_by_name: string;
+  recorded_by: string;
+  granted_at: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+  revoked_reason: string;
+  evidence_ref: string;
+  created_at: string;
+  active: boolean;
+}
+
+export interface ConsentList {
+  patient_id: string;
+  consents: ConsentRecord[];
+  total: number;
+}
+
+export function listConsents(patientId: string): Promise<ConsentList> {
+  return request(`/api/v1/patients/${encodeURIComponent(patientId)}/consents`);
+}
+
+export function recordConsent(patientId: string, body: ConsentInput): Promise<ConsentRecord> {
+  return request(`/api/v1/patients/${encodeURIComponent(patientId)}/consents`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function revokeConsent(
+  patientId: string,
+  consentId: string,
+  reason: string,
+): Promise<ConsentRecord> {
+  const path =
+    `/api/v1/patients/${encodeURIComponent(patientId)}` +
+    `/consents/${encodeURIComponent(consentId)}/revoke`;
+  return request(path, { method: "POST", body: JSON.stringify({ reason }) });
+}
+
+/** Consent policy for visit ingest: "stored_required" on attested PHI desks. */
+export interface ConsentCapabilities {
+  phi_live: boolean;
+  consent_mode: "stored_required" | "attestation";
+}
+
+export async function getConsentCapabilities(): Promise<ConsentCapabilities> {
+  try {
+    const response = await fetch("/api/v1/auth/capabilities");
+    if (!response.ok) {
+      return { phi_live: false, consent_mode: "attestation" };
+    }
+    const body = (await response.json()) as Partial<ConsentCapabilities>;
+    return {
+      phi_live: Boolean(body.phi_live),
+      consent_mode: body.consent_mode === "stored_required" ? "stored_required" : "attestation",
+    };
+  } catch {
+    return { phi_live: false, consent_mode: "attestation" };
+  }
+}
+
+export interface AccessLogEntry {
+  event_id: string;
+  occurred_at: string;
+  actor_label: string;
+  actor_category:
+    | "you"
+    | "care_team"
+    | "care_team_emergency"
+    | "system"
+    | "other_patient"
+    | "unknown";
+  action: string;
+  action_label: string;
+  outcome: "allowed" | "denied";
+}
+
+export interface AccessLog {
+  patient_id: string;
+  total: number;
+  limit: number;
+  offset: number;
+  entries: AccessLogEntry[];
+  disclaimer: string;
+}
+
+export function getMyAccessLog(options?: { limit?: number; offset?: number }): Promise<AccessLog> {
+  const params = new URLSearchParams();
+  params.set("limit", String(options?.limit ?? 20));
+  params.set("offset", String(options?.offset ?? 0));
+  return request(`/api/v1/me/access-log?${params.toString()}`);
+}
+
+/** Full JSON copy of the signed-in patient's own record. */
+export function getMyExport(): Promise<Record<string, unknown> & { generated_at: string }> {
+  return request("/api/v1/me/export");
+}
+
+export type DataSubjectRequestType = "correction" | "erasure" | "grievance" | "nominee";
+
+export interface DataSubjectRequest {
+  request_id: string;
+  patient_id: string;
+  request_type: string;
+  details: string;
+  status: string;
+  created_at: string;
+  resolved_at: string | null;
+  resolution_note: string;
+  outcome: string;
+  handled_by: string | null;
+}
+
+export function getMyRequests(): Promise<{ total: number; requests: DataSubjectRequest[] }> {
+  return request("/api/v1/me/requests");
+}
+
+export function createMyRequest(body: {
+  request_type: DataSubjectRequestType;
+  details: string;
+}): Promise<DataSubjectRequest> {
+  return request("/api/v1/me/requests", { method: "POST", body: JSON.stringify(body) });
 }
