@@ -21,6 +21,7 @@ from app.services.evaluator import (
     evaluate_criterion,
 )
 from app.services.safety_net import apply_safety_net
+
 from evaluation.metrics import CaseOutcome, gate_ok, summarize_outcomes
 
 ROOT = Path(__file__).resolve().parent
