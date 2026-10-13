@@ -1,0 +1,78 @@
+# REAL-DATA TRIAL overlay — one hospital, real patient data. Runbook: docs/GO_LIVE.md
+#
+# Only after the non-code checklist in docs/GO_LIVE.md is signed (IEC approval, DPDP
+# notice + consent, DPO, VAPT, DPA with hosting provider, clinician gold sign-off).
+# Prefer managed PostgreSQL (encryption at rest + PITR) via DATABASE_URL; the bundled
+# postgres container is for a single-host trial only and must sit on encrypted disk.
+#
+#   cp .env.pilot.example .env.trial   # fill every TRIAL_* / DPO_* value
+#   docker compose --env-file .env.trial \
+#     -f docker-compose.yml -f docker-compose.trial.yml config >/dev/null   # validates
+#   make go-live-check MODE=trial
+#   docker compose --env-file .env.trial -f docker-compose.yml -f docker-compose.trial.yml up -d
+#
+# Never combine with docker-compose.demo.yml or docker-compose.oidc.yml (start-dev Keycloak,
+# admin/admin) — the trial uses the production / hospital IdP.
+# Requires Docker Compose v2.24+ (!reset / !override).
+
+services:
+  postgres:
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-healthevidence}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD (no default password in a trial)}
+      POSTGRES_DB: ${POSTGRES_DB:-healthevidence}
+    # Never publish the database port on the host.
+    ports: !reset []
+
+  ollama:
+    # Local model only reachable from the backend on the compose network.
+    ports: !reset []
+
+  backend:
+    environment:
+      ENVIRONMENT: pilot
+      AUTH_MODE: oidc
+      # Managed Postgres recommended; must include the password (no default).
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL (postgresql+psycopg://user:password@host:5432/db?sslmode=require)}
+      OIDC_ISSUER: ${OIDC_ISSUER:?Set OIDC_ISSUER to the production / hospital IdP (https)}
+      OIDC_JWKS_URL: ${OIDC_JWKS_URL:?Set OIDC_JWKS_URL}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:-healthevidence-api}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-healthevidence-api}
+      OIDC_ROLES_CLAIM: ${OIDC_ROLES_CLAIM:-roles}
+      OIDC_REQUIRED_ROLES: patient,senior_clinician,resident,staff,admin,reviewer
+      # Real data is opt-in: both must be set to "true" explicitly in the env file.
+      ALLOW_PHI: ${ALLOW_PHI:-false}
+      PHI_PROGRAM_ATTESTED: ${PHI_PROGRAM_ATTESTED:-false}
+      SEED_ON_STARTUP: "false"
+      ENFORCE_ORG_SCOPE: "true"
+      HOSPITAL_ALLOW_SIMULATE: "false"
+      SYNTHETIC_LIFELONG: "false"
+      DEV_JWT_SECRET: ""
+      # On-prem / local model by default — no chart text leaves the host.
+      LLM_PROVIDER: ${LLM_PROVIDER:-local}
+      LLM_FALLBACK_PROVIDERS: ${LLM_FALLBACK_PROVIDERS:-local}
+      LLM_BAA_ATTESTED: ${LLM_BAA_ATTESTED:-false}
+      LLM_PHI_EGRESS_ALLOWED: ${LLM_PHI_EGRESS_ALLOWED:-false}
+      CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS to the trial UI origin (https://...)}
+      DEFAULT_ORG_CODE: ${TRIAL_SITE_ORG_CODE:?Set TRIAL_SITE_ORG_CODE}
+      DEFAULT_ORG_NAME: ${DEFAULT_ORG_NAME:?Set DEFAULT_ORG_NAME to the trial hospital name}
+      # Trial attestations (validated at boot; see docs/GO_LIVE.md).
+      TRIAL_ETHICS_APPROVAL_REF: ${TRIAL_ETHICS_APPROVAL_REF:?Set TRIAL_ETHICS_APPROVAL_REF (IEC/IRB approval id)}
+      DPO_CONTACT: ${DPO_CONTACT:?Set DPO_CONTACT (data protection / grievance officer)}
+      SECURITY_ASSESSMENT_REF: ${SECURITY_ASSESSMENT_REF:?Set SECURITY_ASSESSMENT_REF (VAPT report id)}
+      BREACH_RUNBOOK_URL: ${BREACH_RUNBOOK_URL:?Set BREACH_RUNBOOK_URL}
+      DATA_RESIDENCY_REGION: ${DATA_RESIDENCY_REGION:?Set DATA_RESIDENCY_REGION (e.g. ap-south-1)}
+      TRIAL_SITE_ORG_CODE: ${TRIAL_SITE_ORG_CODE:?Set TRIAL_SITE_ORG_CODE}
+      TRIAL_END_DATE: ${TRIAL_END_DATE:?Set TRIAL_END_DATE (YYYY-MM-DD)}
+      # Owned by parallel workstreams; required for the trial (go-live check enforces).
+      HOSPITAL_INTERFACE_KEYS: ${HOSPITAL_INTERFACE_KEYS:-}
+      STREAM_TICKET_SECRET: ${STREAM_TICKET_SECRET:?Set STREAM_TICKET_SECRET (>=32 chars)}
+      RATE_LIMIT_ENABLED: "true"
+    # API reachable only from the host; put a TLS-terminating reverse proxy in front.
+    ports: !override
+      - "127.0.0.1:8000:8000"
+
+  frontend:
+    # Serve the UI only behind the TLS reverse proxy on the same host.
+    ports: !override
+      - "127.0.0.1:3000:80"
