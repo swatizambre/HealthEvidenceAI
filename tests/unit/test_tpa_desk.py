@@ -414,6 +414,107 @@ def test_india_checklists_replace_us_payer_labels(client: TestClient) -> None:
     assert "knee" in detail["title"].lower()
 
 
+def test_documents_checklist_accepts_only_typed_documents(client: TestClient) -> None:
+    items = {item["item_id"]: item for item in client.get(f"{API}/cases/PA-000011").json()["checklist"]}
+    xray = items["CRIT-IN-RTA-05"]
+    assert xray["status"] == "SUPPORTED"
+    assert xray["citations"]
+    assert {citation["source"] for citation in xray["citations"]} == {"radiology_report"}
+    # The casualty note mentions the MLC number, but no MLC copy / FIR document is on file.
+    mlc = items["CRIT-IN-RTA-04"]
+    assert mlc["status"] == "MISSING"
+    assert "accepted type" in mlc["reason"]
+    assert mlc["fix_hint"]
+
+    tkr = {item["item_id"]: item for item in client.get(f"{API}/cases/PA-000006").json()["checklist"]}
+    assert tkr["CRIT-IN-TKR-05"]["status"] == "SUPPORTED"
+    assert {c["source"] for c in tkr["CRIT-IN-TKR-05"]["citations"]} == {"radiology_report"}
+    for item in tkr.values():
+        if item["status"] == "SUPPORTED":
+            assert "source record contains the evidence" not in item["reason"].lower()
+
+
+def test_typed_report_upload_satisfies_documents_item(client: TestClient) -> None:
+    workspace = client.get(f"{API}/cases/PA-000006").json()
+    before = workspace["readiness"]["missing"]
+    implant = {item["item_id"]: item for item in workspace["checklist"]}["CRIT-IN-TKR-06"]
+    assert implant["status"] == "MISSING"
+    untyped = client.post(
+        "/api/v1/documents",
+        json={"document_type": "radiology_report", "source": "desk", "content": "X-ray knee"},
+    )
+    assert untyped.status_code == 422  # patient documents need a patient
+    created = client.post(
+        "/api/v1/documents",
+        json={
+            "document_type": "implant_quote",
+            "patient_id": workspace["patient"]["patient_id"],
+            "source": "desk",
+            "content": "Implant quotation: posterior-stabilised knee system, MRP ₹1,05,000",
+        },
+    )
+    assert created.status_code == 201, created.text
+    after = client.get(f"{API}/cases/PA-000006").json()
+    implant = {item["item_id"]: item for item in after["checklist"]}["CRIT-IN-TKR-06"]
+    assert implant["status"] == "SUPPORTED"
+    assert implant["citations"][0]["source"] == "implant_quote"
+    assert after["readiness"]["missing"] == before - 1
+
+
+def test_preauth_form_flags_unsupported_costs_and_relevant_investigations(
+    client: TestClient,
+) -> None:
+    body = client.get(f"{API}/cases/PA-000006/preauth-form").json()
+    fields = {f["key"]: f for section in body["sections"] for f in section["fields"]}
+    for field in fields.values():
+        assert "warning" in field and "hint" in field
+    implants = fields["cost_implants"]
+    assert implants["value"] == "₹1,05,000"
+    assert "Implant quotation" in (implants["warning"] or "")
+    assert fields["cost_room"]["warning"] is None
+
+    investigations = fields["investigations"]
+    assert investigations["source"] == "chart"
+    assert investigations["hint"] == "Confirm before printing"
+    value = investigations["value"] or ""
+    assert "x-ray knee" in value.lower()
+    assert "synthea" not in value.lower()
+    entries = value.split("; ")
+    assert 1 <= len(entries) <= 5
+    assert all(len(entry) <= 160 for entry in entries)
+
+    open_labels = {item["label"] for item in body["checklist_open"]}
+    assert len(body["checklist_open"]) == 2
+    assert "Implant quotation (make, model, MRP)" in open_labels
+
+    # Implant quotation on file (PA-000013): no warning next to the implant amount.
+    quoted = client.get(f"{API}/cases/PA-000013/preauth-form").json()
+    quoted_fields = {f["key"]: f for section in quoted["sections"] for f in section["fields"]}
+    assert quoted_fields["cost_implants"]["warning"] is None
+
+
+def test_discharge_excerpts_end_on_a_word_boundary(client: TestClient) -> None:
+    body = client.get(f"{API}/cases/PA-000014/discharge-check").json()
+    for finding in body["findings"]:
+        for citation in finding["citations"]:
+            excerpt = citation["excerpt"]
+            assert len(excerpt) <= 280
+            if excerpt.endswith("…"):
+                assert not excerpt[-2].isspace()
+
+
+def test_timeline_uses_confirm_wording(client: TestClient) -> None:
+    run_id = client.get(f"{API}/cases/PA-000006").json()["review"]["run_id"]
+    resumed = client.post(
+        f"/api/v1/authorization/review/{run_id}/resume",
+        json={"decision": "acknowledged", "notes": "Checked citations"},
+    )
+    assert resumed.status_code == 200, resumed.text
+    events = [entry["event"] for entry in client.get(f"{API}/cases/PA-000006").json()["timeline"]]
+    assert "Senior confirmed checklist" in events
+    assert not any("acknowledg" in event.lower() for event in events)
+
+
 # --------------------------------------------------------------------------- RBAC
 
 

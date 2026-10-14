@@ -662,7 +662,7 @@ def human_review_gate(state: dict[str, Any], session: Session, settings: Setting
                 "paused": True,
                 "status": "awaiting_human_review",
                 "human_review_reason": state.get("human_review_reason")
-                or "Clinician checklist acknowledgment required",
+                or "Senior confirmation of the checklist required",
                 "agent_trace": [_trace("AuthorizationAgent", "human_review", "paused")],
             }
         from langgraph.types import interrupt
@@ -671,7 +671,7 @@ def human_review_gate(state: dict[str, Any], session: Session, settings: Setting
             {
                 "awaiting_human_review": True,
                 "reason": state.get("human_review_reason")
-                or "Clinician checklist acknowledgment required",
+                or "Senior confirmation of the checklist required",
                 "run_id": state.get("run_id"),
             }
         )

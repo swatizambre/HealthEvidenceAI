@@ -56,7 +56,7 @@ FACILITY_TYPES: tuple[dict[str, str], ...] = (
         "id": "government",
         "label": "Medical college / teaching hospital",
         "tier": "urban",
-        "hint": "Teaching teams — residents prepare; unit consultant acknowledges checklist.",
+        "hint": "Teaching teams — residents prepare; unit consultant confirms the checklist.",
     },
 )
 

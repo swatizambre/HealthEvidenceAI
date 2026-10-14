@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { Translate } from "../i18n";
 import { useRealtime } from "../realtimeContext";
 
 type Options = {
@@ -79,18 +80,33 @@ export function useLiveRefresh(
 export function formatLiveAge(
   lastUpdatedAt: number | null,
   pushConnected = false,
+  t?: Translate,
 ): string {
-  const channel = pushConnected ? "Live push" : "Live poll";
+  const tr: Translate = t ?? ((key, vars) => {
+    let text: string = LIVE_EN[key as keyof typeof LIVE_EN] ?? key;
+    for (const [name, value] of Object.entries(vars ?? {})) text = text.split(`{${name}}`).join(String(value));
+    return text;
+  });
+  const channel = pushConnected ? tr("live.push") : tr("live.poll");
   if (lastUpdatedAt == null) {
-    return `${channel} · connecting…`;
+    return `${channel} · ${tr("live.connecting")}`;
   }
   const seconds = Math.max(0, Math.round((Date.now() - lastUpdatedAt) / 1000));
   if (seconds < 5) {
-    return `${channel} · just now`;
+    return `${channel} · ${tr("live.justNow")}`;
   }
   if (seconds < 60) {
-    return `${channel} · ${seconds}s ago`;
+    return `${channel} · ${tr("live.secondsAgo", { n: seconds })}`;
   }
   const minutes = Math.floor(seconds / 60);
-  return `${channel} · ${minutes}m ago`;
+  return `${channel} · ${tr("live.minutesAgo", { n: minutes })}`;
 }
+
+const LIVE_EN = {
+  "live.push": "Live push",
+  "live.poll": "Live poll",
+  "live.connecting": "connecting…",
+  "live.justNow": "just now",
+  "live.secondsAgo": "{n}s ago",
+  "live.minutesAgo": "{n}m ago",
+} as const;

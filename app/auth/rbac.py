@@ -105,7 +105,7 @@ def ensure_senior_hitl(principal: AuthPrincipal | None) -> None:
     raise AppError(
         "RBAC_FORBIDDEN",
         (
-            "Senior clinician sign-off is required to acknowledge or return an evidence pack. "
+            "Senior clinician sign-off is required to confirm or send back an evidence pack. "
             f"Current roles: {sorted(principal_roles(principal)) or ['none']}."
         ),
         403,

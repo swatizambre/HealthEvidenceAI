@@ -16,6 +16,7 @@ import {
   ageFromDob,
   ageSex,
   formatDate,
+  useIsPhone,
   type Column,
 } from "../ui";
 
@@ -36,6 +37,7 @@ function latestCaseByPatient(items: WorklistItem[]): Map<string, WorklistItem> {
 export function PatientsPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const isPhone = useIsPhone();
   const searchRef = useRef<HTMLInputElement | null>(null);
   const [patients, setPatients] = useState<PatientSummary[] | null>(null);
   const [cases, setCases] = useState<Map<string, WorklistItem>>(new Map());
@@ -104,9 +106,9 @@ export function PatientsPage() {
   const columns: Column<PatientSummary>[] = [
     {
       key: "mrn",
-      header: "MRN",
+      header: t("col.mrn"),
       nowrap: true,
-      render: (row) => <span className="num">{row.mrn || cases.get(row.patient_id)?.mrn || "—"}</span>,
+      render: (row) => <span className="num">{mrnOf(row)}</span>,
     },
     {
       key: "name",
@@ -122,13 +124,13 @@ export function PatientsPage() {
     },
     {
       key: "agesex",
-      header: "Age / sex",
+      header: t("col.ageSex"),
       nowrap: true,
       render: (row) => ageSex(ageFromDob(row.date_of_birth), row.sex),
     },
     {
       key: "stage",
-      header: "Active case",
+      header: t("col.activeCase"),
       render: (row) => {
         const item = cases.get(row.patient_id);
         if (!item) return <span className="muted">No open case</span>;
@@ -158,30 +160,46 @@ export function PatientsPage() {
     },
     {
       key: "last",
-      header: "Last visit",
+      header: t("col.lastVisit"),
       nowrap: true,
       render: (row) => (row.last_visit_at ? formatDate(row.last_visit_at) : <span className="muted">—</span>),
     },
   ];
 
+  function mrnOf(row: PatientSummary): string {
+    return row.mrn || cases.get(row.patient_id)?.mrn || row.patient_id;
+  }
+
   const pageStart = total === 0 ? 0 : offset + 1;
   const pageEnd = Math.min(offset + PAGE_SIZE, total);
+  const caption =
+    patients === null
+      ? "Loading patients"
+      : `Showing ${pageStart}–${pageEnd} of ${total}${debounced ? ` for “${debounced}”` : ""}`;
+  const emptyState = (
+    <EmptyState
+      icon="users"
+      title={debounced ? `No patients match “${debounced}”` : "No patients on file yet"}
+      action={
+        debounced ? (
+          <Button size="sm" onClick={() => setQuery("")}>
+            Clear search
+          </Button>
+        ) : (
+          <ButtonLink size="sm" to="/visit">
+            Add visit note
+          </ButtonLink>
+        )
+      }
+    >
+      {debounced ? "Check the spelling, or search by PAT-ID." : "Add a visit note to create the first chart."}
+    </EmptyState>
+  );
 
   return (
     <section className="page page-wide">
-      <header className="page-head">
-        <div>
-          <h1 className="page-title">Patients</h1>
-          <p className="page-sub">
-            Find a patient by name, ID or MRN. Press Enter to open the first match.
-            <span className="live-stamp">
-              {formatLiveAge(lastUpdatedAt, pushConnected)}
-              <button type="button" className="text-link" onClick={refreshNow}>
-                Refresh
-              </button>
-            </span>
-          </p>
-        </div>
+      <header className="page-head page-head-inline">
+        <h1 className="page-title">Patients</h1>
         <div className="page-actions">
           <label className="search">
             <Icon name="search" />
@@ -201,6 +219,15 @@ export function PatientsPage() {
           </ButtonLink>
         </div>
       </header>
+      <p className="page-sub page-sub-below">
+        Find a patient by name, ID or MRN. Press Enter to open the first match.
+        <span className="live-stamp">
+          {formatLiveAge(lastUpdatedAt, pushConnected, t)}
+          <button type="button" className="text-link" onClick={refreshNow}>
+            {t("common.refresh")}
+          </button>
+        </span>
+      </p>
 
       {recent.length > 0 && !debounced ? (
         <div className="chip-row" aria-label="Recently opened">
@@ -225,51 +252,73 @@ export function PatientsPage() {
         >
           {error}
         </Notice>
+      ) : isPhone ? (
+        patients === null ? (
+          <p className="muted" role="status">
+            Loading patients
+          </p>
+        ) : patients.length === 0 ? (
+          emptyState
+        ) : (
+          <>
+            <ul className="card-list" aria-label="Patients">
+              {patients.map((row) => {
+                const item = cases.get(row.patient_id);
+                return (
+                  <li key={row.patient_id}>
+                    <Link
+                      className="list-card"
+                      to={`/patients/${row.patient_id}`}
+                      onClick={() => remember(row)}
+                      aria-label={`Open chart for ${row.synthetic_name}`}
+                    >
+                      <span className="list-card-line">
+                        <strong className="list-card-title">{row.synthetic_name}</strong>
+                        <span className="list-card-meta num">{mrnOf(row)}</span>
+                      </span>
+                      <span className="list-card-line list-card-sub">
+                        <span>{ageSex(ageFromDob(row.date_of_birth), row.sex)}</span>
+                        <span className="muted">
+                          {row.last_visit_at ? `${t("col.lastVisit")}: ${formatDate(row.last_visit_at)}` : ""}
+                        </span>
+                      </span>
+                      {item ? (
+                        <span className="list-card-line">
+                          <StagePill stage={item.stage} fallbackLabel={item.stage_label} />
+                          <span className="list-card-meta">{item.proposed_treatment || item.case_id}</span>
+                        </span>
+                      ) : null}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="muted small">{caption}</p>
+          </>
+        )
       ) : (
         <DataTable
           columns={columns}
           rows={patients ?? []}
           rowKey={(row) => row.patient_id}
           loading={patients === null}
-          caption={
-            patients === null
-              ? "Loading patients"
-              : `Showing ${pageStart}–${pageEnd} of ${total}${debounced ? ` for “${debounced}”` : ""}`
-          }
+          caption={caption}
           onRowActivate={openPatient}
           rowLabel={(row) => `Open chart for ${row.synthetic_name}`}
-          empty={
-            <EmptyState
-              icon="users"
-              title={debounced ? `No patients match “${debounced}”` : "No patients on file yet"}
-              action={
-                debounced ? (
-                  <Button size="sm" onClick={() => setQuery("")}>
-                    Clear search
-                  </Button>
-                ) : (
-                  <ButtonLink size="sm" to="/visit">
-                    Add visit note
-                  </ButtonLink>
-                )
-              }
-            >
-              {debounced ? "Check the spelling, or search by PAT-ID." : "Add a visit note to create the first chart."}
-            </EmptyState>
-          }
+          empty={emptyState}
         />
       )}
 
       {patients && total > PAGE_SIZE ? (
         <div className="pager">
           <Button size="sm" disabled={offset === 0} onClick={() => setOffset((value) => Math.max(0, value - PAGE_SIZE))}>
-            Previous
+            {t("common.previous")}
           </Button>
           <span className="muted">
             Page {Math.floor(offset / PAGE_SIZE) + 1} of {Math.max(1, Math.ceil(total / PAGE_SIZE))}
           </span>
           <Button size="sm" disabled={offset + PAGE_SIZE >= total} onClick={() => setOffset((value) => value + PAGE_SIZE)}>
-            Next
+            {t("common.next")}
           </Button>
         </div>
       ) : null}

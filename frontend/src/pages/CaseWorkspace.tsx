@@ -15,12 +15,18 @@ import {
   type AdmissionType,
   type CaseEditable,
   type CaseWorkspace,
+  type ChecklistOpenItem,
+  type DeskCitation,
   type DischargeCheck,
+  type DischargeFinding,
+  type FindingSeverity,
   type PayerType,
+  type PreauthField,
   type PreauthForm,
   type StageAction,
 } from "../deskApi";
 import { useLiveRefresh } from "../hooks/useLiveRefresh";
+import { documentTypeLabel } from "../labels";
 import { useRole } from "../roleContext";
 import {
   Button,
@@ -39,7 +45,12 @@ import {
   StatusPill,
   Tabs,
   ageSex,
+  clockState,
+  formatDate,
   formatDateTime,
+  formatDateTimeLong,
+  humanize,
+  useNow,
   useToast,
   type ButtonVariant,
   type IconName,
@@ -48,13 +59,24 @@ import {
 type TabId = "checklist" | "form" | "queries" | "discharge" | "timeline";
 const TAB_IDS: TabId[] = ["checklist", "form", "queries", "discharge", "timeline"];
 
-type DrawerKind =
-  | "edit"
+/** Drawers collect details; dialogs confirm irreversible steps with a summary. */
+type StageKind =
   | "record_query"
   | "answer_query"
-  | "record_approval"
   | "request_enhancement"
-  | "mark_discharge_sent";
+  | "record_approval"
+  | "mark_sent"
+  | "mark_discharge_sent"
+  | "close";
+
+type DrawerKind = "edit" | StageKind;
+
+const CONFIRM_KINDS: ReadonlySet<StageKind> = new Set<StageKind>([
+  "record_approval",
+  "mark_sent",
+  "mark_discharge_sent",
+  "close",
+]);
 
 type ActionId =
   | "send_for_review"
@@ -68,14 +90,23 @@ type ActionId =
   | "mark_discharge_sent"
   | "close";
 
-type ActionSpec = { id: ActionId; label: string; icon: IconName };
+type ActionSpec = { id: ActionId; label: string; icon: IconName; variant?: ButtonVariant };
 
 type NextActions = { primary: ActionSpec | null; secondary: ActionSpec[]; note: string };
 
+function blockerCount(discharge: DischargeCheck | null): number {
+  return discharge ? discharge.findings.filter((finding) => finding.severity === "blocker").length : 0;
+}
+
+/** Only stage-appropriate actions; every irreversible one opens a confirm dialog ("…"). */
 function nextActions(ws: CaseWorkspace, discharge: DischargeCheck | null): NextActions {
   const { stage } = ws.case;
   const review = ws.review.state;
   const openQuery = ws.queries.some((query) => !query.responded_at);
+  const recordApproval: ActionSpec = { id: "record_approval", label: "Record approval…", icon: "check" };
+  const recordQuery: ActionSpec = { id: "record_query", label: "Record query", icon: "question" };
+  const answerQuery: ActionSpec = { id: "answer_query", label: "Answer query", icon: "edit" };
+  const markSent: ActionSpec = { id: "mark_sent", label: "Mark sent to TPA…", icon: "send" };
   switch (stage) {
     case "draft":
       if (review === "awaiting_senior") {
@@ -83,7 +114,7 @@ function nextActions(ws: CaseWorkspace, discharge: DischargeCheck | null): NextA
       }
       if (review === "acknowledged") {
         return {
-          primary: { id: "mark_sent", label: "Mark sent to TPA", icon: "send" },
+          primary: markSent,
           secondary: [],
           note: "Senior confirmed. Send through the insurer/TPA portal, then record it here.",
         };
@@ -98,41 +129,37 @@ function nextActions(ws: CaseWorkspace, discharge: DischargeCheck | null): NextA
       };
     case "ready_to_send":
       return {
-        primary: { id: "mark_sent", label: "Mark sent to TPA", icon: "send" },
+        primary: markSent,
         secondary: [],
         note: "Send through the insurer/TPA portal, then record it here to start the 1-hour clock.",
       };
     case "sent":
-      return {
-        primary: { id: "record_approval", label: "Record approval", icon: "check" },
-        secondary: [{ id: "record_query", label: "Record query", icon: "question" }],
-        note: "Waiting for the insurer/TPA decision.",
-      };
+    case "enhancement":
     case "query":
-      return openQuery
-        ? {
-            primary: { id: "answer_query", label: "Answer query", icon: "edit" },
-            secondary: [{ id: "record_approval", label: "Record approval", icon: "check" }],
-            note: "The TPA raised a query. Reply before the response clock runs out.",
-          }
-        : {
-            primary: { id: "record_approval", label: "Record approval", icon: "check" },
-            secondary: [{ id: "record_query", label: "Record query", icon: "question" }],
-            note: "Query answered. Waiting for the TPA decision.",
-          };
+      if (openQuery) {
+        return {
+          primary: answerQuery,
+          secondary: [],
+          note: "The TPA raised a query. Answer it before the response clock runs out; record the decision after.",
+        };
+      }
+      return {
+        primary: recordApproval,
+        secondary: [recordQuery],
+        note:
+          stage === "enhancement"
+            ? "Enhancement requested. Record the revised approved amount when it arrives."
+            : stage === "query"
+              ? "Query answered. Waiting for the TPA decision."
+              : "Waiting for the insurer/TPA decision.",
+      };
     case "approved":
       return {
         primary: { id: "start_discharge", label: "Start discharge", icon: "doc" },
         secondary: [{ id: "request_enhancement", label: "Request enhancement", icon: "alert" }],
         note: "Approved. Request an enhancement if costs will exceed the approved amount.",
       };
-    case "enhancement":
-      return {
-        primary: { id: "record_approval", label: "Record approval", icon: "check" },
-        secondary: [{ id: "record_query", label: "Record query", icon: "question" }],
-        note: "Enhancement requested. Record the revised approved amount when it arrives.",
-      };
-    case "discharge_pending":
+    case "discharge_pending": {
       if (!discharge) {
         return {
           primary: { id: "run_discharge_check", label: "Run discharge check", icon: "check" },
@@ -140,17 +167,23 @@ function nextActions(ws: CaseWorkspace, discharge: DischargeCheck | null): NextA
           note: "Check the discharge summary and final bill against the pre-auth before sending.",
         };
       }
+      const blockers = blockerCount(discharge);
+      if (blockers > 0) {
+        return {
+          primary: { id: "mark_discharge_sent", label: "Send with override…", icon: "alert", variant: "danger" },
+          secondary: [{ id: "run_discharge_check", label: "Re-run check", icon: "check" }],
+          note: `The discharge check found ${blockers} blocker${blockers === 1 ? "" : "s"}. Fix and re-run the check, or send with a recorded override reason.`,
+        };
+      }
       return {
-        primary: { id: "mark_discharge_sent", label: "Mark discharge sent", icon: "send" },
+        primary: { id: "mark_discharge_sent", label: "Mark discharge sent…", icon: "send" },
         secondary: [],
-        note:
-          discharge.status === "blockers"
-            ? "The discharge check found blockers. Fix them, or record an override reason."
-            : "Discharge check passed. Send the final request, then record it here.",
+        note: "Discharge check passed. Send the final request, then record it here.",
       };
+    }
     case "discharge_sent":
       return {
-        primary: { id: "close", label: "Close case", icon: "check" },
+        primary: { id: "close", label: "Close case…", icon: "check" },
         secondary: [],
         note: "Waiting for final approval (IRDAI: 3 hours).",
       };
@@ -182,6 +215,10 @@ function parseAmount(value: string): number | null {
   return digits ? Number(digits) : null;
 }
 
+function plural(count: number, word: string): string {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="fact">
@@ -191,11 +228,39 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+function openChecklistItems(ws: CaseWorkspace): ChecklistOpenItem[] {
+  return ws.checklist
+    .filter((item) => item.required && item.status !== "SUPPORTED" && item.group !== "form")
+    .map((item) => ({ item_id: item.item_id, label: item.label, group: item.group, status: item.status }));
+}
+
+/** One next-step line in the case header when a clock has run out. */
+function overdueMessage(ws: CaseWorkspace, discharge: DischargeCheck | null, now: number): string {
+  if (!clockState(ws.case.clock, now).overdue) return "";
+  switch (ws.case.stage) {
+    case "discharge_pending":
+      if (!discharge) return "Discharge request overdue — run discharge check and send";
+      return blockerCount(discharge) > 0
+        ? "Discharge request overdue — fix the blockers or send with an override reason"
+        : "Discharge request overdue — send the discharge request now";
+    case "query":
+      return "Query reply overdue — answer the TPA query now";
+    case "draft":
+    case "ready_to_send":
+      return ws.review.state === "awaiting_senior"
+        ? "Preparation overdue — waiting for senior confirmation"
+        : "Preparation overdue — send the pre-auth request";
+    default:
+      return "";
+  }
+}
+
 export function CaseWorkspacePage() {
   const { caseId = "" } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const { canCheckEvidence, canAdjudicate } = useRole();
   const toast = useToast();
+  const now = useNow(30_000);
 
   const tabParam = searchParams.get("tab") || "";
   const tab: TabId = (TAB_IDS as string[]).includes(tabParam) ? (tabParam as TabId) : "checklist";
@@ -272,6 +337,11 @@ export function CaseWorkspacePage() {
     setSearchParams(params, { replace: true });
   }
 
+  function openDrawer(kind: DrawerKind) {
+    setDrawerError("");
+    setDrawer(kind);
+  }
+
   async function applyStage(body: StageAction, success: string): Promise<boolean> {
     setDrawerError("");
     try {
@@ -319,19 +389,12 @@ export function CaseWorkspacePage() {
       case "answer_query":
       case "record_approval":
       case "request_enhancement":
-        setDrawerError("");
-        setDrawer(id);
-        if (id === "answer_query") setTab("queries");
-        return;
+      case "mark_sent":
       case "mark_discharge_sent":
-        if (discharge && discharge.status !== "blockers") {
-          setBusy(id);
-          await applyStage({ action: "mark_discharge_sent" }, "Discharge marked as sent");
-          setBusy(null);
-          return;
-        }
-        setDrawerError("");
-        setDrawer("mark_discharge_sent");
+      case "close":
+        openDrawer(id);
+        if (id === "answer_query") setTab("queries");
+        if (id === "mark_discharge_sent") setTab("discharge");
         return;
       case "run_discharge_check":
         setTab("discharge");
@@ -349,19 +412,9 @@ export function CaseWorkspacePage() {
           setBusy(null);
         }
         return;
-      case "mark_sent":
-        setBusy(id);
-        await applyStage({ action: "mark_sent" }, "Marked sent to TPA. Decision clock started.");
-        setBusy(null);
-        return;
       case "start_discharge":
         setBusy(id);
         await applyStage({ action: "start_discharge" }, "Discharge started");
-        setBusy(null);
-        return;
-      case "close":
-        setBusy(id);
-        await applyStage({ action: "close" }, "Case closed");
         setBusy(null);
         return;
       default: {
@@ -405,6 +458,8 @@ export function CaseWorkspacePage() {
   const readinessDetail = `${ws.readiness.supported} of ${ws.readiness.required} required items supported`;
   const primaryAllowed =
     actions.primary && (actions.primary.id !== "send_for_review" || canCheckEvidence);
+  const checklistOpen = ws.readiness.missing + ws.readiness.unknown + ws.readiness.not_supported;
+  const overdue = overdueMessage(ws, discharge, now);
 
   return (
     <section className="page case-page">
@@ -424,6 +479,13 @@ export function CaseWorkspacePage() {
           <ClockChip clock={c.clock} size="lg" showLabel />
         </div>
       </header>
+
+      {overdue ? (
+        <Notice tone="danger" title={overdue}>
+          <span className="sr-only">Next step. </span>
+          {actions.primary && primaryAllowed ? `Use “${actions.primary.label.replace(/…$/, "")}” below.` : null}
+        </Notice>
+      ) : null}
 
       <div className="case-summary">
         <dl className="facts">
@@ -449,7 +511,7 @@ export function CaseWorkspacePage() {
             <Money value={c.approved_amount_inr} />
           </Fact>
         </dl>
-        <Button size="sm" variant="ghost" icon="edit" className="no-print" onClick={() => setDrawer("edit")}>
+        <Button size="sm" variant="ghost" icon="edit" className="no-print" onClick={() => openDrawer("edit")}>
           Edit details
         </Button>
       </div>
@@ -487,7 +549,7 @@ export function CaseWorkspacePage() {
             ))}
             {actions.primary && primaryAllowed ? (
               <Button
-                variant="primary"
+                variant={actions.primary.variant ?? "primary"}
                 icon={actions.primary.icon}
                 loading={busy === actions.primary.id || (actions.primary.id === "run_discharge_check" && dischargeBusy)}
                 onClick={() => {
@@ -515,9 +577,9 @@ export function CaseWorkspacePage() {
       <div className="no-print">
         <Tabs
           items={[
-            { id: "checklist", label: "Checklist", count: ws.readiness.missing + ws.readiness.unknown + ws.readiness.not_supported },
+            { id: "checklist", label: checklistOpen > 0 ? `Checklist · ${checklistOpen} open` : "Checklist ✓" },
             { id: "form", label: "Pre-auth form" },
-            { id: "queries", label: "Queries", count: openQueries.length },
+            { id: "queries", label: "Queries", count: openQueries.length > 0 ? openQueries.length : undefined },
             { id: "discharge", label: "Discharge check" },
             { id: "timeline", label: "Timeline" },
           ]}
@@ -529,19 +591,30 @@ export function CaseWorkspacePage() {
       </div>
 
       <div id="case-panel" role="tabpanel" aria-labelledby={`case-tab-${tab}`} className="tab-panel">
-        {tab === "checklist" ? <Checklist items={ws.checklist} /> : null}
-        {tab === "form" ? <PreauthPanel form={form} error={formError} /> : null}
+        {tab === "checklist" ? (
+          <Checklist
+            items={ws.checklist}
+            actions={{
+              patientId: ws.patient.patient_id,
+              caseId: c.case_id,
+              policyId: c.policy_id,
+              onEditCase: () => openDrawer("edit"),
+            }}
+          />
+        ) : null}
+        {tab === "form" ? (
+          <PreauthPanel
+            form={form}
+            error={formError}
+            checklistOpen={form?.checklist_open ?? openChecklistItems(ws)}
+            onOpenChecklist={() => setTab("checklist")}
+          />
+        ) : null}
         {tab === "queries" ? (
           <QueriesPanel
             ws={ws}
-            onRecord={() => {
-              setDrawerError("");
-              setDrawer("record_query");
-            }}
-            onAnswer={() => {
-              setDrawerError("");
-              setDrawer("answer_query");
-            }}
+            onRecord={() => openDrawer("record_query")}
+            onAnswer={() => openDrawer("answer_query")}
           />
         ) : null}
         {tab === "discharge" ? (
@@ -573,6 +646,7 @@ export function CaseWorkspacePage() {
       <StageDrawer
         kind={drawer === "edit" ? null : drawer}
         ws={ws}
+        discharge={discharge}
         error={drawerError}
         onClose={() => setDrawer(null)}
         onSubmit={async (body, success) => {
@@ -594,13 +668,52 @@ function Breadcrumb({ caseId }: { caseId: string }) {
   );
 }
 
-function PreauthPanel({ form, error }: { form: PreauthForm | null; error: string }) {
+/** Raw API values → what a TPA form shows ("15 Oct 2026, 08:54", "Male", "TPA", "Planned"). */
+function displayValue(field: PreauthField): string {
+  const value = field.value ?? "";
+  const keepIfUnparsed = (formatted: string) => (formatted === "—" ? value : formatted);
+  switch (field.key) {
+    case "admitted_at":
+      return keepIfUnparsed(formatDateTimeLong(value));
+    case "date_of_birth":
+    case "expected_delivery_date":
+    case "injury_date":
+      return keepIfUnparsed(formatDate(value));
+    case "sex":
+    case "admission_type":
+    case "room_type":
+      return humanize(value);
+    case "payer_type":
+      return PAYER_LABEL[value as PayerType] ?? humanize(value);
+    default:
+      return value;
+  }
+}
+
+function PreauthPanel({
+  form,
+  error,
+  checklistOpen,
+  onOpenChecklist,
+}: {
+  form: PreauthForm | null;
+  error: string;
+  checklistOpen: ChecklistOpenItem[];
+  onOpenChecklist: () => void;
+}) {
   if (error) {
     return <Notice tone="warning" title="Pre-auth form not available">{error}</Notice>;
   }
   if (!form) {
     return <Skeleton lines={8} label="Loading pre-auth form" />;
   }
+  const fieldsMissing = form.missing_required.length;
+  const itemsOpen = checklistOpen.length;
+  const fieldsPart =
+    fieldsMissing === 0 ? "Form fields complete" : `${plural(fieldsMissing, "required field")} missing`;
+  const checklistPart =
+    itemsOpen === 0 ? "checklist complete" : `${plural(itemsOpen, "checklist item")} missing`;
+  const ready = fieldsMissing === 0 && itemsOpen === 0;
   return (
     <div className="preauth print-area">
       <div className="preauth-head">
@@ -616,13 +729,28 @@ function PreauthPanel({ form, error }: { form: PreauthForm | null; error: string
           Print / Save PDF
         </Button>
       </div>
-      {form.missing_required.length > 0 ? (
-        <Notice tone="warning" title={`${form.missing_required.length} required field${form.missing_required.length === 1 ? "" : "s"} missing`}>
-          {form.missing_required.join(", ")}
-        </Notice>
-      ) : (
-        <Notice tone="success" title="All required fields are filled" />
-      )}
+      <Notice
+        tone={ready ? "success" : "warning"}
+        title={`${fieldsPart} · ${checklistPart}${ready ? "" : " — fix before sending"}`}
+        action={
+          itemsOpen > 0 ? (
+            <Button size="sm" className="no-print" onClick={onOpenChecklist}>
+              Open checklist
+            </Button>
+          ) : undefined
+        }
+      >
+        {fieldsMissing > 0 || itemsOpen > 0 ? (
+          <ul className="banner-list">
+            {form.missing_required.map((label) => (
+              <li key={`field-${label}`}>{label}</li>
+            ))}
+            {checklistOpen.map((item) => (
+              <li key={`item-${item.item_id}`}>Checklist: {item.label}</li>
+            ))}
+          </ul>
+        ) : null}
+      </Notice>
       {form.sections.map((section) => (
         <section key={section.title} className="form-section">
           <h3>{section.title}</h3>
@@ -630,7 +758,10 @@ function PreauthPanel({ form, error }: { form: PreauthForm | null; error: string
             {section.fields.map((field) => {
               const missing = field.source === "missing" || !field.value;
               return (
-                <div key={field.key} className={`form-field${missing && field.required ? " is-missing" : ""}`}>
+                <div
+                  key={field.key}
+                  className={`form-field${missing && field.required ? " is-missing" : ""}${field.warning ? " has-warning" : ""}`}
+                >
                   <dt>
                     {field.label}
                     {field.required ? <span className="req" aria-label="required">*</span> : null}
@@ -646,10 +777,17 @@ function PreauthPanel({ form, error }: { form: PreauthForm | null; error: string
                         <span className="muted">Not provided</span>
                       )
                     ) : (
-                      field.value
+                      <span className="form-value">{displayValue(field)}</span>
                     )}
                     {!missing ? (
                       <span className="field-source">{field.source === "chart" ? "From chart" : "From case"}</span>
+                    ) : null}
+                    {!missing && field.hint ? <span className="field-hint-tag no-print">{field.hint}</span> : null}
+                    {field.warning ? (
+                      <span className="field-warning">
+                        <Icon name="alert" size={12} />
+                        {field.warning}
+                      </span>
                     ) : null}
                   </dd>
                 </div>
@@ -744,6 +882,27 @@ function QueriesPanel({
   );
 }
 
+const SEVERITY_RANK: Record<FindingSeverity, number> = { blocker: 0, warning: 1, info: 2 };
+const ICD_PATTERN = /\b[A-TV-Z]\d{2}(?:\.\d{1,4})?\b/g;
+
+/** Values worth marking in a finding's excerpt: the found/expected text, ICD codes, ₹ amounts. */
+function findingTerms(finding: DischargeFinding): string[] {
+  const terms: string[] = [];
+  for (const raw of [finding.found, finding.expected]) {
+    const value = (raw || "").replace(/^[≤≥<>]\s*/, "").trim();
+    if (!value || value === "none" || value === "—") continue;
+    terms.push(value);
+    terms.push(...(value.match(ICD_PATTERN) ?? []));
+    const withoutCode = value.replace(/\s*\([^)]*\)\s*$/, "").trim();
+    if (withoutCode && withoutCode !== value) terms.push(withoutCode);
+  }
+  return terms;
+}
+
+function citationKey(citation: DeskCitation): string {
+  return `${citation.document_id}|${citation.excerpt}`;
+}
+
 function DischargePanel({
   check,
   error,
@@ -755,6 +914,25 @@ function DischargePanel({
   busy: boolean;
   onRun: () => void;
 }) {
+  // Most severe first; each distinct excerpt is shown once (later findings point back to it).
+  const ordered = check
+    ? [...check.findings].sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity])
+    : [];
+  const seen = new Set<string>();
+  const rows = ordered.map((finding) => {
+    const fresh: DeskCitation[] = [];
+    const repeated: DeskCitation[] = [];
+    for (const citation of finding.citations) {
+      const key = citationKey(citation);
+      if (seen.has(key)) repeated.push(citation);
+      else {
+        seen.add(key);
+        fresh.push(citation);
+      }
+    }
+    return { finding, fresh, repeated };
+  });
+  const blockers = blockerCount(check);
   return (
     <div className="discharge">
       <div className="section-bar">
@@ -777,16 +955,13 @@ function DischargePanel({
               tone={check.status === "blockers" ? "danger" : "warning"}
               title={
                 check.status === "blockers"
-                  ? (() => {
-                      const n = check.findings.filter((f) => f.severity === "blocker").length;
-                      return `${n} blocker${n === 1 ? "" : "s"} to fix before sending`;
-                    })()
+                  ? `${plural(blockers, "blocker")} to fix before sending`
                   : "Warnings to review before sending"
               }
             />
           )}
           <ul className="findings">
-            {check.findings.map((finding, index) => (
+            {rows.map(({ finding, fresh, repeated }, index) => (
               <li key={`${finding.code}-${index}`} className={`finding finding-${finding.severity}`}>
                 <div className="finding-head">
                   <SeverityPill severity={finding.severity} />
@@ -804,7 +979,15 @@ function DischargePanel({
                     </div>
                   </dl>
                 ) : null}
-                <Citations citations={finding.citations} />
+                <Citations citations={fresh} highlight={findingTerms(finding)} />
+                {repeated.length > 0 ? (
+                  <p className="citation-ref">
+                    <Icon name="doc" size={12} />
+                    {repeated
+                      .map((citation) => `Same ${documentTypeLabel(citation.source).toLowerCase()} (${citation.document_id}) as above`)
+                      .join("; ")}
+                  </p>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -1026,31 +1209,52 @@ function initialValues(ws: CaseWorkspace): EditValues {
   };
 }
 
-const STAGE_DRAWER_TITLE: Record<Exclude<DrawerKind, "edit">, string> = {
+const STAGE_TITLE: Record<StageKind, string> = {
   record_query: "Record TPA query",
   answer_query: "Answer TPA query",
-  record_approval: "Record approval",
   request_enhancement: "Request enhancement",
+  record_approval: "Record approval?",
+  mark_sent: "Mark sent to TPA?",
+  mark_discharge_sent: "Mark discharge sent?",
+  close: "Close this case?",
+};
+
+const STAGE_SUBMIT: Record<StageKind, string> = {
+  record_query: "Record query",
+  answer_query: "Answer query",
+  request_enhancement: "Request enhancement",
+  record_approval: "Record approval",
+  mark_sent: "Mark sent",
   mark_discharge_sent: "Mark discharge sent",
+  close: "Close case",
 };
 
-const STAGE_DRAWER_SUBMIT: Record<Exclude<DrawerKind, "edit">, { label: string; variant: ButtonVariant }> = {
-  record_query: { label: "Record query", variant: "primary" },
-  answer_query: { label: "Answer query", variant: "primary" },
-  record_approval: { label: "Record approval", variant: "primary" },
-  request_enhancement: { label: "Request enhancement", variant: "primary" },
-  mark_discharge_sent: { label: "Mark discharge sent", variant: "danger" },
-};
+const OVERRIDE_MIN = 10;
 
+function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>{children}</dd>
+    </div>
+  );
+}
+
+/**
+ * Stage steps. Detail-gathering steps open a drawer; irreversible steps (record approval,
+ * mark sent, mark discharge sent, close) open a confirm dialog with a summary.
+ */
 function StageDrawer({
   kind,
   ws,
+  discharge,
   error,
   onClose,
   onSubmit,
 }: {
-  kind: Exclude<DrawerKind, "edit"> | null;
+  kind: StageKind | null;
   ws: CaseWorkspace;
+  discharge: DischargeCheck | null;
   error: string;
   onClose: () => void;
   onSubmit: (body: StageAction, success: string) => Promise<void>;
@@ -1066,9 +1270,7 @@ function StageDrawer({
     setText("");
     setHours("24");
     setQueryId(openQueries[0]?.query_id ?? "");
-    setAmount(
-      kind === "record_approval" && ws.case.estimated_cost_inr != null ? String(ws.case.estimated_cost_inr) : "",
-    );
+    setAmount("");
     // Reset only when the drawer kind changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind]);
@@ -1076,6 +1278,11 @@ function StageDrawer({
   if (!kind) {
     return null;
   }
+
+  const c = ws.case;
+  const blockers = discharge ? discharge.findings.filter((finding) => finding.severity === "blocker") : [];
+  const override = kind === "mark_discharge_sent" && blockers.length > 0;
+  const confirm = CONFIRM_KINDS.has(kind);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -1104,11 +1311,19 @@ function StageDrawer({
             "Enhancement requested",
           );
           break;
+        case "mark_sent":
+          await onSubmit({ action: "mark_sent" }, "Marked sent to TPA. Decision clock started.");
+          break;
         case "mark_discharge_sent":
           await onSubmit(
-            { action: "mark_discharge_sent", override_reason: text.trim() || undefined },
-            "Discharge marked as sent",
+            override
+              ? { action: "mark_discharge_sent", override_reason: text.trim() }
+              : { action: "mark_discharge_sent" },
+            override ? "Discharge sent with override. Reason saved on the timeline." : "Discharge marked as sent",
           );
+          break;
+        case "close":
+          await onSubmit({ action: "close" }, "Case closed");
           break;
         default: {
           const never: never = kind;
@@ -1120,13 +1335,14 @@ function StageDrawer({
     }
   }
 
-  const needsText = kind !== "record_approval";
+  const needsText =
+    kind === "record_query" || kind === "answer_query" || kind === "request_enhancement" || override;
+  const minText = override ? OVERRIDE_MIN : 3;
   const needsAmount = kind === "record_approval" || kind === "request_enhancement";
   const disabled =
-    (needsText && text.trim().length < 3) ||
+    (needsText && text.trim().length < minText) ||
     (needsAmount && !parseAmount(amount)) ||
     (kind === "answer_query" && !queryId);
-  const submitSpec = STAGE_DRAWER_SUBMIT[kind];
   const textLabel =
     kind === "record_query"
       ? "Query from the insurer/TPA"
@@ -1134,24 +1350,49 @@ function StageDrawer({
         ? "Our response"
         : kind === "request_enhancement"
           ? "Reason for enhancement"
-          : "Override reason (required because the discharge check found blockers)";
+          : "Override reason (required: why send despite the blockers?)";
+  const submitLabel = override ? "Send with override" : STAGE_SUBMIT[kind];
+  const submitVariant: ButtonVariant = override ? "danger" : "primary";
+  const title = override ? "Send discharge with override?" : STAGE_TITLE[kind];
+  const payer = `${c.insurer_name || PAYER_LABEL[c.payer_type]}${c.tpa_name ? ` via ${c.tpa_name}` : ""}`;
 
   return (
     <Drawer
       open
-      title={STAGE_DRAWER_TITLE[kind]}
+      variant={confirm ? "dialog" : "drawer"}
+      title={title}
       onClose={onClose}
       footer={
         <div className="button-row">
           <Button onClick={onClose}>Cancel</Button>
-          <Button variant={submitSpec.variant} type="submit" form="stage-form" loading={saving} disabled={disabled}>
-            {submitSpec.label}
+          <Button variant={submitVariant} type="submit" form="stage-form" loading={saving} disabled={disabled}>
+            {submitLabel}
           </Button>
         </div>
       }
     >
       <form id="stage-form" className="stack-form" onSubmit={submit}>
         {error ? <p className="form-error" role="alert">{error}</p> : null}
+        {confirm ? (
+          <dl className="confirm-summary">
+            <SummaryRow label="Patient">
+              {ws.patient.name} <span className="muted">({c.case_id})</span>
+            </SummaryRow>
+            <SummaryRow label="Insurer / TPA">{payer}</SummaryRow>
+            <SummaryRow label="Treatment">{c.proposed_treatment || "Not recorded"}</SummaryRow>
+            <SummaryRow label="Estimate">
+              <Money value={c.estimated_cost_inr} />
+            </SummaryRow>
+            {kind === "close" || kind === "mark_discharge_sent" ? (
+              <SummaryRow label="Approved">
+                <Money value={c.approved_amount_inr} />
+              </SummaryRow>
+            ) : null}
+            {kind === "mark_sent" ? (
+              <SummaryRow label="Senior review">{ws.review.by_label || "Confirmed"}</SummaryRow>
+            ) : null}
+          </dl>
+        ) : null}
         {kind === "answer_query" ? (
           openQueries.length === 0 ? (
             <p className="muted">There are no open queries on this case.</p>
@@ -1171,10 +1412,29 @@ function StageDrawer({
         {kind === "answer_query" && queryId ? (
           <blockquote className="quoted">{openQueries.find((query) => query.query_id === queryId)?.text}</blockquote>
         ) : null}
+        {override ? (
+          <div className="confirm-blockers">
+            <p className="confirm-blockers-title">
+              <Icon name="alert" size={14} />
+              The discharge check found {plural(blockers.length, "blocker")}:
+            </p>
+            <ul>
+              {blockers.map((finding, index) => (
+                <li key={`${finding.code}-${index}`}>{finding.message}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         {needsAmount ? (
           <label className="field">
             <span>{kind === "record_approval" ? "Approved amount (₹)" : "Revised estimate (₹)"}</span>
-            <input inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+            <input
+              inputMode="numeric"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder={kind === "record_approval" ? "As on the approval letter" : undefined}
+              required
+            />
             {parseAmount(amount) ? (
               <span className="field-hint">
                 <Money value={parseAmount(amount)} />
@@ -1185,7 +1445,10 @@ function StageDrawer({
         {needsText ? (
           <label className="field">
             <span>{textLabel}</span>
-            <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} required />
+            <textarea value={text} onChange={(e) => setText(e.target.value)} rows={override ? 3 : 5} required />
+            {override && text.trim().length < OVERRIDE_MIN ? (
+              <span className="field-hint">At least {OVERRIDE_MIN} characters. Saved on the case timeline.</span>
+            ) : null}
           </label>
         ) : null}
         {kind === "record_query" ? (
@@ -1194,14 +1457,16 @@ function StageDrawer({
             <input inputMode="numeric" value={hours} onChange={(e) => setHours(e.target.value.replace(/[^\d]/g, ""))} />
           </label>
         ) : null}
-        {kind === "mark_discharge_sent" ? (
-          <p className="muted small">
-            The override reason is saved on the case timeline. The final approval clock (IRDAI: 3 hours) starts when you mark
-            it sent.
-          </p>
-        ) : null}
-        {kind === "record_approval" ? (
-          <p className="muted small">Record the amount exactly as on the insurer/TPA approval letter.</p>
+        {confirm ? (
+          <Notice tone="warning" title="This step can't be undone from the desk.">
+            {kind === "mark_sent"
+              ? "Only mark it sent after submitting on the insurer/TPA portal. The 1-hour decision clock (IRDAI) starts now."
+              : kind === "record_approval"
+                ? "Record the amount exactly as on the insurer/TPA approval letter. The case moves to Approved."
+                : kind === "mark_discharge_sent"
+                  ? "The 3-hour final approval clock (IRDAI) starts when you mark it sent."
+                  : "The case leaves the work queue and the timeline is kept for audit."}
+          </Notice>
         ) : null}
       </form>
     </Drawer>

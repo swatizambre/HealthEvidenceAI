@@ -253,8 +253,33 @@ class DocumentListResponse(ResponseModel):
     documents: list[DocumentOut]
 
 
+# Typed supporting documents a desk can attach to a chart (TPA checklist documents group).
+ReportDocumentType = Literal[
+    "radiology_report",
+    "investigation_report",
+    "implant_quote",
+    "implant_invoice",
+    "anc_card",
+    "mlc_copy",
+    "discharge_summary",
+    "final_bill",
+]
+REPORT_DOCUMENT_TYPES: frozenset[str] = frozenset(
+    {
+        "radiology_report",
+        "investigation_report",
+        "implant_quote",
+        "implant_invoice",
+        "anc_card",
+        "mlc_copy",
+        "discharge_summary",
+        "final_bill",
+    }
+)
+
+
 class DocumentCreate(APIModel):
-    document_type: Literal["clinical_note", "policy", "lab_result"]
+    document_type: Literal["clinical_note", "policy", "lab_result"] | ReportDocumentType
     source: str = Field(min_length=1, max_length=120)
     content: str = Field(min_length=1, max_length=20000)
     patient_id: str | None = None
@@ -266,6 +291,8 @@ class DocumentCreate(APIModel):
             raise ValueError("patient_id is invalid")
         if self.document_type == "clinical_note" and self.patient_id is None:
             raise ValueError("patient_id is required for clinical notes")
+        if self.document_type in REPORT_DOCUMENT_TYPES and self.patient_id is None:
+            raise ValueError("patient_id is required for patient documents")
         return self
 
 

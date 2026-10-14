@@ -23,6 +23,7 @@ import {
   resolveIngestConsent,
   type ConsentDraft,
 } from "../components/ConsentCapture";
+import { AttachReport } from "../components/AttachReport";
 import { formatLiveAge, useLiveRefresh } from "../hooks/useLiveRefresh";
 import { policyOptionLabel } from "../labels";
 import { printVisitSummary } from "../printSheet";
@@ -127,7 +128,7 @@ export function OpdIngestPage() {
       focus === "meds" ||
       focus === "diagnoses",
   );
-  const [procedure, setProcedure] = useState("Evidence pack documentation");
+  const [procedure, setProcedure] = useState("");
   const [policyId, setPolicyId] = useState(policyParam || "POL-000001");
   const [fhirJson, setFhirJson] = useState(SAMPLE_FHIR);
   const [consentAttested, setConsentAttested] = useState(false);
@@ -236,7 +237,7 @@ export function OpdIngestPage() {
           body.policies[0];
         if (preferred) {
           setPolicyId(preferred.policy_id);
-          setProcedure(preferred.procedure);
+          // Procedure stays empty: the desk types it (no Synthea default).
         }
       })
       .catch((err: Error) => setError(err.message));
@@ -608,6 +609,16 @@ export function OpdIngestPage() {
         </details>
       ) : null}
 
+      {!isPatient && (focus === "document" || /^PAT-\d{6}$/.test(selectedPatientId)) ? (
+        <AttachReport
+          patientId={selectedPatientId}
+          caseId={caseParam || undefined}
+          initialType={searchParams.get("doctype") || undefined}
+          gap={focus === "document" ? gapHint : undefined}
+          defaultOpen={focus === "document"}
+        />
+      ) : null}
+
       <div className="tabs" role="tablist" aria-label="Visit entry mode">
         <button
           type="button"
@@ -900,7 +911,7 @@ export function OpdIngestPage() {
                 const next = e.target.value;
                 setPolicyId(next);
                 const match = policies.find((item) => item.policy_id === next);
-                if (match) setProcedure(match.procedure);
+                if (match && !procedure.trim()) setProcedure(match.procedure);
               }}
             >
               {policies.map((item) => (
@@ -912,7 +923,12 @@ export function OpdIngestPage() {
           </label>
           <label className="field">
             <span>Procedure</span>
-            <input value={procedure} onChange={(e) => setProcedure(e.target.value)} required />
+            <input
+              value={procedure}
+              onChange={(e) => setProcedure(e.target.value)}
+              placeholder="e.g. Total knee replacement"
+              required
+            />
           </label>
 
           {consentRequired ? (
@@ -976,7 +992,12 @@ export function OpdIngestPage() {
           </label>
           <label className="field">
             <span>Procedure</span>
-            <input value={procedure} onChange={(e) => setProcedure(e.target.value)} required />
+            <input
+              value={procedure}
+              onChange={(e) => setProcedure(e.target.value)}
+              placeholder="e.g. Total knee replacement"
+              required
+            />
           </label>
           {consentRequired ? (
             <ConsentCapture

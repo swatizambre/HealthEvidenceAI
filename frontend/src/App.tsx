@@ -1,4 +1,5 @@
-import { Navigate, NavLink, Route, Routes } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { deploymentBannerText } from "./api";
 import { HelpChat } from "./components/HelpChat";
 import { useI18n, type Lang, type MessageKey } from "./i18n";
@@ -14,13 +15,7 @@ import { Icon, type IconName } from "./ui";
 
 type NavItem = { to: string; key: MessageKey; icon: IconName; end?: boolean };
 
-const ROLE_OPTIONS: { id: DeskRole; label: string }[] = [
-  { id: "staff", label: "TPA / insurance desk" },
-  { id: "resident", label: "Junior doctor (PG / MO)" },
-  { id: "senior_clinician", label: "Consultant / senior MO" },
-  { id: "admin", label: "Facility admin" },
-  { id: "patient", label: "Patient (my record)" },
-];
+const ROLE_IDS: DeskRole[] = ["staff", "resident", "senior_clinician", "admin", "patient"];
 
 const LANGS: { id: Lang; label: string; name: string }[] = [
   { id: "en", label: "EN", name: "English" },
@@ -29,6 +24,14 @@ const LANGS: { id: Lang; label: string; name: string }[] = [
 
 export function App() {
   const { t, lang, setLang } = useI18n();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const headerRef = useRef<HTMLElement | null>(null);
+  const location = useLocation();
+
+  // The phone settings menu closes when the desk moves to another page.
+  useEffect(() => {
+    setSettingsOpen(false);
+  }, [location.pathname]);
   const {
     role,
     setRole,
@@ -43,6 +46,18 @@ export function App() {
     loadingAuth,
     deployment,
   } = useRole();
+
+  // Sticky table headers sit just below the (wrapping) app header: publish its height.
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header || typeof ResizeObserver === "undefined") return;
+    const root = document.documentElement;
+    const observer = new ResizeObserver(() => {
+      root.style.setProperty("--app-header-h", `${Math.ceil(header.getBoundingClientRect().height)}px`);
+    });
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, [loadingAuth]);
 
   if (loadingAuth) {
     return (
@@ -82,7 +97,7 @@ export function App() {
         </div>
       ) : null}
 
-      <header className="app-header">
+      <header className="app-header" ref={headerRef}>
         <NavLink to={isPatient ? "/my-record" : "/"} className="brand" end>
           <span className="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="22" height="22">
@@ -96,23 +111,39 @@ export function App() {
           </span>
         </NavLink>
 
-        <div className="header-tools">
+        <button
+          type="button"
+          className="header-btn settings-toggle"
+          aria-expanded={settingsOpen}
+          aria-controls="desk-settings"
+          onClick={() => setSettingsOpen((value) => !value)}
+        >
+          <Icon name="chevron-down" className={settingsOpen ? "is-flipped" : undefined} />
+          <span>{t("shell.settings")}</span>
+        </button>
+        <div
+          className={`header-tools${settingsOpen ? " is-open" : ""}`}
+          id="desk-settings"
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && settingsOpen) setSettingsOpen(false);
+          }}
+        >
           {demoSigninAllowed ? (
             <>
               {!isPatient ? (
-              <label className="header-field">
-                <span className="header-field-label">{t("shell.facility")}</span>
-                <select
-                  value={facility}
-                  onChange={(event) => setFacility(event.target.value as FacilityType)}
-                >
-                  {facilityOptions().map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <label className="header-field">
+                  <span className="header-field-label">{t("shell.facility")}</span>
+                  <select
+                    value={facility}
+                    onChange={(event) => setFacility(event.target.value as FacilityType)}
+                  >
+                    {facilityOptions().map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {t(`facility.${item.id}` as MessageKey)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               ) : null}
               <label className="header-field">
                 <span className="header-field-label">{t("shell.signIn")}</span>
@@ -121,9 +152,9 @@ export function App() {
                   aria-label={t("shell.signIn")}
                   onChange={(event) => setRole(event.target.value as DeskRole)}
                 >
-                  {ROLE_OPTIONS.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.label}
+                  {ROLE_IDS.map((id) => (
+                    <option key={id} value={id}>
+                      {t(`role.${id}` as MessageKey)}
                     </option>
                   ))}
                 </select>

@@ -199,9 +199,20 @@ export interface CaseWorkspace {
 export interface PreauthField {
   key: string;
   label: string;
-  value: string;
+  value: string | null;
   source: "chart" | "case" | "missing";
   required: boolean;
+  /** v1.2: supporting document missing for this value (e.g. implant cost without a quotation). */
+  warning?: string | null;
+  /** v1.2: reviewer guidance, e.g. "Confirm before printing" on chart-derived text. */
+  hint?: string | null;
+}
+
+export interface ChecklistOpenItem {
+  item_id: string;
+  label: string;
+  group: ChecklistGroup;
+  status: ChecklistStatus;
 }
 
 export interface PreauthSection {
@@ -219,6 +230,8 @@ export interface PreauthForm {
   form_version: string;
   sections: PreauthSection[];
   missing_required: string[];
+  /** v1.2: required clinical/document checklist items still open. */
+  checklist_open?: ChecklistOpenItem[];
   attachments: PreauthAttachment[];
 }
 
@@ -316,6 +329,64 @@ export function getPreauthForm(caseId: string): Promise<PreauthForm> {
 
 export function getDischargeCheck(caseId: string): Promise<DischargeCheck> {
   return apiRequest(`${BASE}/cases/${encodeURIComponent(caseId)}/discharge-check`);
+}
+
+/** Typed supporting documents the desk attaches to a chart (contract v1.2). */
+export type ReportDocumentType =
+  | "radiology_report"
+  | "investigation_report"
+  | "implant_quote"
+  | "implant_invoice"
+  | "anc_card"
+  | "mlc_copy"
+  | "discharge_summary"
+  | "final_bill";
+
+export const REPORT_DOCUMENT_LABEL: Record<ReportDocumentType, string> = {
+  radiology_report: "Radiology report (X-ray / CT / USG / MRI)",
+  investigation_report: "Investigation report (lab, ECG, echo, biometry…)",
+  implant_quote: "Implant quotation (make, model, MRP)",
+  implant_invoice: "Implant invoice / sticker",
+  anc_card: "ANC card / antenatal record",
+  mlc_copy: "MLC copy / police intimation (FIR)",
+  discharge_summary: "Discharge summary",
+  final_bill: "Final bill",
+};
+
+export function isReportDocumentType(value: string): value is ReportDocumentType {
+  return Object.prototype.hasOwnProperty.call(REPORT_DOCUMENT_LABEL, value);
+}
+
+/** Best document type for a checklist "documents" item, from its label. */
+export function reportTypeFor(label: string): ReportDocumentType {
+  const text = label.toLowerCase();
+  if (/implant|stent|iol/.test(text)) return /invoice|sticker/.test(text) ? "implant_invoice" : "implant_quote";
+  if (/x-ray|\bct\b|usg|ultrasound|mri|scan|radiolog/.test(text)) return "radiology_report";
+  if (/\banc\b|antenatal record/.test(text)) return "anc_card";
+  if (/mlc|police|\bfir\b/.test(text)) return "mlc_copy";
+  if (/discharge summary/.test(text)) return "discharge_summary";
+  if (/bill/.test(text)) return "final_bill";
+  return "investigation_report";
+}
+
+export function attachPatientDocument(body: {
+  patient_id: string;
+  document_type: ReportDocumentType;
+  content: string;
+  case_id?: string;
+}): Promise<{ document_id: string }> {
+  const metadata: Record<string, string> = { origin: "tpa_desk" };
+  if (body.case_id) metadata.case_id = body.case_id;
+  return apiRequest("/api/v1/documents", {
+    method: "POST",
+    body: JSON.stringify({
+      patient_id: body.patient_id,
+      document_type: body.document_type,
+      content: body.content,
+      source: "tpa_desk",
+      metadata,
+    }),
+  });
 }
 
 /** Plain message for an error from the desk API, with a clear note for undeployed routes. */

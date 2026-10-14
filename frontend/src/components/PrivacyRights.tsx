@@ -12,6 +12,7 @@ import {
   type DataSubjectRequest,
   type DataSubjectRequestType,
 } from "../api";
+import { formatDateTime } from "../ui";
 
 const PAGE_SIZE = 20;
 
@@ -28,17 +29,18 @@ const REQUEST_LABELS: Record<DataSubjectRequestType, string> = {
   nominee: "Nominate someone to act for me",
 };
 
+/** Same "14 Oct, 12:54" (en-IN) format as the rest of the desk. */
 function when(value: string | null): string {
   if (!value) {
     return "—";
   }
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+  const formatted = formatDateTime(value);
+  return formatted === "—" ? value : formatted;
 }
 
 type AccessRow =
   | { kind: "entry"; entry: AccessLogEntry }
-  | { kind: "self"; key: string; count: number; label: string; latest: string; day: string };
+  | { kind: "self"; key: string; count: number; label: string; latest: string; earliest: string; day: string };
 
 function dayKey(value: string): string {
   const parsed = new Date(value);
@@ -56,15 +58,16 @@ function dayLabel(value: string): string {
   return `on ${parsed.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`;
 }
 
-/** Collapse runs of your own activity on the same day into one row. */
+/** Collapse consecutive identical rows of your own activity (same action, same day) into one. */
 export function collapseAccessLog(entries: AccessLogEntry[]): AccessRow[] {
   const rows: AccessRow[] = [];
   for (const entry of entries) {
     const isSelf = entry.actor_category === "you" && entry.outcome === "allowed";
     const last = rows[rows.length - 1];
     const day = dayKey(entry.occurred_at);
-    if (isSelf && last && last.kind === "self" && last.day === day) {
+    if (isSelf && last && last.kind === "self" && last.day === day && last.label === entry.action_label) {
       last.count += 1;
+      last.earliest = entry.occurred_at;
       continue;
     }
     if (isSelf) {
@@ -74,6 +77,7 @@ export function collapseAccessLog(entries: AccessLogEntry[]): AccessRow[] {
         count: 1,
         label: entry.action_label,
         latest: entry.occurred_at,
+        earliest: entry.occurred_at,
         day,
       });
     } else {
@@ -140,11 +144,18 @@ function AccessLogSection() {
                 row.kind === "self" ? (
                   <li key={row.key} className="access-self">
                     <span>
-                      {row.count > 1
-                        ? `You viewed your record · ${row.count} times ${dayLabel(row.latest)}`
-                        : `You: ${(row.label || "viewed your record").replace(/^\w/, (ch) => ch.toLowerCase())}`}
+                      {`You: ${(row.label || "viewed your record").replace(/^\w/, (ch) => ch.toLowerCase())}`}
+                      {row.count > 1 ? (
+                        <span className="count-badge" aria-label={`${row.count} times ${dayLabel(row.latest)}`}>
+                          ×{row.count}
+                        </span>
+                      ) : null}
                     </span>
-                    <span className="muted small">{when(row.latest)}</span>
+                    <span className="muted small">
+                      {row.count > 1 && row.earliest !== row.latest
+                        ? `${when(row.earliest)} – ${when(row.latest).split(", ").pop() ?? ""}`
+                        : when(row.latest)}
+                    </span>
                   </li>
                 ) : (
                   <li

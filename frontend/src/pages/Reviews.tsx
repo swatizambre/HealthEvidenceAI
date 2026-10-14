@@ -12,6 +12,7 @@ import {
   type WorklistItem,
 } from "../deskApi";
 import { formatLiveAge, useLiveRefresh } from "../hooks/useLiveRefresh";
+import { useI18n } from "../i18n";
 import { procedureDisplayName } from "../labels";
 import { useRole } from "../roleContext";
 import {
@@ -40,6 +41,7 @@ const FILTER_MATCH: Record<Filter, (item: AuthCase) => boolean> = {
 };
 
 export function ReviewsPage() {
+  const { t } = useI18n();
   const { canAdjudicate } = useRole();
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -53,6 +55,7 @@ export function ReviewsPage() {
   const [ws, setWs] = useState<CaseWorkspace | null>(null);
   const [wsError, setWsError] = useState<{ message: string; missing: boolean } | null>(null);
   const [notes, setNotes] = useState("");
+  const [noteError, setNoteError] = useState("");
   const [deciding, setDeciding] = useState<"acknowledged" | "needs_documentation" | null>(null);
   const [assistBusy, setAssistBusy] = useState(false);
 
@@ -119,6 +122,7 @@ export function ReviewsPage() {
 
   useEffect(() => {
     setNotes("");
+    setNoteError("");
     if (selectedId) {
       void loadWorkspace(selectedId);
     } else {
@@ -130,17 +134,25 @@ export function ReviewsPage() {
   const runId = ws?.review.run_id || selected?.last_run_id || "";
   const awaiting = ws ? ws.review.state === "awaiting_senior" : selected?.status === "ready_for_human";
   const openRequired = ws ? ws.checklist.filter((item) => item.required && item.status !== "SUPPORTED").length : 0;
+  // With required items open, Confirm needs a note saying why it is acceptable.
+  const confirmNeedsNote = openRequired > 0;
+  const noteGiven = notes.trim().length >= 3;
 
   async function decide(decision: "acknowledged" | "needs_documentation") {
     if (!runId) return;
-    if (decision === "needs_documentation" && notes.trim().length < 3) {
-      toast.show("Add a note saying what is still needed before sending back.", "danger");
+    if (decision === "needs_documentation" && !noteGiven) {
+      setNoteError("Add a note saying what is still needed before sending back.");
       return;
     }
+    if (decision === "acknowledged" && confirmNeedsNote && !noteGiven) {
+      setNoteError("Required items are missing. Add a note explaining why you confirm anyway.");
+      return;
+    }
+    setNoteError("");
     setDeciding(decision);
     try {
       await resumeReview(runId, { decision, notes: notes.trim() });
-      toast.show(decision === "acknowledged" ? "Checklist confirmed" : "Sent back to the desk", "success");
+      toast.show(decision === "acknowledged" ? t("review.confirmedToast") : "Sent back to the desk", "success");
       const remaining = visible.filter((item) => item.case_id !== selectedId);
       await loadList();
       setNotes("");
@@ -177,12 +189,12 @@ export function ReviewsPage() {
         <div>
           <h1 className="page-title">Reviews</h1>
           <p className="page-sub">
-            Confirm each checklist against the cited chart excerpts, or send it back with a note. Confirming is not an
-            insurance approval.
+            Confirm each checklist against the cited chart excerpts, or send it back with a note. A senior confirmation
+            is not an insurance approval.
             <span className="live-stamp">
-              {formatLiveAge(lastUpdatedAt, pushConnected)}
+              {formatLiveAge(lastUpdatedAt, pushConnected, t)}
               <button type="button" className="text-link" onClick={refreshNow}>
-                Refresh
+                {t("common.refresh")}
               </button>
             </span>
           </p>
@@ -193,7 +205,7 @@ export function ReviewsPage() {
         <aside className="review-queue" aria-label="Review queue">
           <Tabs
             items={[
-              { id: "awaiting", label: "Awaiting senior", count: cases ? counts.awaiting : undefined },
+              { id: "awaiting", label: t("review.awaiting_senior"), count: cases ? counts.awaiting : undefined },
               { id: "sent_back", label: "Sent back", count: cases ? counts.sent_back : undefined },
               { id: "open", label: "All", count: cases ? counts.open : undefined },
             ]}
@@ -329,41 +341,65 @@ export function ReviewsPage() {
                 ) : (
                   <div className="decision-body">
                     <label className="field decision-note">
-                      <span>Note to the desk</span>
+                      <span>
+                        Note to the desk
+                        {confirmNeedsNote ? <span className="req" aria-hidden="true">*</span> : null}
+                      </span>
                       <textarea
                         rows={2}
                         value={notes}
-                        onChange={(event) => setNotes(event.target.value)}
-                        placeholder="Required when sending back: say what is missing."
+                        onChange={(event) => {
+                          setNotes(event.target.value);
+                          if (noteError && event.target.value.trim().length >= 3) setNoteError("");
+                        }}
+                        placeholder={
+                          confirmNeedsNote
+                            ? "Required: say what is missing (send back) or why you confirm anyway."
+                            : "Required when sending back: say what is missing."
+                        }
+                        aria-invalid={noteError ? true : undefined}
+                        aria-describedby="decision-note-help"
                       />
+                      <span
+                        id="decision-note-help"
+                        className={noteError ? "field-error" : "field-hint"}
+                        role={noteError ? "alert" : undefined}
+                      >
+                        {noteError ||
+                          (confirmNeedsNote
+                            ? `${openRequired} required item${openRequired === 1 ? " is" : "s are"} missing. ${t("review.confirm")} is available after you add a note.`
+                            : "A note is optional when you confirm.")}
+                      </span>
                     </label>
                     <div className="button-row decision-buttons">
                       <Button size="sm" variant="ghost" loading={assistBusy} onClick={() => void draftNote()}>
                         Draft note
                       </Button>
                       <Button
+                        variant={confirmNeedsNote ? "primary" : "secondary"}
                         icon="arrow-right"
                         loading={deciding === "needs_documentation"}
                         disabled={deciding !== null}
                         onClick={() => void decide("needs_documentation")}
                       >
-                        Send back
+                        {t("review.sendBack")}
                       </Button>
                       <Button
-                        variant="primary"
+                        variant={confirmNeedsNote ? "secondary" : "primary"}
                         icon="check"
                         loading={deciding === "acknowledged"}
-                        disabled={deciding !== null}
+                        disabled={deciding !== null || (confirmNeedsNote && !noteGiven)}
+                        aria-describedby="decision-note-help"
                         onClick={() => void decide("acknowledged")}
                       >
-                        Acknowledge
+                        {t("review.confirm")}
                       </Button>
                     </div>
                   </div>
                 )}
                 {awaiting && canAdjudicate && runId ? (
                   <p className="muted small">
-                    <Icon name="info" size={12} /> Acknowledging confirms the checklist matches the chart. It is not an
+                    <Icon name="info" size={12} /> Confirm records that the checklist matches the chart. It is not an
                     approval or denial of care.
                   </p>
                 ) : null}

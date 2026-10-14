@@ -1,18 +1,21 @@
 export { Button, ButtonLink, type ButtonVariant } from "./Button";
 export { ClockChip, clockState } from "./ClockChip";
 export { DataTable, type Column } from "./DataTable";
-export { Drawer, Money, ReadinessMeter, Tabs, type TabItem } from "./Display";
+export { Dialog, Drawer, Money, ReadinessMeter, Tabs, type TabItem } from "./Display";
 export { EmptyState, Notice, Skeleton } from "./Feedback";
 export {
   ageFromDob,
   ageSex,
   formatDate,
   formatDateTime,
+  formatDateTimeLong,
   formatDuration,
   formatInr,
   formatInrPlain,
+  humanize,
   useNow,
 } from "./format";
+export { PHONE_QUERY, useIsPhone, useMediaQuery } from "./useMediaQuery";
 export { Icon, type IconName } from "./icons";
 export {
   ItemStatusPill,

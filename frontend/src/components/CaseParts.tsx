@@ -1,9 +1,9 @@
 /** Shared case pieces used by the case workspace and senior Reviews. */
-import { useState } from "react";
-import type { ChecklistGroup, ChecklistItem, DeskCitation, Stage } from "../deskApi";
+import { Fragment, useState, type ReactNode } from "react";
+import { reportTypeFor, type ChecklistGroup, type ChecklistItem, type DeskCitation, type Stage } from "../deskApi";
 import { useI18n, type MessageKey } from "../i18n";
 import { documentTypeLabel } from "../labels";
-import { Icon, ItemStatusPill, formatDate } from "../ui";
+import { Button, ButtonLink, Icon, ItemStatusPill, formatDate } from "../ui";
 
 export const ILLUSTRATIVE_NOTE = "Illustrative field set — confirm with each insurer/TPA.";
 
@@ -15,7 +15,38 @@ const GROUP_LABEL: Record<ChecklistGroup, string> = {
   documents: "Documents",
 };
 
-export function Citations({ citations }: { citations: DeskCitation[] }) {
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Wrap each occurrence of `terms` in <mark> (case-insensitive, longest term first). */
+export function Highlighted({ text, terms }: { text: string; terms?: string[] }) {
+  const wanted = (terms ?? [])
+    .map((term) => term.trim())
+    .filter((term) => term.length >= 3)
+    .sort((a, b) => b.length - a.length);
+  if (wanted.length === 0) {
+    return <>{text}</>;
+  }
+  const pattern = new RegExp(`(${wanted.map(escapeRegExp).join("|")})`, "gi");
+  const parts = text.split(pattern);
+  return (
+    <>
+      {parts.map((part, index) =>
+        index % 2 === 1 ? <mark key={index}>{part}</mark> : <Fragment key={index}>{part}</Fragment>,
+      )}
+    </>
+  );
+}
+
+export function Citations({
+  citations,
+  highlight,
+}: {
+  citations: DeskCitation[];
+  /** Values to mark inside the excerpt (diagnosis, ICD code, amount). */
+  highlight?: string[];
+}) {
   if (citations.length === 0) {
     return null;
   }
@@ -23,7 +54,9 @@ export function Citations({ citations }: { citations: DeskCitation[] }) {
     <ul className="citations" aria-label="Chart citations">
       {citations.map((citation, index) => (
         <li key={`${citation.document_id}-${citation.chunk_id}-${index}`} className="citation">
-          <blockquote>{citation.excerpt}</blockquote>
+          <blockquote>
+            <Highlighted text={citation.excerpt} terms={highlight} />
+          </blockquote>
           <p className="citation-meta">
             <Icon name="doc" size={12} />
             <span>{documentTypeLabel(citation.source)}</span>
@@ -36,8 +69,49 @@ export function Citations({ citations }: { citations: DeskCitation[] }) {
   );
 }
 
-function ChecklistRow({ item }: { item: ChecklistItem }) {
+/** Where a missing item's "To fix" button leads. Optional: Reviews shows hints only. */
+export type ChecklistFixActions = {
+  patientId: string;
+  caseId: string;
+  policyId?: string | null;
+  onEditCase?: () => void;
+};
+
+function visitLink(actions: ChecklistFixActions, item: ChecklistItem, focus: "note" | "document"): string {
+  const params = new URLSearchParams({ patient: actions.patientId, case: actions.caseId, focus });
+  if (actions.policyId) params.set("policy", actions.policyId);
+  params.set("gap", item.label);
+  if (focus === "document") params.set("doctype", reportTypeFor(item.label));
+  return `/visit?${params.toString()}`;
+}
+
+function FixAction({ item, actions }: { item: ChecklistItem; actions?: ChecklistFixActions }) {
+  if (!actions) return null;
+  if (item.group === "form") {
+    return actions.onEditCase ? (
+      <Button size="sm" icon="edit" onClick={actions.onEditCase}>
+        Edit case details
+      </Button>
+    ) : null;
+  }
+  if (item.group === "documents" && item.status === "MISSING") {
+    return (
+      <ButtonLink size="sm" icon="doc" to={visitLink(actions, item, "document")}>
+        Attach document
+      </ButtonLink>
+    );
+  }
+  return (
+    <ButtonLink size="sm" icon="note" to={visitLink(actions, item, "note")}>
+      Add visit note
+    </ButtonLink>
+  );
+}
+
+function ChecklistRow({ item, actions }: { item: ChecklistItem; actions?: ChecklistFixActions }) {
   const open = item.status !== "SUPPORTED";
+  const hasAction = Boolean(actions && (item.group !== "form" || actions.onEditCase));
+  const fix: ReactNode = open && hasAction ? <FixAction item={item} actions={actions} /> : null;
   return (
     <li className={`check-item check-${item.status.toLowerCase()}`}>
       <div className="check-head">
@@ -47,14 +121,15 @@ function ChecklistRow({ item }: { item: ChecklistItem }) {
           {!item.required ? <span className="tag">Optional</span> : null}
         </p>
       </div>
-      {item.reason ? <p className="check-reason">{item.reason}</p> : null}
-      {open && item.fix_hint ? (
-        <p className="check-fix">
+      {item.reason && (open || item.group !== "form") ? <p className="check-reason">{item.reason}</p> : null}
+      {open && (item.fix_hint || fix) ? (
+        <div className="check-fix">
           <Icon name="arrow-right" size={14} />
           <span>
             <strong>To fix:</strong> {item.fix_hint}
           </span>
-        </p>
+          {fix ? <span className="check-fix-action">{fix}</span> : null}
+        </div>
       ) : null}
       <Citations citations={item.citations} />
       {item.status === "SUPPORTED" && item.citations.length === 0 && item.group !== "form" ? (
@@ -65,8 +140,9 @@ function ChecklistRow({ item }: { item: ChecklistItem }) {
 }
 
 /** Checklist grouped as form / clinical / documents, citations shown inline. */
-export function Checklist({ items }: { items: ChecklistItem[] }) {
+export function Checklist({ items, actions }: { items: ChecklistItem[]; actions?: ChecklistFixActions }) {
   const [onlyOpen, setOnlyOpen] = useState(false);
+  const [formExpanded, setFormExpanded] = useState<boolean | null>(null);
   const visible = onlyOpen ? items.filter((item) => item.status !== "SUPPORTED") : items;
 
   return (
@@ -86,19 +162,49 @@ export function Checklist({ items }: { items: ChecklistItem[] }) {
         if (groupItems.length === 0) {
           return null;
         }
-        const supported = items.filter((item) => item.group === group && item.status === "SUPPORTED").length;
-        const total = items.filter((item) => item.group === group).length;
+        const all = items.filter((item) => item.group === group);
+        const supported = all.filter((item) => item.status === "SUPPORTED").length;
+        if (group === "form") {
+          const openCount = all.length - supported;
+          // Form fields collapse to one summary line; open fields keep it expanded by default.
+          const expanded = formExpanded ?? (openCount > 0 || onlyOpen);
+          return (
+            <section key={group} className="check-group" aria-label={GROUP_LABEL[group]}>
+              <button
+                type="button"
+                className="check-summary"
+                aria-expanded={expanded}
+                aria-controls="checklist-form-fields"
+                onClick={() => setFormExpanded(!expanded)}
+              >
+                <Icon name="chevron-down" className={expanded ? "is-flipped" : undefined} />
+                <ItemStatusPill status={openCount === 0 ? "SUPPORTED" : "MISSING"} onCase />
+                <span className="check-summary-text">
+                  {supported} of {all.length} form fields on case
+                  {openCount > 0 ? <span className="muted"> · {openCount} missing</span> : null}
+                </span>
+              </button>
+              {expanded ? (
+                <ul className="check-list" id="checklist-form-fields">
+                  {groupItems.map((item) => (
+                    <ChecklistRow key={item.item_id} item={item} actions={actions} />
+                  ))}
+                </ul>
+              ) : null}
+            </section>
+          );
+        }
         return (
           <section key={group} className="check-group" aria-label={GROUP_LABEL[group]}>
             <h3 className="check-group-title">
               {GROUP_LABEL[group]}
               <span className="muted">
-                {supported} of {total} supported
+                {supported} of {all.length} supported
               </span>
             </h3>
             <ul className="check-list">
               {groupItems.map((item) => (
-                <ChecklistRow key={item.item_id} item={item} />
+                <ChecklistRow key={item.item_id} item={item} actions={actions} />
               ))}
             </ul>
           </section>

@@ -23,7 +23,14 @@ from app.db.repository import (
     list_procedures,
 )
 from app.models import AuthorizationCase, ClinicalNote, Document, InsurancePolicy, Patient
-from app.services.case_checklist import EXCERPT_MAX, GROUP_DOCUMENTS, build_case_checklist
+from app.services.case_checklist import (
+    GROUP_DOCUMENTS,
+    GROUP_FORM,
+    STATUS_SUPPORTED,
+    ChecklistItem,
+    build_case_checklist,
+    clip_words,
+)
 from app.services.tpa_desk import age_years, aware, format_inr, iso
 
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
@@ -40,6 +47,22 @@ _INJURY = re.compile(r"\brta\b|road traffic|accident|injury|trauma|fracture|assa
 _IMPLANT = re.compile(
     r"implant|\biol\b|lens|replacement|arthroplasty|stent|ptca|angioplasty|orif|plate|nail", re.I
 )
+_INVESTIGATION_TYPES = frozenset(
+    {"lab_result", "investigation_report", "imaging_report", "radiology_report"}
+)
+_INVESTIGATION_MAX_ITEMS = 5
+_INVESTIGATION_MAX_CHARS = 160
+# Synthea placeholders are metadata, not findings — never print them on a pre-auth form.
+_CHART_NOISE = re.compile(
+    r"synthea|imaging metadata|no image pixels|no diagnostic interpretation", re.I
+)
+# Words too generic to decide whether a chart entry relates to this case.
+_GENERIC_WORDS = frozenset(
+    {"total", "primary", "management", "medical", "grade", "elective", "planned", "procedure",
+     "surgery", "surgical", "plan", "done", "secondary", "unspecified", "disorder", "finding",
+     "closed", "open", "drug", "eluting"}
+)
+CHART_CONFIRM_HINT = "Confirm before printing"
 _ICD = re.compile(r"\b([A-TV-Z][0-9][0-9AB](?:\.[0-9A-Z]{1,4})?)\b")
 _AMOUNT = re.compile(r"(?:₹|rs\.?|inr)\s*([0-9][0-9,]*)", re.I)
 
@@ -63,7 +86,11 @@ def _field(
     source: str,
     *,
     required: bool,
+    warning: str | None = None,
+    hint: str | None = None,
 ) -> dict[str, Any]:
+    """One form field. ``warning`` flags a value whose supporting document is missing;
+    ``hint`` is reviewer guidance (e.g. chart-derived text to confirm before printing)."""
     text = "" if value is None else str(value).strip()
     return {
         "key": key,
@@ -71,6 +98,8 @@ def _field(
         "value": text or None,
         "source": source if text else "missing",
         "required": required,
+        "warning": warning,
+        "hint": hint if text else None,
     }
 
 
@@ -116,22 +145,73 @@ def _chronic_history(session: Session, patient: Patient) -> list[dict[str, Any]]
             value = f"Yes — {found_value}" + (f" ({duration})" if duration else "")
             fields.append(_field(key, label, value, "chart", required=False))
         else:
-            fields.append(
-                {"key": key, "label": label, "value": "Not documented", "source": "chart",
-                 "required": False}
-            )
+            fields.append(_field(key, label, "Not documented", "chart", required=False))
     return fields
 
 
-def _investigations(session: Session, patient: Patient) -> str:
-    labs = list_labs(session, patient.id)
-    imaging = list_imaging(session, patient.id)
-    parts: list[str] = []
-    for lab in sorted(labs, key=lambda item: aware(item.collected_at) or _EPOCH, reverse=True)[:6]:
-        parts.append(f"{lab.test_name}: {lab.value} {lab.unit}".strip())
-    for study in imaging[-3:]:
-        parts.append(f"{study.modality} {study.body_part}: {study.description}"[:160])
-    return "; ".join(parts)
+def _case_keywords(case: AuthorizationCase, policy: InsurancePolicy | None) -> set[str]:
+    text = " ".join(
+        [
+            str(case.proposed_treatment or case.procedure or ""),
+            str(case.provisional_diagnosis or ""),
+            str(policy.procedure_name or "") if policy else "",
+        ]
+    )
+    return {token for token in _tokens(text) if token not in _GENERIC_WORDS}
+
+
+def _mentions(text: str, keywords: set[str]) -> bool:
+    return bool(keywords) and bool(_tokens(text) & keywords)
+
+
+def _investigations(
+    session: Session,
+    patient: Patient,
+    keywords: set[str],
+    cited: set[str],
+) -> str:
+    """Investigations relevant to this case only.
+
+    An entry is relevant when the case checklist cites it, or it mentions the case's
+    diagnosis/procedure keywords. Synthea metadata placeholders are dropped. At most
+    five entries, each clipped on a word boundary.
+    """
+    documents = _patient_documents(session, patient)
+    code_by_id = {doc.id: doc.document_code for doc in documents}
+    items: list[str] = []
+    seen: set[str] = set()
+
+    def push(text: str) -> None:
+        # Entries are joined with "; " — keep each entry free of that separator.
+        clean = " ".join((text or "").split()).replace("; ", ", ")
+        key = clean.lower()
+        if not clean or _CHART_NOISE.search(clean) or key in seen:
+            return
+        seen.add(key)
+        items.append(clip_words(clean, _INVESTIGATION_MAX_CHARS))
+
+    for doc in documents:
+        if doc.document_type not in _INVESTIGATION_TYPES or doc.document_type == "lab_result":
+            continue
+        if doc.document_code in cited or _mentions(doc.content or "", keywords):
+            push(doc.content or "")
+    labs = sorted(
+        list_labs(session, patient.id),
+        key=lambda item: aware(item.collected_at) or _EPOCH,
+        reverse=True,
+    )
+    tests_seen: set[str] = set()
+    for lab in labs:
+        name = (lab.test_name or "").strip().lower()
+        if name in tests_seen:
+            continue
+        if code_by_id.get(lab.document_id) in cited or _mentions(lab.test_name or "", keywords):
+            tests_seen.add(name)
+            push(f"{lab.test_name}: {lab.value} {lab.unit}".strip())
+    for study in reversed(list_imaging(session, patient.id)):
+        if _mentions(f"{study.body_part} {study.description}", keywords):
+            push(f"{study.modality} {study.body_part}: {study.description}")
+    return "; ".join(items[:_INVESTIGATION_MAX_ITEMS])
 
 
 def _presenting_complaints(session: Session, patient: Patient) -> str:
@@ -153,12 +233,15 @@ def preauth_form(session: Session, case: AuthorizationCase) -> dict[str, Any]:
     maternity = bool(_MATERNITY.search(context))
     injury = bool(_INJURY.search(context))
     tpa_required = str(case.payer_type or "") == "tpa"
+    checklist = build_case_checklist(session, case)
+    cited = {citation.document_id for item in checklist for citation in item.citations}
+    documents = _patient_documents(session, patient) if patient else []
 
     def extra_field(key: str, label: str, *, required: bool, fallback: Any = None,
-                    fallback_source: str = "chart") -> dict[str, Any]:
+                    fallback_source: str = "chart", hint: str | None = None) -> dict[str, Any]:
         if extra.get(key) not in (None, ""):
             return _case_value(key, label, extra.get(key), required=required)
-        return _field(key, label, fallback, fallback_source, required=required)
+        return _field(key, label, fallback, fallback_source, required=required, hint=hint)
 
     patient_fields = [
         _field("patient_name", "Name of the patient", patient.synthetic_name if patient else None,
@@ -190,7 +273,12 @@ def preauth_form(session: Session, case: AuthorizationCase) -> dict[str, Any]:
         _case_value("icd10_code", "ICD-10 code (diagnosis)", case.icd10_code, required=True),
         _case_value("proposed_treatment", "Proposed line of treatment", treatment, required=True),
         extra_field("investigations", "Investigations / medical management details",
-                    required=True, fallback=_investigations(session, patient) if patient else ""),
+                    required=True,
+                    fallback=(
+                        _investigations(session, patient, _case_keywords(case, policy), cited)
+                        if patient else ""
+                    ),
+                    hint=CHART_CONFIRM_HINT),
         extra_field("route_of_drug_administration", "Route of drug administration",
                     required=not surgical),
     ]
@@ -235,11 +323,12 @@ def preauth_form(session: Session, case: AuthorizationCase) -> dict[str, Any]:
 
     history_fields = _chronic_history(session, patient) if patient else []
 
-    def cost(key: str, label: str) -> dict[str, Any]:
+    def cost(key: str, label: str, warning: str | None = None) -> dict[str, Any]:
         raw = costs.get(key)
-        return _case_value(
-            f"cost_{key}", label, f"₹{format_inr(int(raw))}" if raw not in (None, "") else None,
-            required=False,
+        amount = f"₹{format_inr(int(raw))}" if raw is not None and raw != "" else None
+        return _field(
+            f"cost_{key}", label, amount, "case",
+            required=False, warning=warning if amount else None,
         )
 
     total = case.estimated_cost_inr
@@ -250,7 +339,7 @@ def preauth_form(session: Session, case: AuthorizationCase) -> dict[str, Any]:
         cost("professional_fees", "Professional fees (surgeon, anaesthetist, consultation)"),
         cost("medicines_consumables", "Medicines + consumables"),
         cost("investigations", "Investigations / diagnostics"),
-        cost("implants", "Cost of implants"),
+        cost("implants", "Cost of implants", _implant_warning(checklist, documents)),
         _case_value("cost_total", "Total expected cost of hospitalisation",
                     f"₹{format_inr(total)}" if total else None, required=True),
     ]
@@ -268,12 +357,19 @@ def preauth_form(session: Session, case: AuthorizationCase) -> dict[str, Any]:
         for field in section["fields"]
         if field["required"] and field["source"] == "missing"
     ]
+    checklist_open = [
+        {"item_id": item.item_id, "label": item.label, "group": item.group,
+         "status": item.status}
+        for item in checklist
+        if item.required and item.status != STATUS_SUPPORTED and item.group != GROUP_FORM
+    ]
     return {
         "form_version": FORM_VERSION,
         "case_id": case.case_code,
         "sections": sections,
         "missing_required": missing,
-        "attachments": _attachments(session, case, patient),
+        "checklist_open": checklist_open,
+        "attachments": _attachments(session, checklist, patient, documents),
         "disclaimer": (
             "Illustrative mapping of the IRDAI cashless request form — confirm the current "
             "form and document list with each insurer/TPA. Not a submission."
@@ -281,11 +377,31 @@ def preauth_form(session: Session, case: AuthorizationCase) -> dict[str, Any]:
     }
 
 
+def _implant_warning(
+    checklist: Sequence[ChecklistItem], documents: Sequence[Document]
+) -> str | None:
+    """Implant cost needs a quotation/invoice on file (make, model, MRP)."""
+    for item in checklist:
+        if (
+            item.group == GROUP_DOCUMENTS
+            and item.required
+            and item.status != STATUS_SUPPORTED
+            and "implant" in item.label.lower()
+        ):
+            return f"Supporting document missing: {item.label}"
+    if any("implant" in str(doc.document_type or "").lower() for doc in documents):
+        return None
+    return "Supporting document missing: implant quotation (make, model, MRP)"
+
+
 def _attachments(
-    session: Session, case: AuthorizationCase, patient: Patient | None
+    session: Session,
+    checklist: Sequence[ChecklistItem],
+    patient: Patient | None,
+    documents: Sequence[Document],
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
-    for item in build_case_checklist(session, case):
+    for item in checklist:
         if item.group != GROUP_DOCUMENTS:
             continue
         out.append(
@@ -297,10 +413,7 @@ def _attachments(
             }
         )
     if patient is not None:
-        investigations = [
-            doc for doc in _patient_documents(session, patient)
-            if doc.document_type in {"lab_result", "investigation_report", "imaging_report"}
-        ]
+        investigations = [doc for doc in documents if doc.document_type in _INVESTIGATION_TYPES]
         citations = _doc_citations(session, investigations[:3])
         out.append(
             {
@@ -338,7 +451,7 @@ def _doc_citations(session: Session, documents: Sequence[Document]) -> list[dict
                 "document_id": doc.document_code,
                 "chunk_id": chunks[0].chunk_code,
                 "source": doc.document_type,
-                "excerpt": chunks[0].content.strip()[:EXCERPT_MAX],
+                "excerpt": clip_words(chunks[0].content),
                 "date": iso(doc.created_at),
             }
         )
@@ -521,8 +634,7 @@ def discharge_check(session: Session, case: AuthorizationCase) -> dict[str, Any]
             add("info", "LOS_AS_EXPECTED", "Length of stay is in line with the estimate.",
                 expected=f"{expected_days} day(s)", found=f"{actual_days} day(s)")
 
-    investigations = [doc for doc in docs if doc.document_type in
-                      {"lab_result", "investigation_report", "imaging_report"}]
+    investigations = [doc for doc in docs if doc.document_type in _INVESTIGATION_TYPES]
     if not investigations:
         add("warning", "INVESTIGATION_REPORTS_MISSING",
             "No investigation reports are on file to attach with the discharge request.")

@@ -161,7 +161,7 @@ def prepare_evidence_packet(session: Session, payload: PacketPrepareRequest) -> 
         )
         next_steps.append("Re-run Prepare evidence pack to refresh the readiness score.")
     if review.human_review_required:
-        next_steps.append("Open Reviews to acknowledge the checklist or mark needs documentation.")
+        next_steps.append("Open Reviews to confirm the checklist or send it back for documentation.")
     if not gaps and not review.human_review_required:
         next_steps.append(
             "Checklist looks complete for this evidence pack — still not an approval or denial."
