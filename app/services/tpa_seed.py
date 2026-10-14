@@ -902,6 +902,7 @@ def _apply_case(
             updated_at=stamp,
         )
         session.add(document)
+        session.flush()  # parent row first (PostgreSQL enforces the FK)
         added.append(document)
         if doc.as_note:
             session.add(
@@ -932,6 +933,7 @@ def _apply_case(
             updated_at=stamp,
         )
         session.add(document)
+        session.flush()
         added.append(document)
         session.add(
             LabResult(
