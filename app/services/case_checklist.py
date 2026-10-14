@@ -302,7 +302,7 @@ def _fix_hint(group: str, status: str, missing_label: str) -> str:
 def _criterion_items(
     results: list[dict[str, Any]],
     rules: Mapping[str, Mapping[str, Any]],
-    doc_dates: Mapping[str, str],
+    doc_dates: Mapping[str, str | None],
 ) -> list[ChecklistItem]:
     items: list[ChecklistItem] = []
     for row in results:
@@ -444,7 +444,7 @@ def build_case_checklist(
             .order_by(Document.created_at.desc(), Document.document_code)
         ).all()
     )
-    doc_dates = {doc.document_code: _iso(doc.created_at) or "" for doc in documents}
+    doc_dates = {doc.document_code: _iso(doc.created_at) for doc in documents}
     criterion_items = _criterion_items(results, rules, doc_dates)
     for item in criterion_items:
         if item.group == GROUP_DOCUMENTS:
