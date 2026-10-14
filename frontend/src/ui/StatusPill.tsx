@@ -87,15 +87,18 @@ const ITEM_ICON: Record<ChecklistStatus, IconName> = {
   NOT_SUPPORTED: "alert",
 };
 
-export function ItemStatusPill({ status }: { status: ChecklistStatus }) {
+export function ItemStatusPill({
+  status,
+  onCase = false,
+}: {
+  status: ChecklistStatus;
+  /** Form fields are satisfied by case details, not chart excerpts. */
+  onCase?: boolean;
+}) {
   const { t } = useI18n();
-  return (
-    <StatusPill
-      tone={ITEM_TONE[status]}
-      icon={ITEM_ICON[status]}
-      label={t(`item.${status}` as MessageKey)}
-    />
-  );
+  const label =
+    onCase && status === "SUPPORTED" ? t("item.SUPPORTED_ON_CASE") : t(`item.${status}` as MessageKey);
+  return <StatusPill tone={ITEM_TONE[status]} icon={ITEM_ICON[status]} label={label} />;
 }
 
 const REVIEW_TONE: Record<ReviewState, Tone> = {

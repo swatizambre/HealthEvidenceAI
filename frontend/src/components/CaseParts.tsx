@@ -41,7 +41,7 @@ function ChecklistRow({ item }: { item: ChecklistItem }) {
   return (
     <li className={`check-item check-${item.status.toLowerCase()}`}>
       <div className="check-head">
-        <ItemStatusPill status={item.status} />
+        <ItemStatusPill status={item.status} onCase={item.group === "form"} />
         <p className="check-label">
           {item.label}
           {!item.required ? <span className="tag">Optional</span> : null}
@@ -57,7 +57,7 @@ function ChecklistRow({ item }: { item: ChecklistItem }) {
         </p>
       ) : null}
       <Citations citations={item.citations} />
-      {item.status === "SUPPORTED" && item.citations.length === 0 ? (
+      {item.status === "SUPPORTED" && item.citations.length === 0 && item.group !== "form" ? (
         <p className="check-reason muted">No excerpt attached to this item.</p>
       ) : null}
     </li>

@@ -49,6 +49,7 @@ const en = {
   "step.closed": "Closed",
 
   "item.SUPPORTED": "Found in chart",
+  "item.SUPPORTED_ON_CASE": "On case",
   "item.MISSING": "Missing",
   "item.UNKNOWN": "Unclear",
   "item.NOT_SUPPORTED": "Doesn't match",
@@ -133,6 +134,7 @@ const hi: Record<MessageKey, string> = {
   "step.closed": "बंद",
 
   "item.SUPPORTED": "चार्ट में मिला",
+  "item.SUPPORTED_ON_CASE": "केस में दर्ज",
   "item.MISSING": "नहीं मिला",
   "item.UNKNOWN": "अस्पष्ट",
   "item.NOT_SUPPORTED": "मेल नहीं खाता",

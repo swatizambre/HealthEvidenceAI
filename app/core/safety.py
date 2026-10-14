@@ -53,9 +53,24 @@ _UNSAFE_PHRASE = re.compile(
 )
 
 
+# Desk vocabulary that names a document field or an insurer's recorded outcome, not a
+# decision made by this system (e.g. "Provisional diagnosis with ICD-10", "approved
+# amount"). Neutralised before the phrase check so checklist labels can appear in
+# summaries; first-person or system decisions ("we approve…") are still caught.
+_FIELD_PHRASES = re.compile(
+    r"\b(?:provisional|final|discharge|admission|primary|secondary|working|pre-?auth|"
+    r"principal|differential)\s+diagnos(?:is|es)\b"
+    r"|\bdiagnos(?:is|es)\s+(?:code|codes|with\s+icd(?:-?10)?|and\s+icd(?:-?10)?)\b"
+    r"|\b(?:approved|approval)\s+(?:amount|procedure|limit|letter|date|status)\b"
+    r"|\b(?:insurer|tpa|pre-?auth|cashless)\s+approval\b"
+    r"|\brecord(?:ed)?\s+approval\b",
+    re.IGNORECASE,
+)
+
+
 def contains_unsafe_decision_language(text: str) -> bool:
     """Broader phrase check for free-text model output (help chat, summaries)."""
-    value = (text or "").strip()
+    value = _FIELD_PHRASES.sub("field", (text or "")).strip()
     if not value:
         return False
     if contains_autonomous_decision(value):

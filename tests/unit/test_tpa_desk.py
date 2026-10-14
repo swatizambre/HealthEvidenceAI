@@ -418,7 +418,10 @@ def test_india_checklists_replace_us_payer_labels(client: TestClient) -> None:
 
 
 def _token(client: TestClient, subject: str, *roles: str) -> dict[str, str]:
-    response = client.post("/api/v1/auth/dev-token", json={"subject": subject, "roles": list(roles)})
+    body: dict[str, object] = {"subject": subject, "roles": list(roles)}
+    if "patient" in roles:
+        body["patient_id"] = "PAT-000001"  # patient tokens must be bound to a chart
+    response = client.post("/api/v1/auth/dev-token", json=body)
     assert response.status_code == 200, response.text
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
@@ -477,3 +480,20 @@ def test_tpa_desk_migration_upgrade_and_downgrade(monkeypatch: pytest.MonkeyPatc
     finally:
         engine.dispose()
         get_settings.cache_clear()
+
+
+def test_safety_filter_allows_desk_field_names_but_not_decisions() -> None:
+    from app.core.safety import contains_unsafe_decision_language
+
+    for allowed in (
+        "2 items missing: Provisional diagnosis with ICD-10; Pre-anaesthetic check.",
+        "Discharge diagnosis differs from pre-auth diagnosis; approved amount exceeded.",
+        "Record approval from the TPA portal.",
+    ):
+        assert not contains_unsafe_decision_language(allowed), allowed
+    for blocked in (
+        "We approve this request.",
+        "The patient is diagnosed with diabetes.",
+        "Final diagnosis: appendicitis. We diagnose sepsis.",
+    ):
+        assert contains_unsafe_decision_language(blocked), blocked
