@@ -489,6 +489,8 @@ def test_safety_filter_allows_desk_field_names_but_not_decisions() -> None:
         "2 items missing: Provisional diagnosis with ICD-10; Pre-anaesthetic check.",
         "Discharge diagnosis differs from pre-auth diagnosis; approved amount exceeded.",
         "Record approval from the TPA portal.",
+        "Diagnosis: primary osteoarthritis right knee, Kellgren-Lawrence grade 4",
+        "Diagnosis of ACS / CAD documented.",
     ):
         assert not contains_unsafe_decision_language(allowed), allowed
     for blocked in (

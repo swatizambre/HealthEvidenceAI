@@ -63,7 +63,11 @@ _FIELD_PHRASES = re.compile(
     r"|\bdiagnos(?:is|es)\s+(?:code|codes|with\s+icd(?:-?10)?|and\s+icd(?:-?10)?)\b"
     r"|\b(?:approved|approval)\s+(?:amount|procedure|limit|letter|date|status)\b"
     r"|\b(?:insurer|tpa|pre-?auth|cashless)\s+approval\b"
-    r"|\brecord(?:ed)?\s+approval\b",
+    r"|\brecord(?:ed)?\s+approval\b"
+    # Chart headings quoted as evidence ("Diagnosis: …") and checklist labels
+    # ("Diagnosis of ACS documented") describe source records, not system decisions.
+    r"|\bdiagnos(?:is|es)\s*[:\-–]"
+    r"|\bdiagnos(?:is|es)\s+of\b[^.;\n]{0,80}\b(?:documented|recorded|present|on\s+file)\b",
     re.IGNORECASE,
 )
 

@@ -841,6 +841,21 @@ input[readonly] {
   max-width: 100%;
 }
 
+/* Long option text (policy names) must not set the row's width on phones. */
+.inline-field,
+.button-row > *,
+.section-bar > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .inline-field,
+  .inline-field select {
+    width: 100%;
+  }
+}
+
 .search {
   position: relative;
   display: flex;
