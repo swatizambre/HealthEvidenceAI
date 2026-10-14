@@ -254,6 +254,17 @@ class DeskFormField(_Response):
     value: str | None = None
     source: Literal["chart", "case", "missing"]
     required: bool
+    # v1.2: flag next to the value (e.g. implant cost without a quotation on file) and
+    # a staff hint (e.g. "Confirm before printing" for chart-derived investigations).
+    warning: str | None = None
+    hint: str | None = None
+
+
+class DeskChecklistOpenItem(_Response):
+    item_id: str
+    label: str
+    group: str
+    status: str
 
 
 class DeskFormSection(_Response):
@@ -273,6 +284,7 @@ class DeskPreauthFormResponse(_Response):
     case_id: str = ""
     sections: list[DeskFormSection]
     missing_required: list[str]
+    checklist_open: list[DeskChecklistOpenItem] = []
     attachments: list[DeskAttachment]
     disclaimer: str = ""
 
