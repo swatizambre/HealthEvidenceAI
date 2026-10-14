@@ -78,6 +78,7 @@ export function OpdIngestPage() {
   const policyParam = searchParams.get("policy") || "";
   const caseParam = searchParams.get("case") || "";
   const [mode, setMode] = useState<Mode>("visit");
+  const [feedOpenInitially] = useState(() => window.location.hash === "#hospital-feed");
   const [facilityName, setFacilityName] = useState(facilityLabel);
   const [policies, setPolicies] = useState<PolicySummary[]>([]);
   const [pickerQuery, setPickerQuery] = useState("");
@@ -498,13 +499,10 @@ export function OpdIngestPage() {
 
   return (
     <section className="page">
-      <header className="page-header">
+      <header className="page-head">
         <div>
-          <p className="eyebrow">
-            {isPatient ? "Add to my lifelong record" : "Patient chart update"}
-          </p>
           <h1 className="page-title">Visit note</h1>
-          <p className="page-subtitle">
+          <p className="page-sub">
             {isPatient
               ? "Record a visit, treatment, or update so every future clinician can see it in your lifelong chart."
               : "Document the visit under the correct facility and department so it becomes part of the lifelong chart."}
@@ -513,34 +511,44 @@ export function OpdIngestPage() {
       </header>
 
       {gapHint ? (
-        <div className="panel warn-panel">
-          <h2 className="panel-title">Please add this to the chart</h2>
+        <div className="notice notice-warning" role="status">
+          <div className="notice-body">
+          <p className="notice-title">Please add this to the chart</p>
           <p className="muted">{gapHint}</p>
-          <p className="hint">
+          <p className="muted small">
             Form is focused on {focus || "a note"}. Save this visit note, then re-check the evidence
             pack on the patient chart.
           </p>
+          </div>
         </div>
       ) : null}
 
       {!isPatient ? (
-        <div className="panel" id="hospital-feed" aria-label="Hospital interface pipeline">
-          <div className="panel-head-row">
+        <details
+          className="panel disclosure"
+          id="hospital-feed"
+          aria-label="Hospital interface pipeline"
+          open={feedOpenInitially || undefined}
+        >
+          <summary>
+            <span className="section-title">Hospital feed</span>
+            <span className="muted small">Practice HIS/FHIR feed</span>
+          </summary>
+          <div className="section-bar">
             <div>
-              <h2 className="panel-title">Hospital feed</h2>
               <p className="muted">
-                Practice HIS/FHIR path: visit lands on chart, evidence pack refreshes, Today updates
+                Practice HIS/FHIR path: visit lands on chart, evidence pack refreshes, the work queue updates
                 over live push.
               </p>
             </div>
-            <p className="hint" role="status">
+            <p className="muted small" role="status">
               {formatLiveAge(pipeUpdatedAt, pushConnected)}
               {pipeStatus
                 ? ` · ${pipeStatus.recent_ok}/${pipeStatus.recent_total} recent ok`
                 : ""}
             </p>
           </div>
-          <div className="home-actions">
+          <div className="button-row">
             {pipeStatus?.simulate_allowed !== false ? (
               <button
                 type="button"
@@ -551,14 +559,14 @@ export function OpdIngestPage() {
                 {pipeBusy ? "Running feed…" : "Simulate hospital visit"}
               </button>
             ) : (
-              <p className="hint" role="status">
+              <p className="muted small" role="status">
                 Live mode — use HIS/FHIR hospital feeds (simulator off).
                 {pipeStatus?.phi_live ? " PHI program attested." : ""}
               </p>
             )}
             <button
               type="button"
-              className="btn btn-ghost"
+              className="btn btn-secondary"
               disabled={pipeBusy}
               onClick={() => refreshPipeline()}
             >
@@ -566,20 +574,20 @@ export function OpdIngestPage() {
             </button>
             {pipeRun?.case_id ? (
               <Link
-                className="btn btn-ghost"
+                className="btn btn-secondary"
                 to={`/reviews?case=${encodeURIComponent(pipeRun.case_id)}`}
               >
                 Open case {pipeRun.case_id}
               </Link>
             ) : null}
             {pipeRun?.patient_id ? (
-              <Link className="btn btn-ghost" to={`/patients/${pipeRun.patient_id}?prepare=1`}>
+              <Link className="btn btn-secondary" to={`/patients/${pipeRun.patient_id}?prepare=1`}>
                 Open chart
               </Link>
             ) : null}
           </div>
           {pipeRun ? (
-            <p className="hint" role="status">
+            <p className="muted small" role="status">
               Last run {pipeRun.status}
               {pipeRun.patient_id ? ` · ${pipeRun.patient_id}` : ""}
               {pipeRun.case_id ? ` · ${pipeRun.case_id}` : ""}
@@ -589,22 +597,22 @@ export function OpdIngestPage() {
               {pipeRun.detail ? ` — ${pipeRun.detail}` : ""}
             </p>
           ) : pipeStatus?.runs?.[0] ? (
-            <p className="hint" role="status">
+            <p className="muted small" role="status">
               Latest feed: {pipeStatus.runs[0].status}
               {pipeStatus.runs[0].patient_id ? ` · ${pipeStatus.runs[0].patient_id}` : ""}
               {pipeStatus.runs[0].detail ? ` — ${pipeStatus.runs[0].detail}` : ""}
             </p>
           ) : (
-            <p className="hint">No hospital feeds yet — run a simulation to prove the loop.</p>
+            <p className="muted small">No hospital feeds yet. Run a simulation to see a visit land on the chart.</p>
           )}
-        </div>
+        </details>
       ) : null}
 
-      <div className="mode-tabs" role="tablist" aria-label="Visit entry mode">
+      <div className="tabs" role="tablist" aria-label="Visit entry mode">
         <button
           type="button"
           role="tab"
-          className={`mode-tab ${mode === "visit" ? "active" : ""}`}
+          className={`tab${mode === "visit" ? " is-active" : ""}`}
           aria-selected={mode === "visit"}
           onClick={() => setMode("visit")}
         >
@@ -613,7 +621,7 @@ export function OpdIngestPage() {
         <button
           type="button"
           role="tab"
-          className={`mode-tab ${mode === "fhir" ? "active" : ""}`}
+          className={`tab${mode === "fhir" ? " is-active" : ""}`}
           aria-selected={mode === "fhir"}
           onClick={() => setMode("fhir")}
         >
@@ -622,13 +630,13 @@ export function OpdIngestPage() {
       </div>
 
       {error ? (
-        <p className="error" role="alert">
+        <p className="form-error" role="alert">
           {error}
         </p>
       ) : null}
 
       {mode === "visit" ? (
-        <form className="panel form-grid" onSubmit={onSubmitVisit}>
+        <form className="panel form-grid visit-form" onSubmit={onSubmitVisit}>
           {draftHint ? (
             <p className="agent-draft span-2" role="status">
               Draft applied from chart evidence — review before save. Not a diagnosis.
@@ -637,9 +645,10 @@ export function OpdIngestPage() {
                 : " Draft is in the visit history field."}
             </p>
           ) : null}
+          <h2 className="form-section-title span-2">Patient</h2>
           <div className="span-2 picker-block">
             {isPatient ? (
-              <p className="hint" role="status">
+              <p className="muted small" role="status">
                 Visit note writes only to your record: <strong>{myPatientId}</strong>
               </p>
             ) : (
@@ -666,12 +675,12 @@ export function OpdIngestPage() {
                   </ul>
                 ) : null}
                 {selectedPatientId ? (
-                  <p className="hint">
+                  <p className="muted small">
                     Chart linked: <strong>{selectedPatientId}</strong>
                     {displayName ? ` · ${displayName}` : ""}
                   </p>
                 ) : (
-                  <p className="hint">Or enter a new MRN below to create a chart.</p>
+                  <p className="muted small">Or enter a new MRN below to create a chart.</p>
                 )}
               </>
             )}
@@ -688,7 +697,7 @@ export function OpdIngestPage() {
             />
           </label>
           <label className="field">
-            <span>Visit #</span>
+            <span>Visit number</span>
             <input value={visitNumber} onChange={(e) => setVisitNumber(e.target.value)} required />
           </label>
           <label className="field">
@@ -715,6 +724,7 @@ export function OpdIngestPage() {
             </select>
           </label>
 
+          <h2 className="form-section-title span-2">Clinical</h2>
           <label className="field span-2">
             <span>Chief complaint</span>
             <input
@@ -741,7 +751,7 @@ export function OpdIngestPage() {
                     <button
                       key={condition}
                       type="button"
-                      className={`chip ${active ? "chip-active" : ""}`}
+                      className={`chip${active ? " is-active" : ""}`}
                       onClick={() => toggleKnownCondition(condition)}
                     >
                       {condition}
@@ -754,8 +764,8 @@ export function OpdIngestPage() {
 
           <div className="span-2 dx-block">
             <div className="dx-head">
-              <h3 className="panel-title">Diagnoses / disorders</h3>
-              <button type="button" className="btn btn-ghost sm" onClick={addDxRow}>
+              <h3 className="field-group-title">Diagnoses</h3>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={addDxRow}>
                 Add another
               </button>
             </div>
@@ -779,7 +789,7 @@ export function OpdIngestPage() {
                 </label>
                 <button
                   type="button"
-                  className="btn btn-ghost sm"
+                  className="btn btn-secondary btn-sm"
                   onClick={() => removeDxRow(index)}
                   aria-label={`Remove diagnosis ${index + 1}`}
                 >
@@ -802,7 +812,7 @@ export function OpdIngestPage() {
           <div className="span-2">
             <button
               type="button"
-              className="btn btn-ghost sm"
+              className="btn btn-secondary btn-sm"
               onClick={() => setShowMore((value) => !value)}
             >
               {showMore ? "Hide extra fields" : "Add vitals, labs, meds, demographics"}
@@ -811,6 +821,7 @@ export function OpdIngestPage() {
 
           {showMore ? (
             <>
+              <h2 className="form-section-title span-2">More details</h2>
               <label className="field">
                 <span>Name</span>
                 <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
@@ -880,8 +891,9 @@ export function OpdIngestPage() {
             </>
           ) : null}
 
+          <h2 className="form-section-title span-2">Evidence pack</h2>
           <label className="field">
-            <span>Policy</span>
+            <span>Checklist</span>
             <select
               value={policyId}
               onChange={(e) => {
@@ -917,7 +929,7 @@ export function OpdIngestPage() {
               canRecord={!isPatient}
             />
           ) : null}
-          <div className="form-actions span-2 sticky-actions">
+          <div className="span-2 save-bar">
             {consentRequired ? null : (
               <label className="consent-check">
                 <input
@@ -1003,8 +1015,8 @@ export function OpdIngestPage() {
       )}
 
       {result ? (
-        <div className="panel success-panel">
-          <h2 className="panel-title">
+        <div className="panel success-panel" role="status">
+          <h2 className="section-title">
             {pipeRun ? "Hospital feed landed" : "Visit note saved"}
           </h2>
           <p>
@@ -1014,10 +1026,10 @@ export function OpdIngestPage() {
               ? ` · Evidence pack ${pipeRun.readiness_percent}%`
               : " Re-check the evidence pack so it updates with this note."}
           </p>
-          <div className="home-actions">
+          <div className="button-row">
             <button
               type="button"
-              className="btn btn-ghost"
+              className="btn btn-secondary"
               onClick={() =>
                 printVisitSummary({
                   facilityName: facilityName || facilityLabel,
@@ -1056,18 +1068,18 @@ export function OpdIngestPage() {
             >
               Re-check evidence pack
             </Link>
-            <Link className="btn btn-ghost" to={`/patients/${result.patient_id}`}>
+            <Link className="btn btn-secondary" to={`/patients/${result.patient_id}`}>
               Open chart
             </Link>
             {result.case_id ? (
               <Link
-                className="btn btn-ghost"
+                className="btn btn-secondary"
                 to={`/reviews?case=${encodeURIComponent(result.case_id)}`}
               >
                 Open Reviews
               </Link>
             ) : (
-              <Link className="btn btn-ghost" to="/visit">
+              <Link className="btn btn-secondary" to="/visit">
                 Next patient
               </Link>
             )}
