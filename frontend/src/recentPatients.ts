@@ -22,5 +22,9 @@ export function pushRecentPatient(item: RecentPatient): void {
     item,
     ...readRecentPatients().filter((entry) => entry.patient_id !== item.patient_id),
   ].slice(0, MAX);
-  localStorage.setItem(KEY, JSON.stringify(next));
+  try {
+    localStorage.setItem(KEY, JSON.stringify(next));
+  } catch {
+    /* storage unavailable (private mode / blocked) */
+  }
 }

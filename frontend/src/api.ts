@@ -12,6 +12,9 @@ export interface PatientSummary {
   date_of_birth: string;
   sex: string;
   conditions: string[];
+  /** Optional enrichments (shown when the server provides them). */
+  mrn?: string | null;
+  last_visit_at?: string | null;
 }
 
 export interface PatientDetail {
@@ -73,6 +76,8 @@ export interface AuthCase {
   status?: "queued" | "needs_documentation" | "ready_for_human" | "closed_as_draft";
   last_run_id?: string | null;
   lifecycle_note?: string;
+  cycle_elapsed_minutes?: number | null;
+  assigned_to?: string | null;
 }
 
 export interface EvidenceRef {
@@ -336,6 +341,29 @@ async function ensureDevToken(): Promise<string | null> {
   return token;
 }
 
+/** Error thrown by every API helper; carries the HTTP status and server error code. */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string;
+
+  constructor(message: string, status: number, code: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+
+  /** True when the route itself is not deployed on this server (generic 404). */
+  get endpointMissing(): boolean {
+    return this.status === 404 && (this.code === "NOT_FOUND" || this.code === "");
+  }
+}
+
+/** Shared authenticated JSON request (used by deskApi.ts). */
+export function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  return request<T>(path, init);
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -360,7 +388,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       message?: string;
       error_code?: string;
     };
-    throw new Error(friendlyApiMessage(body.error_code, body.message, response.status));
+    throw new ApiError(
+      friendlyApiMessage(body.error_code, body.message, response.status),
+      response.status,
+      body.error_code || "",
+    );
   }
   return (await response.json()) as T;
 }

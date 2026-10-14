@@ -1,22 +1,40 @@
 import { Navigate, NavLink, Route, Routes } from "react-router-dom";
-import { FOOTER_DISCLAIMER, deploymentBannerText } from "./api";
+import { deploymentBannerText } from "./api";
 import { HelpChat } from "./components/HelpChat";
+import { useI18n, type Lang, type MessageKey } from "./i18n";
 import { facilityOptions, useRole, type DeskRole, type FacilityType } from "./roleContext";
-import { AuthorizationPage } from "./pages/Authorization";
-import { DashboardPage } from "./pages/Dashboard";
+import { CaseWorkspacePage } from "./pages/CaseWorkspace";
 import { MyRecordPage } from "./pages/MyRecord";
 import { OpdIngestPage } from "./pages/OpdIngest";
 import { PatientDetailPage } from "./pages/PatientDetail";
 import { PatientsPage } from "./pages/Patients";
+import { ReviewsPage } from "./pages/Reviews";
+import { WorkQueuePage } from "./pages/WorkQueue";
+import { Icon, type IconName } from "./ui";
+
+type NavItem = { to: string; key: MessageKey; icon: IconName; end?: boolean };
+
+const ROLE_OPTIONS: { id: DeskRole; label: string }[] = [
+  { id: "staff", label: "TPA / insurance desk" },
+  { id: "resident", label: "Junior doctor (PG / MO)" },
+  { id: "senior_clinician", label: "Consultant / senior MO" },
+  { id: "admin", label: "Facility admin" },
+  { id: "patient", label: "Patient (my record)" },
+];
+
+const LANGS: { id: Lang; label: string; name: string }[] = [
+  { id: "en", label: "EN", name: "English" },
+  { id: "hi", label: "हिंदी", name: "Hindi" },
+];
 
 export function App() {
+  const { t, lang, setLang } = useI18n();
   const {
     role,
     setRole,
     facility,
     setFacility,
     label,
-    facilityLabel,
     isPatient,
     myPatientId,
     demoSigninAllowed,
@@ -28,22 +46,34 @@ export function App() {
 
   if (loadingAuth) {
     return (
-      <div className="app-shell app-shell-loading">
-        <p className="muted pulse" role="status">
-          Signing in to the evidence desk…
-        </p>
+      <div className="app-loading">
+        <p role="status">{t("shell.loading")}</p>
       </div>
     );
   }
 
+  const nav: NavItem[] = isPatient
+    ? [
+        { to: "/my-record", key: "nav.myRecord", icon: "shield" },
+        { to: "/visit", key: "nav.addNote", icon: "note" },
+        { to: `/patients/${myPatientId}`, key: "nav.fullChart", icon: "folder" },
+      ]
+    : [
+        { to: "/", key: "nav.queue", icon: "queue", end: true },
+        { to: "/cases", key: "nav.cases", icon: "folder" },
+        { to: "/reviews", key: "nav.reviews", icon: "check" },
+        { to: "/patients", key: "nav.patients", icon: "users" },
+        { to: "/visit", key: "nav.visit", icon: "note" },
+      ];
+
   return (
-    <div className="app-shell">
+    <div className="app">
       <a className="skip-link" href="#main-content">
-        Skip to main content
+        {t("shell.skip")}
       </a>
       {deployment ? (
         <div
-          className={`deployment-banner deployment-banner-${deployment.mode}`}
+          className={`mode-banner mode-banner-${deployment.mode}`}
           role="status"
           aria-live="polite"
           data-mode={deployment.mode}
@@ -51,104 +81,129 @@ export function App() {
           {deploymentBannerText(deployment)}
         </div>
       ) : null}
-      <header className="topbar">
-        <div className="topbar-inner">
-          <NavLink to="/" className="brand" end>
-            <span className="brand-mark" aria-hidden="true" />
-            <span className="brand-text">
-              <strong>HealthEvidence AI</strong>
-              <em>Evidence desk · lifelong chart</em>
-            </span>
-          </NavLink>
-          <nav className="top-nav" aria-label="Application">
-            {isPatient ? (
-              <>
-                <NavLink to="/my-record">My record</NavLink>
-                <NavLink to="/visit">Add note</NavLink>
-                <NavLink to={`/patients/${myPatientId}`}>Full chart</NavLink>
-              </>
-            ) : (
-              <>
-                <NavLink to="/" end>
-                  Today
-                </NavLink>
-                <NavLink to="/reviews">Reviews</NavLink>
-                <NavLink to="/patients">Patients</NavLink>
-                <NavLink to="/visit">Visit note</NavLink>
-              </>
-            )}
-          </nav>
-          <div className="desk-switches">
-            {demoSigninAllowed ? (
-              <>
-                <label className="role-switch">
-                  <span className="sr-only">Facility type</span>
-                  <select
-                    value={facility}
-                    onChange={(event) => setFacility(event.target.value as FacilityType)}
-                    aria-label="Facility type"
-                    title={`Desk: ${facilityLabel}`}
-                  >
-                    {facilityOptions().map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="role-switch">
-                  <span className="sr-only">Demo sign-in</span>
-                  <select
-                    value={role}
-                    onChange={(event) => setRole(event.target.value as DeskRole)}
-                    aria-label="Demo sign-in"
-                    title={`Demo sign-in as ${label}`}
-                  >
-                    <option value="patient">Patient (my record)</option>
-                    <option value="staff">Records / TPA desk clerk</option>
-                    <option value="resident">Junior doctor / PG / MO (junior)</option>
-                    <option value="senior_clinician">Consultant / senior MO</option>
-                    <option value="admin">Facility / HIS admin</option>
-                  </select>
-                </label>
-              </>
-            ) : (
-              <p className="signed-in-chip" title={`Auth: ${authMode}`}>
-                {signedInSubject || label}
-              </p>
-            )}
+
+      <header className="app-header">
+        <NavLink to={isPatient ? "/my-record" : "/"} className="brand" end>
+          <span className="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22">
+              <rect x="1" y="1" width="22" height="22" rx="6" />
+              <path d="M7 12h10M12 7v10" />
+            </svg>
+          </span>
+          <span className="brand-text">
+            <strong>HealthEvidence AI</strong>
+            <span>{t("shell.brandSub")}</span>
+          </span>
+        </NavLink>
+
+        <div className="header-tools">
+          {demoSigninAllowed ? (
+            <>
+              {!isPatient ? (
+              <label className="header-field">
+                <span className="header-field-label">{t("shell.facility")}</span>
+                <select
+                  value={facility}
+                  onChange={(event) => setFacility(event.target.value as FacilityType)}
+                >
+                  {facilityOptions().map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              ) : null}
+              <label className="header-field">
+                <span className="header-field-label">{t("shell.signIn")}</span>
+                <select
+                  value={role}
+                  aria-label={t("shell.signIn")}
+                  onChange={(event) => setRole(event.target.value as DeskRole)}
+                >
+                  {ROLE_OPTIONS.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          ) : (
+            <p className="header-identity" title={`Auth: ${authMode}`}>
+              <span className="header-field-label">{t("shell.signedIn")}</span>
+              <strong>{signedInSubject || label}</strong>
+            </p>
+          )}
+
+          <div className="lang-toggle" role="group" aria-label={t("shell.language")}>
+            {LANGS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                lang={item.id}
+                aria-pressed={lang === item.id}
+                className={lang === item.id ? "is-active" : undefined}
+                onClick={() => setLang(item.id)}
+                title={item.name}
+              >
+                {item.label}
+              </button>
+            ))}
           </div>
+          <HelpChat />
         </div>
       </header>
-      <main className="content" id="main-content">
-        <Routes>
-          <Route
-            path="/"
-            element={isPatient ? <Navigate to="/my-record" replace /> : <DashboardPage />}
-          />
-          <Route path="/my-record" element={<MyRecordPage />} />
-          <Route
-            path="/patients"
-            element={isPatient ? <Navigate to="/my-record" replace /> : <PatientsPage />}
-          />
-          <Route
-            path="/patients/:patientId"
-            element={<PatientDetailPage />}
-          />
-          <Route path="/visit" element={<OpdIngestPage />} />
-          <Route
-            path="/reviews"
-            element={isPatient ? <Navigate to="/my-record" replace /> : <AuthorizationPage />}
-          />
-          <Route path="/encounter" element={<Navigate to="/visit" replace />} />
-          <Route path="/opd" element={<Navigate to="/visit" replace />} />
-          <Route path="/authorization" element={<Navigate to="/reviews" replace />} />
-        </Routes>
-      </main>
-      <footer className="app-footer">
-        <p>{FOOTER_DISCLAIMER}</p>
-      </footer>
-      <HelpChat />
+
+      <div className="app-body">
+        <nav className="app-nav" aria-label={t("nav.label")}>
+          <ul>
+            {nav.map((item) => (
+              <li key={item.to}>
+                <NavLink to={item.to} end={item.end}>
+                  <Icon name={item.icon} />
+                  <span>{t(item.key)}</span>
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <main className="app-main" id="main-content" tabIndex={-1}>
+          <Routes>
+            <Route
+              path="/"
+              element={isPatient ? <Navigate to="/my-record" replace /> : <WorkQueuePage mode="queue" />}
+            />
+            <Route
+              path="/cases"
+              element={isPatient ? <Navigate to="/my-record" replace /> : <WorkQueuePage mode="cases" />}
+            />
+            <Route
+              path="/cases/:caseId"
+              element={isPatient ? <Navigate to="/my-record" replace /> : <CaseWorkspacePage />}
+            />
+            <Route path="/my-record" element={<MyRecordPage />} />
+            <Route
+              path="/patients"
+              element={isPatient ? <Navigate to="/my-record" replace /> : <PatientsPage />}
+            />
+            <Route path="/patients/:patientId" element={<PatientDetailPage />} />
+            <Route path="/visit" element={<OpdIngestPage />} />
+            <Route
+              path="/reviews"
+              element={isPatient ? <Navigate to="/my-record" replace /> : <ReviewsPage />}
+            />
+            <Route path="/encounter" element={<Navigate to="/visit" replace />} />
+            <Route path="/opd" element={<Navigate to="/visit" replace />} />
+            <Route path="/authorization" element={<Navigate to="/reviews" replace />} />
+            <Route path="/today" element={<Navigate to="/" replace />} />
+          </Routes>
+          <footer className="app-footer">
+            <p>{t("shell.footer")}</p>
+          </footer>
+        </main>
+      </div>
     </div>
   );
 }
