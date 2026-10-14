@@ -659,6 +659,15 @@ textarea {
   animation: rise 520ms ease-out;
 }
 
+/* Flex/grid children default to min-width:auto, so a wide table (e.g. the patient
+   access log) stretched the whole page past the phone viewport. Let them shrink and
+   leave horizontal scrolling to .table-wrap. */
+.content > *,
+.page > *,
+.panel {
+  min-width: 0;
+}
+
 .content > .page,
 .content > .home,
 .content > .stack {
