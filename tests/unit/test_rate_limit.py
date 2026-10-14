@@ -29,7 +29,7 @@ def test_rule_groups() -> None:
         rate_limit_ingest_per_minute=8,
         rate_limit_search_per_minute=9,
     )
-    auth = rule_for_path("/api/v1/auth/dev-token", settings, "POST")
+    auth = rule_for_path("/api/v1/auth/session", settings, "POST")
     assert auth is not None and auth.group == "auth" and auth.limit == 7
     assert not auth.per_principal
     assert rule_for_path("/api/v1/auth/me", settings, "GET") is None
@@ -59,10 +59,16 @@ def test_auth_routes_return_429_with_retry_after(monkeypatch: pytest.MonkeyPatch
         RATE_LIMIT_AUTH_PER_MINUTE="3",
     ) as client:
         body = {"subject": "rl-user", "roles": ["staff"]}
-        for _ in range(3):
+        # Demo dev-token minting is exempt (role switching must not lock the desk out).
+        for _ in range(6):
             ok = client.post("/api/v1/auth/dev-token", json=body)
             assert ok.status_code == 200, ok.text
-        blocked = client.post("/api/v1/auth/dev-token", json=body)
+        token = client.post("/api/v1/auth/dev-token", json=body).json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        # Any other POST under /auth is limited (counted before routing, after auth).
+        for _ in range(3):
+            assert client.post("/api/v1/auth/session", json=body, headers=headers).status_code != 429
+        blocked = client.post("/api/v1/auth/session", json=body, headers=headers)
         assert blocked.status_code == 429
         payload = blocked.json()
         assert payload["error_code"] == "RATE_LIMITED"
@@ -103,3 +109,13 @@ def test_search_limit_is_per_principal(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_rate_limit_disabled_by_default_in_tests(client: TestClient) -> None:
     for _ in range(30):
         assert client.post("/api/v1/auth/dev-token", json={"roles": ["staff"]}).status_code != 429
+
+
+def test_dev_token_exempt_only_where_minting_is_allowed() -> None:
+    local = Settings(environment="local", auth_mode="dev-jwt")
+    assert local.dev_token_allowed()
+    assert rule_for_path("/api/v1/auth/dev-token", local, "POST") is None
+    pilot = Settings(environment="pilot", auth_mode="oidc")
+    assert not pilot.dev_token_allowed()
+    limited = rule_for_path("/api/v1/auth/dev-token", pilot, "POST")
+    assert limited is not None and limited.group == "auth"

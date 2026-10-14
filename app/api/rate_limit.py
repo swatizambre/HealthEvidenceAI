@@ -86,6 +86,10 @@ def rule_for_path(path: str, settings: Settings, method: str = "POST") -> RateLi
     if path.startswith("/api/v1/auth/") or path == "/api/v1/auth":
         if method.upper() in {"GET", "HEAD", "OPTIONS"}:
             return None
+        # Demo role switching mints a dev token per switch; limiting it only breaks the
+        # walkthrough. Dev minting is never enabled in pilot / trial / shared live.
+        if path.rstrip("/") == "/api/v1/auth/dev-token" and settings.dev_token_allowed():
+            return None
         return RateLimitRule("auth", settings.rate_limit_auth_per_minute, per_principal=False)
     if (
         path.startswith("/api/v1/opd/")
