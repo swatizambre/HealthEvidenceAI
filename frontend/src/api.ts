@@ -991,6 +991,60 @@ export function ingestOpdPacket(body: OpdIngestBody): Promise<OpdIngestResult> {
   });
 }
 
+export interface DocumentExtractResult {
+  document_kind: "lab_report" | "prescription" | "clinical_note" | "unknown";
+  extraction_method: "heuristic" | "llm" | "llm_vision";
+  media_kind: "pdf" | "text" | "image";
+  filename?: string | null;
+  page_count?: number;
+  chief_complaint?: string;
+  history_of_present_illness?: string;
+  assessment_and_plan?: string;
+  note?: string;
+  procedure?: string;
+  diagnoses?: { display: string; code?: string }[];
+  labs?: { test_name: string; value: string; unit?: string }[];
+  medications?: {
+    name: string;
+    dose?: string;
+    frequency?: string;
+    route?: string;
+    status?: "active" | "discontinued";
+  }[];
+  vitals?: { name: string; value: string; unit?: string }[];
+  source_excerpt?: string;
+  warnings?: string[];
+  disclaimer?: string;
+}
+
+/** AI/heuristic extract from PDF/image/text — does not write the chart. */
+export async function extractOpdDocument(
+  file: File,
+  documentKind: "auto" | "lab_report" | "prescription" | "clinical_note" = "auto",
+): Promise<DocumentExtractResult> {
+  const token = await getAccessToken();
+  const body = new FormData();
+  body.append("file", file);
+  body.append("document_kind", documentKind);
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  const response = await fetch("/api/v1/opd/extract", {
+    method: "POST",
+    headers,
+    body,
+  });
+  if (!response.ok) {
+    const errBody = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      error_code?: string;
+    };
+    throw new Error(friendlyApiMessage(errBody.error_code, errBody.message, response.status));
+  }
+  return (await response.json()) as DocumentExtractResult;
+}
+
 export interface HospitalPipelineRun {
   run_id: string;
   status: "ok" | "error";

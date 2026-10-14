@@ -1,13 +1,21 @@
 """Hospital-compatible OPD ingest (manual HIS form + FHIR R4)."""
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from typing import Literal
+
+from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import enforce_patient_write, get_db, get_principal, require_any_role
 from app.auth.oidc import AuthPrincipal
 from app.auth.rbac import ROLES_CHART_WRITE
 from app.core.exceptions import AppError
-from app.schemas.api import OpdFhirIngestRequest, OpdIngestRequest, OpdIngestResponse
+from app.schemas.api import (
+    DocumentExtractResponse,
+    OpdFhirIngestRequest,
+    OpdIngestRequest,
+    OpdIngestResponse,
+)
+from app.services.document_extract import extract_clinical_document
 from app.services.fhir_opd import fhir_bundle_to_opd_request
 from app.services.opd_ingest import ingest_opd_packet
 from app.services.org_scope import org_scope_active, resolve_org_id
@@ -34,6 +42,25 @@ def _ingest_org_id(request: Request, db: Session) -> str | None:
             403,
         )
     return org_id
+
+
+@router.post("/extract", response_model=DocumentExtractResponse)
+async def extract_opd_document(
+    request: Request,
+    file: UploadFile = File(..., description="Lab report or prescription PDF/image/text"),
+    document_kind: Literal["auto", "lab_report", "prescription", "clinical_note"] = Form("auto"),
+    _principal: AuthPrincipal = Depends(require_any_role(*ROLES_CHART_WRITE)),
+) -> DocumentExtractResponse:
+    """AI-assisted semantic extraction — does not write the chart until /ingest."""
+    data = await file.read()
+    settings = getattr(request.app.state, "settings", None)
+    return extract_clinical_document(
+        data=data,
+        filename=file.filename or "",
+        content_type=file.content_type or "",
+        document_kind=document_kind,
+        settings=settings,
+    )
 
 
 @router.post("/ingest", response_model=OpdIngestResponse)

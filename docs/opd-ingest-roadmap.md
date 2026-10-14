@@ -65,10 +65,12 @@ OPD desk / EHR
 ### Phase 2 — OPD workflow in the UI — **done (basic)**
 
 1. Open **OPD ingest** in the UI
-2. Paste today’s note + optional labs/meds
+2. Paste today’s note + optional labs/meds **or upload a PDF/image** (`POST /api/v1/opd/extract` → AI/heuristic fill → staff review → ingest)
 3. Select procedure + policy checklist
 4. Ingest → index → continue to Authorization Review
 5. Review statuses and citations for that patient/case
+
+**Document extract:** text PDF / plain text use local heuristics + optional LLM JSON structuring; JPEG/PNG prescriptions need OpenAI or Gemini vision. Extraction never writes the chart until `/opd/ingest`.
 
 ### Phase 3 — EHR / FHIR (controlled environments only)
 

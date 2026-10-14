@@ -6,10 +6,12 @@ import {
   getPatient,
   getPatients,
   getPolicies,
+  extractOpdDocument,
   getSpecialties,
   ingestOpdFhir,
   ingestOpdPacket,
   simulateHospitalVisit,
+  type DocumentExtractResult,
   type HospitalPipelineRun,
   type HospitalPipelineStatus,
   type OpdIngestResult,
@@ -33,8 +35,22 @@ import { useRole } from "../roleContext";
 type Mode = "visit" | "fhir";
 
 type DxRow = { display: string; code: string };
+type LabRow = { test_name: string; value: string; unit: string };
+type MedRow = {
+  name: string;
+  dose: string;
+  frequency: string;
+  status: "active" | "discontinued";
+};
 
 const emptyDx = (): DxRow => ({ display: "", code: "" });
+const emptyLab = (): LabRow => ({ test_name: "", value: "", unit: "mg/dL" });
+const emptyMed = (): MedRow => ({
+  name: "",
+  dose: "",
+  frequency: "",
+  status: "active",
+});
 
 const SAMPLE_FHIR = `{
   "resourceType": "Bundle",
@@ -110,14 +126,22 @@ export function OpdIngestPage() {
       : [emptyDx()],
   );
   const [knownConditions, setKnownConditions] = useState<string[]>([]);
-  const [labName, setLabName] = useState(() =>
-    focus === "labs" && gapHint ? gapHint.slice(0, 80) : "",
+  const [labRows, setLabRows] = useState<LabRow[]>(() =>
+    focus === "labs" && gapHint
+      ? [{ test_name: gapHint.slice(0, 80), value: "", unit: "mg/dL" }]
+      : [emptyLab()],
   );
-  const [labValue, setLabValue] = useState("");
-  const [labUnit, setLabUnit] = useState("mg/dL");
-  const [medName, setMedName] = useState(() =>
-    focus === "meds" && gapHint ? gapHint.slice(0, 80) : "",
+  const [medRows, setMedRows] = useState<MedRow[]>(() =>
+    focus === "meds" && gapHint
+      ? [{ name: gapHint.slice(0, 80), dose: "", frequency: "", status: "active" }]
+      : [emptyMed()],
   );
+  const [extractBusy, setExtractBusy] = useState(false);
+  const [extractKind, setExtractKind] = useState<
+    "auto" | "lab_report" | "prescription" | "clinical_note"
+  >("auto");
+  const [extractMeta, setExtractMeta] = useState<DocumentExtractResult | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [bp, setBp] = useState("");
   const [hr, setHr] = useState("");
   const [temp, setTemp] = useState("");
@@ -252,11 +276,11 @@ export function OpdIngestPage() {
       setDepartment(specialtyHint);
     }
     if (focus === "labs" && gapHint) {
-      setLabName(gapHint.slice(0, 80));
+      setLabRows([{ test_name: gapHint.slice(0, 80), value: "", unit: "mg/dL" }]);
       setShowMore(true);
     }
     if (focus === "meds" && gapHint) {
-      setMedName(gapHint.slice(0, 80));
+      setMedRows([{ name: gapHint.slice(0, 80), dose: "", frequency: "", status: "active" }]);
       setShowMore(true);
     }
     if (focus === "diagnoses" && gapHint) {
@@ -392,6 +416,80 @@ export function OpdIngestPage() {
 
   const consentReady = consentRequired ? consentDraftComplete(consentDraft) : consentAttested;
 
+  async function onExtractFile(file: File | null) {
+    if (!file) {
+      return;
+    }
+    setExtractBusy(true);
+    setError("");
+    setExtractMeta(null);
+    try {
+      const extracted = await extractOpdDocument(file, extractKind);
+      setExtractMeta(extracted);
+      setShowMore(true);
+      if (extracted.chief_complaint?.trim()) {
+        setChiefComplaint(extracted.chief_complaint.trim());
+      }
+      if (extracted.history_of_present_illness?.trim()) {
+        setHpi(extracted.history_of_present_illness.trim());
+      }
+      if (extracted.assessment_and_plan?.trim()) {
+        setAssessmentPlan(extracted.assessment_and_plan.trim());
+      } else if (extracted.note?.trim() && !assessmentPlan.trim()) {
+        setAssessmentPlan(extracted.note.trim().slice(0, 2000));
+      }
+      if (extracted.procedure?.trim()) {
+        setProcedure(extracted.procedure.trim());
+      }
+      if (extracted.diagnoses?.length) {
+        setDiagnoses(
+          extracted.diagnoses.map((row) => ({
+            display: row.display,
+            code: row.code || "",
+          })),
+        );
+      }
+      const labs = extracted.labs || [];
+      if (labs.length) {
+        setLabRows(
+          labs.map((row) => ({
+            test_name: row.test_name,
+            value: row.value,
+            unit: row.unit || "",
+          })),
+        );
+      }
+      const meds = extracted.medications || [];
+      if (meds.length) {
+        setMedRows(
+          meds.map((row) => ({
+            name: row.name,
+            dose: row.dose || "",
+            frequency: row.frequency || "",
+            status: row.status === "discontinued" ? "discontinued" : "active",
+          })),
+        );
+      }
+      for (const vital of extracted.vitals || []) {
+        const name = vital.name.toLowerCase();
+        if (name.includes("blood") || name === "bp") {
+          setBp(vital.value);
+        } else if (name.includes("heart") || name === "hr" || name.includes("pulse")) {
+          setHr(vital.value);
+        } else if (name.includes("temp")) {
+          setTemp(vital.value);
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Document extract failed");
+    } finally {
+      setExtractBusy(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  }
+
   async function onSubmitVisit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -438,18 +536,22 @@ export function OpdIngestPage() {
         assessment_and_plan: assessmentPlan.trim() || undefined,
         diagnoses: dxPayload,
         vitals,
-        labs: labName.trim()
-          ? [
-              {
-                test_name: labName.trim(),
-                value: labValue.trim() || "nr",
-                unit: labUnit.trim(),
-              },
-            ]
-          : [],
-        medications: medName.trim()
-          ? [{ name: medName.trim(), status: "active" }]
-          : [],
+        labs: labRows
+          .map((row) => ({
+            test_name: row.test_name.trim(),
+            value: row.value.trim() || "nr",
+            unit: row.unit.trim(),
+          }))
+          .filter((row) => row.test_name),
+        medications: medRows
+          .map((row) => ({
+            name: row.name.trim(),
+            dose: row.dose.trim() || undefined,
+            frequency: row.frequency.trim() || undefined,
+            status: row.status,
+          }))
+          .filter((row) => row.name),
+        note: extractMeta?.note?.trim() || undefined,
         procedure: procedure.trim(),
         policy_id: policyId || undefined,
         source: "his_export",
@@ -656,6 +758,73 @@ export function OpdIngestPage() {
                 : " Draft is in the visit history field."}
             </p>
           ) : null}
+          <div className="span-2 extract-block" aria-label="AI document extract">
+            <div className="dx-head">
+              <h2 className="form-section-title">Upload lab report or prescription</h2>
+            </div>
+            <p className="muted">
+              PDF, image, or text — AI fills labs, meds, and note fields below. Review every value.
+              Nothing is saved until you click Save visit note.
+            </p>
+            <div className="extract-controls">
+              <label className="field">
+                <span>Document type</span>
+                <select
+                  value={extractKind}
+                  onChange={(e) =>
+                    setExtractKind(
+                      e.target.value as "auto" | "lab_report" | "prescription" | "clinical_note",
+                    )
+                  }
+                  disabled={extractBusy || busy}
+                >
+                  <option value="auto">Auto-detect</option>
+                  <option value="lab_report">Lab report</option>
+                  <option value="prescription">Prescription</option>
+                  <option value="clinical_note">Clinical note</option>
+                </select>
+              </label>
+              <label className="field grow">
+                <span>Choose file</span>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.txt,.png,.jpg,.jpeg,.webp,application/pdf,image/*"
+                  disabled={extractBusy || busy}
+                  onChange={(e) => void onExtractFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+            </div>
+            {extractBusy ? (
+              <p className="hint" role="status">
+                Extracting fields with AI…
+              </p>
+            ) : null}
+            {extractMeta ? (
+              <div className="extract-status" role="status">
+                <p>
+                  Filled from <strong>{extractMeta.filename || "upload"}</strong> ·{" "}
+                  {extractMeta.extraction_method.replace("_", " ")}
+                  {extractMeta.document_kind !== "unknown"
+                    ? ` · ${extractMeta.document_kind.replaceAll("_", " ")}`
+                    : ""}
+                  {" · "}
+                  {labRows.filter((r) => r.test_name.trim()).length} labs ·{" "}
+                  {medRows.filter((r) => r.name.trim()).length} meds
+                </p>
+                {extractMeta.warnings?.length ? (
+                  <ul className="extract-warnings">
+                    {extractMeta.warnings.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="hint">Edit any field below before saving.</p>
+                )}
+              </div>
+            ) : null}
+          </div>
+
           <h2 className="form-section-title span-2">Patient</h2>
           <div className="span-2 picker-block">
             {isPatient ? (
@@ -883,22 +1052,145 @@ export function OpdIngestPage() {
                 <span>Temp</span>
                 <input value={temp} onChange={(e) => setTemp(e.target.value)} placeholder="36.8" />
               </label>
-              <label className="field span-2">
-                <span>Lab</span>
-                <input value={labName} onChange={(e) => setLabName(e.target.value)} />
-              </label>
-              <label className="field">
-                <span>Value</span>
-                <input value={labValue} onChange={(e) => setLabValue(e.target.value)} />
-              </label>
-              <label className="field">
-                <span>Unit</span>
-                <input value={labUnit} onChange={(e) => setLabUnit(e.target.value)} />
-              </label>
-              <label className="field span-2">
-                <span>Medication</span>
-                <input value={medName} onChange={(e) => setMedName(e.target.value)} />
-              </label>
+              <div className="span-2 dx-block">
+                <div className="dx-head">
+                  <h3 className="panel-title">Labs</h3>
+                  <button
+                    type="button"
+                    className="btn btn-ghost sm"
+                    onClick={() => setLabRows((rows) => [...rows, emptyLab()])}
+                  >
+                    Add lab
+                  </button>
+                </div>
+                {labRows.map((row, index) => (
+                  <div className="dx-row" key={`lab-${index}`}>
+                    <label className="field grow">
+                      <span>Test {index + 1}</span>
+                      <input
+                        value={row.test_name}
+                        onChange={(e) =>
+                          setLabRows((rows) =>
+                            rows.map((item, i) =>
+                              i === index ? { ...item, test_name: e.target.value } : item,
+                            ),
+                          )
+                        }
+                        placeholder="e.g. HbA1c"
+                      />
+                    </label>
+                    <label className="field dx-code">
+                      <span>Value</span>
+                      <input
+                        value={row.value}
+                        onChange={(e) =>
+                          setLabRows((rows) =>
+                            rows.map((item, i) =>
+                              i === index ? { ...item, value: e.target.value } : item,
+                            ),
+                          )
+                        }
+                      />
+                    </label>
+                    <label className="field dx-code">
+                      <span>Unit</span>
+                      <input
+                        value={row.unit}
+                        onChange={(e) =>
+                          setLabRows((rows) =>
+                            rows.map((item, i) =>
+                              i === index ? { ...item, unit: e.target.value } : item,
+                            ),
+                          )
+                        }
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="btn btn-ghost sm"
+                      onClick={() =>
+                        setLabRows((rows) =>
+                          rows.length <= 1 ? [emptyLab()] : rows.filter((_, i) => i !== index),
+                        )
+                      }
+                      aria-label={`Remove lab ${index + 1}`}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="span-2 dx-block">
+                <div className="dx-head">
+                  <h3 className="panel-title">Medications</h3>
+                  <button
+                    type="button"
+                    className="btn btn-ghost sm"
+                    onClick={() => setMedRows((rows) => [...rows, emptyMed()])}
+                  >
+                    Add medication
+                  </button>
+                </div>
+                {medRows.map((row, index) => (
+                  <div className="dx-row" key={`med-${index}`}>
+                    <label className="field grow">
+                      <span>Medication {index + 1}</span>
+                      <input
+                        value={row.name}
+                        onChange={(e) =>
+                          setMedRows((rows) =>
+                            rows.map((item, i) =>
+                              i === index ? { ...item, name: e.target.value } : item,
+                            ),
+                          )
+                        }
+                        placeholder="e.g. Metformin"
+                      />
+                    </label>
+                    <label className="field dx-code">
+                      <span>Dose</span>
+                      <input
+                        value={row.dose}
+                        onChange={(e) =>
+                          setMedRows((rows) =>
+                            rows.map((item, i) =>
+                              i === index ? { ...item, dose: e.target.value } : item,
+                            ),
+                          )
+                        }
+                        placeholder="500 mg"
+                      />
+                    </label>
+                    <label className="field dx-code">
+                      <span>Freq</span>
+                      <input
+                        value={row.frequency}
+                        onChange={(e) =>
+                          setMedRows((rows) =>
+                            rows.map((item, i) =>
+                              i === index ? { ...item, frequency: e.target.value } : item,
+                            ),
+                          )
+                        }
+                        placeholder="BD"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="btn btn-ghost sm"
+                      onClick={() =>
+                        setMedRows((rows) =>
+                          rows.length <= 1 ? [emptyMed()] : rows.filter((_, i) => i !== index),
+                        )
+                      }
+                      aria-label={`Remove medication ${index + 1}`}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
             </>
           ) : null}
 
@@ -1066,10 +1358,10 @@ export function OpdIngestPage() {
                   hpi,
                   assessmentPlan,
                   diagnoses,
-                  labName,
-                  labValue,
-                  labUnit,
-                  medName,
+                  labName: labRows.find((row) => row.test_name.trim())?.test_name || "",
+                  labValue: labRows.find((row) => row.test_name.trim())?.value || "",
+                  labUnit: labRows.find((row) => row.test_name.trim())?.unit || "",
+                  medName: medRows.find((row) => row.name.trim())?.name || "",
                   vitals: { bp, hr, temp },
                   caseId: result.case_id || undefined,
                 })

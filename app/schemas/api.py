@@ -1095,6 +1095,31 @@ class OpdIngestRequest(APIModel):
         return self
 
 
+class DocumentExtractResponse(ResponseModel):
+    """AI/heuristic extraction from an uploaded lab report or prescription file.
+
+    Staff must review fields before POST /opd/ingest. Not for clinical use.
+    """
+
+    document_kind: Literal["lab_report", "prescription", "clinical_note", "unknown"] = "unknown"
+    extraction_method: Literal["heuristic", "llm", "llm_vision"] = "heuristic"
+    media_kind: Literal["pdf", "text", "image"] = "text"
+    filename: str | None = None
+    page_count: int = 0
+    chief_complaint: str = ""
+    history_of_present_illness: str = ""
+    assessment_and_plan: str = ""
+    note: str = ""
+    procedure: str = ""
+    diagnoses: list[OpdDiagnosisIn] = Field(default_factory=list)
+    labs: list[OpdLabIn] = Field(default_factory=list)
+    medications: list[OpdMedicationIn] = Field(default_factory=list)
+    vitals: list[OpdVitalIn] = Field(default_factory=list)
+    source_excerpt: str = ""
+    warnings: list[str] = Field(default_factory=list)
+    disclaimer: str = ""
+
+
 class OpdFhirIngestRequest(APIModel):
     """FHIR R4 Bundle (or resource set) mapped into an OPD encounter packet."""
 
