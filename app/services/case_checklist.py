@@ -40,6 +40,18 @@ _GROUPS = frozenset({GROUP_FORM, GROUP_CLINICAL, GROUP_DOCUMENTS})
 EXCERPT_MAX = 280
 
 
+def clip_words(text: str, limit: int = EXCERPT_MAX) -> str:
+    """Trim ``text`` to at most ``limit`` characters on a word boundary, adding an ellipsis."""
+    value = (text or "").strip()
+    if len(value) <= limit:
+        return value
+    cut = value[: limit - 1]
+    boundary = max(cut.rfind(" "), cut.rfind("\n"))
+    if boundary >= limit // 2:
+        cut = cut[:boundary]
+    return cut.rstrip(" ,;:-\n") + "…"
+
+
 @dataclass(frozen=True)
 class Citation:
     document_id: str
@@ -287,6 +299,18 @@ def form_items(case: AuthorizationCase) -> list[ChecklistItem]:
     return items
 
 
+# Evaluator boilerplate that repeats the status pill; dropped from SUPPORTED rows.
+_BOILERPLATE_SUPPORTED = frozenset(
+    {"a source record contains the evidence this criterion asks for."}
+)
+
+
+def _informative_reason(status: str, reason: str) -> str:
+    if status == STATUS_SUPPORTED and reason.strip().lower() in _BOILERPLATE_SUPPORTED:
+        return ""
+    return reason
+
+
 def _fix_hint(group: str, status: str, missing_label: str) -> str:
     if status == STATUS_SUPPORTED:
         return ""
@@ -303,6 +327,7 @@ def _criterion_items(
     results: list[dict[str, Any]],
     rules: Mapping[str, Mapping[str, Any]],
     doc_dates: Mapping[str, str | None],
+    doc_types: Mapping[str, str] | None = None,
 ) -> list[ChecklistItem]:
     items: list[ChecklistItem] = []
     for row in results:
@@ -316,8 +341,8 @@ def _criterion_items(
             Citation(
                 document_id=ref["document_id"],
                 chunk_id=ref["chunk_id"],
-                source=ref["source"],
-                excerpt=ref["text_reference"][:EXCERPT_MAX],
+                source=(doc_types or {}).get(ref["document_id"]) or ref["source"],
+                excerpt=clip_words(ref["text_reference"]),
                 date=doc_dates.get(ref["document_id"]),
             )
             for ref in row["evidence"]
@@ -330,7 +355,7 @@ def _criterion_items(
                 label=str(rule.get("label") or row["criterion"]),
                 status=row["status"],
                 required=required,
-                reason=row["reason"],
+                reason=_informative_reason(row["status"], row["reason"]),
                 fix_hint=_fix_hint(group, row["status"], missing_label),
                 citations=citations,
             )
@@ -372,22 +397,41 @@ def live_rule_results(session: Session, patient: Patient, policy: InsurancePolic
     return list(apply_safety_net(evaluate_criteria(criteria, records.notes, records.labs)))
 
 
+def _type_matches(document_type: str | None, wanted: Sequence[str]) -> bool:
+    value = str(document_type or "").lower()
+    return any(token in value for token in wanted)
+
+
 def _document_presence(
     item: ChecklistItem,
     rule: Mapping[str, Any],
     documents: Sequence[Document],
     session: Session,
 ) -> None:
-    """Upgrade a documents-group item when a document of the named type is on file."""
-    wanted = [str(value).lower() for value in rule.get("document_types") or [] if value]
-    if item.status == STATUS_SUPPORTED or not wanted:
-        return
-    for document in documents:
-        doc_type = str(document.document_type or "").lower()
-        if not any(token in doc_type for token in wanted):
-            continue
-        from app.db.repository import chunks_by_document
+    """Enforce ``rule.document_types`` on a documents-group item.
 
+    A mention in a clinical note does not satisfy "X-ray report" — only a document of an
+    accepted type does. Supported items keep only citations from accepted document types
+    (downgraded to MISSING when none remain); open items are upgraded when an accepted
+    document is on file.
+    """
+    wanted = [str(value).lower() for value in rule.get("document_types") or [] if value]
+    if not wanted:
+        return
+    if item.status == STATUS_SUPPORTED:
+        types = {doc.document_code: doc.document_type for doc in documents}
+        kept = [
+            citation for citation in item.citations
+            if citation.document_id in types and _type_matches(types[citation.document_id], wanted)
+        ]
+        if kept:
+            item.citations = kept
+            return
+    from app.db.repository import chunks_by_document
+
+    for document in documents:
+        if not _type_matches(document.document_type, wanted):
+            continue
         chunks = chunks_by_document(session, [document.id]).get(document.id) or []
         if not chunks:
             continue
@@ -399,11 +443,20 @@ def _document_presence(
                 document_id=document.document_code,
                 chunk_id=chunks[0].chunk_code,
                 source=document.document_type,
-                excerpt=chunks[0].content.strip()[:EXCERPT_MAX],
+                excerpt=clip_words(chunks[0].content),
                 date=_iso(document.created_at),
             )
         ]
         return
+    if item.status == STATUS_SUPPORTED:
+        accepted = ", ".join(value.replace("_", " ") for value in wanted)
+        item.status = STATUS_MISSING
+        item.reason = (
+            f"Mentioned in the chart, but no document of an accepted type ({accepted}) is on file."
+        )
+        item.fix_hint = _fix_hint(
+            GROUP_DOCUMENTS, STATUS_MISSING, str(rule.get("missing_label") or item.label)
+        )
 
 
 def build_case_checklist(
@@ -445,7 +498,8 @@ def build_case_checklist(
         ).all()
     )
     doc_dates = {doc.document_code: _iso(doc.created_at) for doc in documents}
-    criterion_items = _criterion_items(results, rules, doc_dates)
+    doc_types = {doc.document_code: str(doc.document_type or "") for doc in documents}
+    criterion_items = _criterion_items(results, rules, doc_dates, doc_types)
     for item in criterion_items:
         if item.group == GROUP_DOCUMENTS:
             _document_presence(item, rules.get(item.item_id) or {}, documents, session)

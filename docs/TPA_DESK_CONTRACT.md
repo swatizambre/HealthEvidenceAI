@@ -191,3 +191,33 @@ Nothing above was renamed or removed. Extra fields the backend returns / accepts
   `discharge_pending` uses `prep` with `expected_discharge_at`.
 - Pre-auth form: `case_id`, `disclaimer`; attachments carry `required`.
 - Stats: `total_cases`.
+
+## Backend additions (v1.2 — additive only)
+
+- Pre-auth form field: `warning` (string or `null`) flags a value whose supporting
+  document is missing — e.g. `cost_implants` without an implant quotation/invoice on
+  file ("Supporting document missing: Implant quotation (make, model, MRP)"). `hint`
+  (string or `null`) is reviewer guidance; chart-derived `investigations` carry
+  `"Confirm before printing"`.
+- Pre-auth form: `checklist_open` — required clinical/document checklist items that are
+  not yet supported (`[{item_id, label, group, status}]`). The UI banner reflects both
+  `missing_required` (form fields) and `checklist_open`.
+- `investigations` (when not set in `form_extra`) lists only chart entries relevant to the
+  case: documents/labs cited by the case checklist, or entries mentioning the case's
+  diagnosis/procedure keywords. Synthea metadata placeholders are excluded; at most 5
+  entries, each ≤160 characters cut on a word boundary, joined with `"; "`.
+- Citation excerpts (checklist, attachments, discharge check) are cut on a word boundary
+  and end with `…` when shortened (still ≤280 characters). Checklist citation `source`
+  is the cited document's `document_type` (e.g. `radiology_report`).
+- Documents-group criteria may set `rule.document_types` (substring match on
+  `document_type`). Only documents of an accepted type satisfy the item: a mention in a
+  clinical note is not an X-ray report. A supported item whose citations are all from
+  other types becomes `MISSING` unless an accepted document is on file. Seeded imaging
+  reports use `radiology_report`.
+- `POST /documents` also accepts patient document types `radiology_report`,
+  `investigation_report`, `implant_quote`, `implant_invoice`, `anc_card`, `mlc_copy`,
+  `discharge_summary`, `final_bill` (`patient_id` required).
+- SUPPORTED checklist rows drop the evaluator's boilerplate reason (the pill already
+  says it); informative reasons are kept.
+- Wording: the senior action is "Confirm" everywhere in labels and timeline events
+  ("Senior confirmed checklist"). API values (`acknowledged`) are unchanged.

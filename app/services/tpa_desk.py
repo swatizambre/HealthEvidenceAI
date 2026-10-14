@@ -439,7 +439,7 @@ def build_timeline(
         if row.action == "evidence_pack_review":
             decision = "needs_documentation" if "needs_documentation" in (row.detail or "") else ""
             label = (
-                "Senior sent back for documentation" if decision else "Senior acknowledged checklist"
+                "Senior sent back for documentation" if decision else "Senior confirmed checklist"
             )
         add(row.created_at, label, row.actor)
     events.sort(key=lambda item: item["at"])
@@ -843,7 +843,7 @@ def apply_stage_action(
             raise _invalid(
                 action,
                 stage,
-                "A senior clinician must acknowledge the checklist before the request is sent "
+                "A senior clinician must confirm the checklist before the request is sent "
                 f"(review state: {review.state}).",
             )
         case.sent_at = current

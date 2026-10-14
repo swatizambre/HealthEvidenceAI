@@ -8,6 +8,7 @@ from app.models import AuthorizationCase
 from app.services.case_checklist import (
     ChecklistItem,
     clinical_results,
+    clip_words,
     form_items,
     normalize_results,
     readiness_from_results,
@@ -37,6 +38,16 @@ def test_readiness_is_supported_over_required_only() -> None:
     assert summary.label.startswith("1 item missing")
     assert summary.open_items == 2
     assert summary.as_dict()["percent"] == 80
+
+
+def test_clip_words_cuts_on_a_word_boundary() -> None:
+    assert clip_words("short text", 40) == "short text"
+    text = "Final diagnosis: acute appendicitis with perforation and localised peritonitis"
+    clipped = clip_words(text, 40)
+    assert len(clipped) <= 40
+    assert clipped.endswith("…")
+    assert text.startswith(clipped[:-1])
+    assert text[len(clipped) - 1] == " "  # the cut lands between words
 
 
 def test_readiness_labels() -> None:

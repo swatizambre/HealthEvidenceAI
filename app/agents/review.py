@@ -205,7 +205,7 @@ def _sync_case_lifecycle(
 
     if response.awaiting_human_review:
         status = "ready_for_human"
-        note = response.human_review_reason or "Awaiting clinician checklist acknowledgment"
+        note = response.human_review_reason or "Awaiting senior confirmation of the checklist"
     elif clinician_decision == "needs_documentation" or (
         response.human_review_required and response.missing_evidence
     ):
@@ -213,7 +213,7 @@ def _sync_case_lifecycle(
         note = "; ".join(response.missing_evidence[:3]) or response.human_review_reason
     elif response.human_review_required:
         status = "ready_for_human" if not clinician_decision else "closed_as_draft"
-        note = response.human_review_reason or "Clinician acknowledgment recorded"
+        note = response.human_review_reason or "Senior confirmed the checklist"
         if clinician_decision == "acknowledged":
             status = "closed_as_draft"
     else:

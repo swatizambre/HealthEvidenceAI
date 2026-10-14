@@ -76,6 +76,11 @@ def _kw(code: str, description: str, phrases: list[str], *, group: str = "clinic
     return {"code": code, "description": description, "rule": rule}
 
 
+# Accepted document types for documents-group criteria (substring match on document_type).
+_IMAGING_DOCS = ["radiology_report", "imaging_report"]
+_REPORT_DOCS = ["investigation_report", "radiology_report", "imaging_report"]
+
+
 def _lab(code: str, description: str, test_name: str, *, missing: str = "") -> dict[str, Any]:
     return {
         "code": code,
@@ -113,7 +118,8 @@ INDIA_CHECKLISTS: tuple[ChecklistSpec, ...] = (
                  "cataract grade"]),
             _lab("CRIT-IN-CAT-03", "Pre-operative blood sugar recorded", "Random blood sugar"),
             _kw("CRIT-IN-CAT-04", "A-scan biometry report with IOL power",
-                ["biometry report", "a-scan biometry"], group="documents"),
+                ["biometry report", "a-scan biometry"], group="documents",
+                document_types=_REPORT_DOCS),
             _kw("CRIT-IN-CAT-05", "IOL sticker / invoice (needed at discharge)",
                 ["iol sticker", "lens sticker"], group="documents", required=False,
                 document_types=["implant_invoice"]),
@@ -131,7 +137,8 @@ INDIA_CHECKLISTS: tuple[ChecklistSpec, ...] = (
             _kw("CRIT-IN-TKR-04", "Pre-anaesthetic check / fitness for surgery",
                 ["fit for surgery", "pre-anaesthetic check", "pac done"]),
             _kw("CRIT-IN-TKR-05", "Weight-bearing X-ray knee report",
-                ["x-ray knee", "weight-bearing x-ray"], group="documents"),
+                ["x-ray knee", "weight-bearing x-ray"], group="documents",
+                document_types=_IMAGING_DOCS),
             _kw("CRIT-IN-TKR-06", "Implant quotation (make, model, MRP)",
                 ["implant quotation", "implant quote"], group="documents",
                 document_types=["implant_quote"]),
@@ -147,7 +154,8 @@ INDIA_CHECKLISTS: tuple[ChecklistSpec, ...] = (
             _kw("CRIT-IN-APP-03", "Surgeon's admission note with operative plan",
                 ["laparoscopic appendectomy"]),
             _kw("CRIT-IN-APP-04", "USG / CT abdomen report supporting appendicitis",
-                ["usg abdomen", "ultrasound abdomen", "ct abdomen"], group="documents"),
+                ["usg abdomen", "ultrasound abdomen", "ct abdomen"], group="documents",
+                document_types=_IMAGING_DOCS),
         ),
     ),
     ChecklistSpec(
@@ -161,9 +169,11 @@ INDIA_CHECKLISTS: tuple[ChecklistSpec, ...] = (
                  "non-progress of labour"]),
             _lab("CRIT-IN-LSCS-03", "Haemoglobin recorded", "Hemoglobin"),
             _kw("CRIT-IN-LSCS-04", "Antenatal ultrasound (growth scan) report",
-                ["obstetric ultrasound", "antenatal usg", "growth scan"], group="documents"),
+                ["obstetric ultrasound", "antenatal usg", "growth scan"], group="documents",
+                document_types=_IMAGING_DOCS),
             _kw("CRIT-IN-LSCS-05", "ANC card / antenatal record",
-                ["anc card", "antenatal record"], group="documents"),
+                ["anc card", "antenatal record"], group="documents",
+                document_types=["anc_card", "antenatal_record"]),
         ),
     ),
     ChecklistSpec(
@@ -176,9 +186,10 @@ INDIA_CHECKLISTS: tuple[ChecklistSpec, ...] = (
                 ["stemi", "nstemi", "myocardial infarction", "unstable angina",
                  "coronary artery disease"]),
             _kw("CRIT-IN-PTCA-04", "Coronary angiography (CAG) report",
-                ["coronary angiography report", "cag report"], group="documents"),
+                ["coronary angiography report", "cag report"], group="documents",
+                document_types=_REPORT_DOCS),
             _kw("CRIT-IN-PTCA-05", "2D echo report", ["2d echo", "echocardiography"],
-                group="documents"),
+                group="documents", document_types=_REPORT_DOCS),
             _kw("CRIT-IN-PTCA-06", "Stent invoice / sticker (needed at discharge)",
                 ["stent invoice", "stent sticker"], group="documents", required=False,
                 document_types=["implant_invoice"]),
@@ -197,7 +208,7 @@ INDIA_CHECKLISTS: tuple[ChecklistSpec, ...] = (
             _kw("CRIT-IN-AFI-04", "Fever work-up (dengue NS1 / malaria / typhoid test)",
                 ["dengue ns1", "malaria antigen", "peripheral smear", "widal"]),
             _kw("CRIT-IN-AFI-05", "CBC report", ["complete blood count", "cbc report"],
-                group="documents"),
+                group="documents", document_types=[*_REPORT_DOCS, "lab_result"]),
         ),
     ),
     ChecklistSpec(
@@ -212,9 +223,9 @@ INDIA_CHECKLISTS: tuple[ChecklistSpec, ...] = (
             _kw("CRIT-IN-RTA-03", "Injury details documented", ["fracture"]),
             _kw("CRIT-IN-RTA-04", "MLC copy / police intimation (FIR)",
                 ["mlc number", "medico-legal case", "police intimation", "fir"],
-                group="documents"),
+                group="documents", document_types=["mlc_copy", "police_intimation", "fir_copy"]),
             _kw("CRIT-IN-RTA-05", "X-ray / CT report of the injured part", ["x-ray", "ct scan"],
-                group="documents"),
+                group="documents", document_types=_IMAGING_DOCS),
         ),
     ),
 )
@@ -364,7 +375,7 @@ def demo_case_specs(now: datetime) -> tuple[CaseSpec, ...]:
                         "little relief\n"
                         "Known hypertension for 10 years on amlodipine\n"
                         "Plan: total knee replacement right knee", -50),
-                DocSpec("investigation_report",
+                DocSpec("radiology_report",
                         "X-ray knee report (standing AP and lateral, weight-bearing): severe "
                         "medial joint space narrowing, osteophytes, subchondral sclerosis right "
                         "knee", -49),
@@ -411,7 +422,7 @@ def demo_case_specs(now: datetime) -> tuple[CaseSpec, ...]:
                         "right iliac fossa, with vomiting\n"
                         "Examination: RIF tenderness, rebound tenderness at McBurney point\n"
                         "Plan: laparoscopic appendectomy under general anaesthesia", -2.9),
-                DocSpec("investigation_report",
+                DocSpec("radiology_report",
                         "USG abdomen report: non-compressible aperistaltic tubular structure in "
                         "right iliac fossa, 9 mm diameter, suggestive of acute appendicitis", -2.7),
             ),
@@ -462,6 +473,9 @@ def demo_case_specs(now: datetime) -> tuple[CaseSpec, ...]:
                         "Indication: previous LSCS with inadequate scar interval\n"
                         "ANC card reviewed: 9 antenatal visits\n"
                         "Plan: elective LSCS", -24),
+                DocSpec("anc_card",
+                        "ANC card: G2P1L1A0, 9 antenatal visits, TT 2 doses, blood group B "
+                        "positive", -24.5, as_note=False),
             ),
             queries=(
                 QuerySpec("Please share the antenatal ultrasound (growth scan) report and the "
@@ -489,6 +503,9 @@ def demo_case_specs(now: datetime) -> tuple[CaseSpec, ...]:
                         "MLC number MLC/2026/1187 registered; police intimation sent\n"
                         "Breath alcohol test done at casualty\n"
                         "X-ray right thigh: displaced fracture shaft of femur", -30),
+                DocSpec("radiology_report",
+                        "X-ray right femur report (AP and lateral): displaced transverse "
+                        "fracture of the mid-shaft of the right femur", -29.5),
             ),
             queries=(
                 QuerySpec("Submit a copy of the MLC / FIR and the breath alcohol test report.",
@@ -550,7 +567,7 @@ def demo_case_specs(now: datetime) -> tuple[CaseSpec, ...]:
                         "Diagnosis: primary osteoarthritis left knee, Kellgren-Lawrence grade 4\n"
                         "Conservative management: physiotherapy for 1 year\n"
                         "Pre-anaesthetic check: fit for surgery (ASA II)", -96),
-                DocSpec("investigation_report",
+                DocSpec("radiology_report",
                         "X-ray knee report (weight-bearing): tricompartmental osteoarthritis left "
                         "knee", -95),
                 DocSpec("implant_quote",
@@ -576,7 +593,7 @@ def demo_case_specs(now: datetime) -> tuple[CaseSpec, ...]:
                         "Presenting complaints: pain in right iliac fossa for 2 days with fever\n"
                         "Examination: RIF tenderness and guarding\n"
                         "Plan: laparoscopic appendectomy", -107.5),
-                DocSpec("investigation_report",
+                DocSpec("radiology_report",
                         "USG abdomen report: inflamed appendix 11 mm with periappendiceal "
                         "collection", -107.2),
                 DocSpec("discharge_summary",
@@ -873,11 +890,11 @@ def _apply_case(
     if spec.review == "acknowledged":
         case.status = "closed_as_draft"
         case.review_ready_at = review_at
-        case.lifecycle_note = "Senior clinician acknowledged the checklist (synthetic demo)"
+        case.lifecycle_note = "Senior confirmed the checklist (synthetic demo)"
     elif spec.review == "awaiting_senior":
         case.status = "ready_for_human"
         case.review_ready_at = review_at
-        case.lifecycle_note = "Awaiting senior clinician acknowledgment"
+        case.lifecycle_note = "Awaiting senior confirmation"
     else:
         case.status = "queued"
 
@@ -1030,10 +1047,10 @@ def _seed_reviews_and_queries(
                 "evidence_coverage": "AVAILABLE" if results else "NONE",
                 "human_review_required": True,
                 "human_review_reason": (
-                    "Clinician checklist acknowledgment required; reviewer=Citations checked "
+                    "Senior confirmation of the checklist required; reviewer=Citations checked "
                     "against the chart (synthetic demo)"
                     if acknowledged
-                    else "Clinician checklist acknowledgment required"
+                    else "Senior confirmation of the checklist required"
                 ),
                 "human_decision": "acknowledged" if acknowledged else None,
                 "paused": not acknowledged,
