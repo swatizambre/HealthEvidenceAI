@@ -44,3 +44,66 @@ def test_skips_admin_procedures() -> None:
     assert not is_clinical_procedure("Medication reconciliation (procedure)")
     assert not is_clinical_procedure("Medication review due")
     assert is_clinical_procedure("Appendectomy")
+
+
+SOCIAL_FINDINGS = (
+    "Received higher education (finding)",
+    "Received higher education",
+    "Full-time employment (finding)",
+    "Full-time employment",
+    "Stress (finding)",
+    "Stress",
+    "Social isolation (finding)",
+    "Has a criminal record (finding)",
+    "Has a criminal record",
+    "Not in labor force (finding)",
+    "Reports of violence in the environment (finding)",
+)
+
+
+def test_synthea_social_findings_are_never_clinical_conditions() -> None:
+    from app.services.disorders import clinical_conditions, is_social_finding
+
+    for item in SOCIAL_FINDINGS:
+        assert not is_clinical_condition(item), item
+    assert is_social_finding("Received higher education (finding)")
+    assert not is_social_finding("Essential hypertension (disorder)")
+    kept = clinical_conditions([*SOCIAL_FINDINGS, "Essential hypertension (disorder)", "diabetes"])
+    assert kept == ["Essential hypertension (disorder)", "diabetes"]
+
+
+def test_social_findings_hidden_from_patients_list_chart_and_problem_list(monkeypatch) -> None:
+    from app.models import Patient
+    from sqlalchemy import select
+    from tests.conftest import make_client
+
+    with make_client(monkeypatch) as client:
+        session = client.app.state.session_factory()
+        try:
+            patient = session.scalar(select(Patient).where(Patient.patient_code == "PAT-000003"))
+            assert patient is not None
+            patient.conditions = [*SOCIAL_FINDINGS, "Essential hypertension (disorder)"]
+            session.commit()
+        finally:
+            session.close()
+
+        listing = client.get("/api/v1/patients", params={"limit": 5})
+        assert listing.status_code == 200, listing.text
+        row = next(p for p in listing.json()["patients"] if p["patient_id"] == "PAT-000003")
+        assert row["conditions"] == ["Essential hypertension (disorder)"]
+
+        detail = client.get("/api/v1/patients/PAT-000003")
+        assert detail.status_code == 200, detail.text
+        assert detail.json()["conditions"] == ["Essential hypertension (disorder)"]
+
+        lifelong = client.get("/api/v1/patients/PAT-000003/lifelong")
+        assert lifelong.status_code == 200, lifelong.text
+        problem_titles = " ".join(
+            event["title"].lower()
+            for event in lifelong.json()["events"]
+            if event["event_id"].startswith("cond-")
+        )
+        assert "hypertension" in problem_titles
+        for item in ("higher education", "full-time employment", "social isolation", "criminal record",
+                     "stress"):
+            assert item not in problem_titles

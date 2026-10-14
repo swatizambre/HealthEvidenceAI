@@ -792,12 +792,16 @@ def require_patient(session: Session, patient_code: str) -> Patient:
 
 
 def _summary(patient: Patient) -> PatientSummary:
+    from app.services.disorders import clinical_conditions
+
     return PatientSummary(
         patient_id=patient.patient_code,
         synthetic_name=patient.synthetic_name,
         date_of_birth=patient.birth_date,
         sex=patient.sex,
-        conditions=list(patient.conditions),
+        # Synthea social findings ("Received higher education", "Stress", …) are not
+        # clinical conditions — never list them as such.
+        conditions=clinical_conditions(patient.conditions),
     )
 
 

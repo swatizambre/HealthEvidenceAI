@@ -22,6 +22,7 @@ from app.schemas.api import (
     ToolPatientSummaryResponse,
 )
 from app.services.audit import record_audit
+from app.services.disorders import clinical_conditions
 
 router = APIRouter(prefix="/tools", tags=["tools"])
 
@@ -163,7 +164,7 @@ def get_patient_summary(
     )
     return ToolPatientSummaryResponse(
         patient_id=str(result["patient_id"]),
-        conditions=list(result.get("conditions") or []),
+        conditions=clinical_conditions(list(result.get("conditions") or [])),
         medication_count=int(result.get("medication_count") or 0),
         lab_count=int(result.get("lab_count") or 0),
         note_count=int(result.get("note_count") or 0),
