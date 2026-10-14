@@ -2640,8 +2640,11 @@ details.disclosure:not(.panel) > summary {
     grid-template-columns: 1fr 16px;
   }
 
-  .record-toggle > span:not(.record-title) {
+  /* Every text cell (including the title) stacks in column 1; only the chevron sits
+     in the narrow column. The title was auto-placed into the 16px column before. */
+  .record-toggle > span {
     grid-column: 1;
+    min-width: 0;
   }
 
   .record-chevron {
