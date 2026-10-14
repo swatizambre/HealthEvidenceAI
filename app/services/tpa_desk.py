@@ -238,9 +238,16 @@ class ReviewState:
     by_label: str = ""
     at: str | None = None
     notes: str = ""
+    run_id: str = ""
 
     def as_dict(self) -> dict[str, Any]:
-        return {"state": self.state, "by_label": self.by_label, "at": self.at, "notes": self.notes}
+        return {
+            "state": self.state,
+            "by_label": self.by_label,
+            "at": self.at,
+            "notes": self.notes,
+            "run_id": self.run_id,
+        }
 
 
 def _reviewer_notes(reason: str) -> str:
@@ -274,7 +281,7 @@ def review_state(session: Session, case: AuthorizationCase) -> ReviewState:
         elif legacy == "needs_documentation" and run_state is None:
             state = "needs_documentation"
     if state == "awaiting_senior":
-        return ReviewState(state=state, at=iso(case.review_ready_at))
+        return ReviewState(state=state, at=iso(case.review_ready_at), run_id=run_id)
     if state in {"acknowledged", "needs_documentation"}:
         event = session.scalar(
             select(AuditEvent)
@@ -288,10 +295,14 @@ def review_state(session: Session, case: AuthorizationCase) -> ReviewState:
         )
         if event is not None:
             return ReviewState(
-                state=state, by_label=event.actor, at=iso(event.created_at), notes=notes
+                state=state,
+                by_label=event.actor,
+                at=iso(event.created_at),
+                notes=notes,
+                run_id=run_id,
             )
-        return ReviewState(state=state, notes=notes)
-    return ReviewState(state=state)
+        return ReviewState(state=state, notes=notes, run_id=run_id)
+    return ReviewState(state=state, run_id=run_id)
 
 
 def on_review_decision(
@@ -375,6 +386,7 @@ def case_dict(
         "cost_breakdown_inr": dict(case.cost_breakdown_inr or {}),
         "form_extra": dict(case.form_extra or {}),
         "assigned_to": case.assigned_to,
+        "last_run_id": case.last_run_id,
         "created_at": iso(case.created_at),
         "updated_at": iso(case.updated_at),
     }
