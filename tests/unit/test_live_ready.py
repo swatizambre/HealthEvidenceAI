@@ -21,6 +21,50 @@ def test_ready_exposes_live_surface(client: TestClient) -> None:
     assert "phi_live" in body
 
 
+def test_pilot_harness_rejects_allow_phi() -> None:
+    settings = Settings(
+        ENVIRONMENT="pilot",
+        AUTH_MODE="dev-jwt",
+        DEV_JWT_SECRET="ci-harness-secret-at-least-32-chars",
+        DATABASE_URL="postgresql+psycopg://u:p@localhost/he",
+        LLM_PROVIDER="local",
+        SEED_ON_STARTUP="false",
+        ALLOW_PHI="true",
+        PHI_PROGRAM_ATTESTED="true",
+    )
+    import os
+
+    os.environ["PILOT_POSTGRES_TEST"] = "1"
+    try:
+        with pytest.raises(AppError) as exc:
+            settings.validate_live_configuration()
+        assert exc.value.error_code == "LIVE_CONFIG_INVALID"
+        assert "PILOT_POSTGRES_TEST" in exc.value.message
+        assert "ALLOW_PHI" in exc.value.message
+    finally:
+        os.environ.pop("PILOT_POSTGRES_TEST", None)
+
+
+def test_pilot_harness_requires_explicit_dev_jwt_secret() -> None:
+    settings = Settings(
+        ENVIRONMENT="pilot",
+        AUTH_MODE="dev-jwt",
+        DEV_JWT_SECRET="",
+        DATABASE_URL="postgresql+psycopg://u:p@localhost/he",
+        LLM_PROVIDER="local",
+        ALLOW_PHI="false",
+    )
+    import os
+
+    os.environ["PILOT_POSTGRES_TEST"] = "1"
+    try:
+        with pytest.raises(AppError) as exc:
+            settings.require_dev_jwt_secret()
+        assert exc.value.error_code == "AUTH_DEV_SECRET_REQUIRED"
+    finally:
+        os.environ.pop("PILOT_POSTGRES_TEST", None)
+
+
 def test_shared_live_rejects_seed_on() -> None:
     settings = Settings(
         ENVIRONMENT="staging",
@@ -64,6 +108,7 @@ def test_shared_live_ok_when_hardened() -> None:
         ENFORCE_ORG_SCOPE="true",
         ALLOW_PHI="false",
         HOSPITAL_ALLOW_SIMULATE="false",
+        STREAM_TICKET_SECRET="prod-stream-ticket-secret-at-least-32-chars",
     )
     settings.validate_live_configuration()
     assert settings.is_shared_live_env()
@@ -113,3 +158,40 @@ def test_desk_catalog_requires_auth_when_jwt_on(monkeypatch) -> None:
         )
         assert ok.status_code == 200
         assert len(ok.json()["specialties"]) >= 8
+
+
+def test_ready_reports_demo_mode_without_secrets(monkeypatch) -> None:
+    secret = "demo-secret-value-that-is-long-enough-123"
+    with make_client(monkeypatch, AUTH_MODE="dev-jwt", ENVIRONMENT="local", DEV_JWT_SECRET=secret) as client:
+        body = client.get("/ready").json()
+        assert body["mode"] == "demo"
+        assert body["banner"] == "DEMO — synthetic data"
+        assert body["trial_site_org_code"] == ""
+        assert body["trial_end_date"] == ""
+        assert secret not in client.get("/ready").text
+        caps = client.get("/api/v1/auth/capabilities").json()
+        assert caps["deployment"]["mode"] == "demo"
+    get_settings.cache_clear()
+
+
+def test_deployment_banner_for_trial_and_practice() -> None:
+    trial = Settings(
+        ENVIRONMENT="pilot",
+        ALLOW_PHI="true",
+        PHI_PROGRAM_ATTESTED="true",
+        TRIAL_SITE_ORG_CODE="ORG-000001",
+        TRIAL_END_DATE="2026-12-31",
+        DPO_CONTACT="dpo@hospital.example",
+    )
+    banner = trial.deployment_banner()
+    assert banner["mode"] == "trial"
+    assert banner["trial_site_org_code"] == "ORG-000001"
+    assert banner["trial_end_date"] == "2026-12-31"
+    assert banner["banner"] == "REAL-DATA TRIAL — ORG-000001 until 2026-12-31"
+    assert "dpo@hospital.example" not in str(banner)
+
+    practice = Settings(ENVIRONMENT="staging", ALLOW_PHI="false", TRIAL_SITE_ORG_CODE="ORG-000001")
+    shown = practice.deployment_banner()
+    assert shown["mode"] == "practice"
+    assert shown["trial_site_org_code"] == ""
+    assert shown["banner"].startswith("PRACTICE")

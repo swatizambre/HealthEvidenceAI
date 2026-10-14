@@ -49,6 +49,15 @@ def main() -> int:
                         case_id=case.get("case_id"),
                     ),
                 )
+                # Mandatory senior HITL: every complete path must pause before resume.
+                expect_pause = case.get("expect_awaiting_human_review")
+                if expect_pause is None:
+                    expect_pause = case.get("expect_human_review")
+                paused_ok = True
+                if expect_pause is True and not result.awaiting_human_review:
+                    paused_ok = False
+                if expect_pause is False and result.awaiting_human_review:
+                    paused_ok = False
                 if result.awaiting_human_review:
                     result = resume_review(
                         session,
@@ -61,8 +70,7 @@ def main() -> int:
                 counts = Counter(item.status for item in result.criteria)
                 expected = case.get("expect_statuses") or {}
                 ok = all(counts.get(k, 0) == v for k, v in expected.items())
-                if case.get("expect_human_review") and not result.human_review_required:
-                    ok = False
+                ok = ok and paused_ok
                 if result.agent_trace:
                     ok = ok and True
                 else:

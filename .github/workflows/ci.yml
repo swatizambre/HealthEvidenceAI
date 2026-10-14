@@ -33,6 +33,10 @@ jobs:
         run: |
           uv run coverage run -m pytest -q
           uv run coverage report --fail-under=80
+      - name: Gold evaluation gate (rules path)
+        run: uv run python -m evaluation.run_gold --path rules
+      - name: Agent evaluation (HITL pause check)
+        run: uv run python -m evaluation.run_agent
 
   pilot-postgres:
     runs-on: ubuntu-latest
@@ -53,11 +57,13 @@ jobs:
     env:
       DATABASE_URL: postgresql+psycopg://healthevidence:healthevidence@localhost:5432/healthevidence
       PILOT_POSTGRES_TEST: "1"
-      DEV_JWT_SECRET: ci-only-healthevidence-hmac-do-not-reuse-32
+      ALLOW_PHI: "false"
       HE_HITL_SOFT_PAUSE: "1"
       PYTHONFAULTHANDLER: "1"
     steps:
       - uses: actions/checkout@v4
+      - name: Generate per-run harness JWT secret
+        run: echo "DEV_JWT_SECRET=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
       - uses: astral-sh/setup-uv@v6
         with:
           version: "0.11.26"

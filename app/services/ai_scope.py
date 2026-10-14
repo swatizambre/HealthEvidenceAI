@@ -22,7 +22,10 @@ AI_IN_SCOPE: tuple[dict[str, str], ...] = (
     {
         "id": "criteria_checklist",
         "label": "Criteria checklist (support / missing / unknown)",
-        "how": "Rules-first; optional LLM assist when allowed",
+        "how": (
+            "Default: deterministic keyword/lab rules (rule check). "
+            "Optional LLM status only when a real model provider is configured"
+        ),
         "fallback": "Rules / deterministic eval only",
     },
     {
@@ -89,7 +92,8 @@ def describe_ai_scope(settings: Settings) -> dict[str, Any]:
         "human_in_the_loop": True,
         "rules_only": rules_only,
         "disclaimer": (
-            "AI organizes evidence and coaches documentation. "
+            "Most checklist scoring is rule-based; optional AI only rephrases or "
+            "suggests status when a real model is configured. "
             "It does not approve, deny, diagnose, or submit prior auth."
         ),
     }

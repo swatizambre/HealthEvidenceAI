@@ -1,18 +1,22 @@
 # AI scope in HealthEvidence
 
-HealthEvidence is **hybrid decision-support**, not fully AI-driven care.
+HealthEvidence is **hybrid decision-support for prior-auth paperwork**, not clinical AI and not fully AI-driven care.
 
-## Where AI is used
+In the default setup (`LLM_PROVIDER=local`), checklist scoring is **almost entirely rule-based**: keyword/lab matching, negation, and unit rules. The “local” provider does **not** run a model — it relabels rule results and echoes chart text. Real models (Ollama, OpenAI, Anthropic, Gemini) only run when you configure them; cloud models are blocked when real PHI is on without BAA/egress attestation.
 
-| Capability | Role | Fallback |
-|------------|------|----------|
-| Criteria scoring | LLM over retrieved chart (`CRITERIA_EVAL_MODE=ai_primary`) | Deterministic rules + safety net |
-| Hybrid RAG | Dense + lexical retrieval with citations | Lexical search |
-| Report phrasing | Grounded `complete_report` | Local grounded phrasing |
-| Gap drafts | Short visit-note coaching from chart cues | Template + chart cue |
-| Critic / pathway | Confidence + ordered next-doc steps | Deterministic scorecard |
-| Imaging assist | MONAI non-diagnostic features | Skip imaging node |
-| Help phrasing | Rephrase FAQ from fixed contexts | Static FAQ |
+## What actually runs
+
+| Capability | Default (local) | Optional real AI |
+|------------|-----------------|------------------|
+| Criteria scoring | Deterministic rules → labeled **Rule check** (`rule_check:local` / `rules`) | LLM status + chart excerpt → **AI check** (`ai_clinical:ollama|gemini|…`) |
+| Hybrid RAG | Word hashing + lexical overlap | Dense embeddings when configured |
+| Report phrasing | Grounded template over rule outcomes | `complete_report` from a model |
+| Gap drafts | Template + chart cue (`ai:local` = rule-assisted wording) | LLM coaching when a real provider is on |
+| Critic / pathway | Fixed confidence bands + ordered next-doc steps | Same deterministic scorecard |
+| Imaging assist | Non-diagnostic stub / random features unless MONAI is wired | Skip when unavailable |
+| Help phrasing | Static FAQ | LLM rephrase from fixed contexts |
+
+Desk and packet copy must say **rule check** vs **AI check** accordingly. Do not call rule output “AI”.
 
 ## Where AI must not decide
 
@@ -25,7 +29,7 @@ HealthEvidence is **hybrid decision-support**, not fully AI-driven care.
 ## Config
 
 ```bash
-CRITERIA_EVAL_MODE=ai_primary   # or rules
+CRITERIA_EVAL_MODE=ai_primary   # or rules — with LLM_PROVIDER=local this is still rule check
 AI_GAP_DRAFTS=true              # unset follows criteria mode
 LLM_PROVIDER=ollama|openai|anthropic|gemini|local
 LLM_FALLBACK_PROVIDERS=local
@@ -36,8 +40,8 @@ LLM_FALLBACK_PROVIDERS=local
 - `GET /api/v1/ai/scope` — public scope map
 - `POST /api/v1/ai/gap-draft` — on-demand coaching draft (care-team)
 - `GET /api/v1/auth/capabilities` → `ai` object
-- Prepare / hospital status responses include `ai_assist` / `ai`
+- Prepare / hospital status responses include `ai_assist` / `ai` and `scoring_path`
 
 ## Product rule
 
-AI organizes evidence and coaches documentation. Humans own the final review.
+Rules organize evidence predictably; optional AI may assist wording or status when a real model is configured. Humans own the final review. This is not a clinical device.

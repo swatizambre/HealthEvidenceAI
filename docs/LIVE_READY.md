@@ -10,12 +10,23 @@ This is the go-live runbook for shared hospital environments (staging / producti
 | Practice feeds | HIS/FHIR webhooks with `synthetic=true` + `consent_attested=true` |
 | Live PHI feeds | `ALLOW_PHI=true` **and** `PHI_PROGRAM_ATTESTED=true` + change-control signed |
 
+Real-data trial runbook (prerequisites, `make go-live-check MODE=trial`, monitoring, stop
+criteria): [GO_LIVE.md](GO_LIVE.md).
+
 Default remains **synthetic / practice**. The product is evidence-pack decision support — not a clinical device.
 
 ## Hospital interface (completed platform pieces)
 
 - Durable runs: `hospital_pipeline_runs` (status survives restart)
-- Machine auth: `HOSPITAL_INTERFACE_API_KEY` → header `X-Hospital-Api-Key`
+- Machine auth: `HOSPITAL_INTERFACE_KEYS=ORG-000001:<key>,...` (each ≥32 chars) → header
+  `X-Hospital-Api-Key`; the caller authenticates as `hospital-interface:ORG-xxxxxx` bound to that
+  org. The legacy single `HOSPITAL_INTERFACE_API_KEY` has no org and is refused while org scope is on.
+- SSE: the desk calls `POST /api/v1/events/stream-ticket` (bearer) and opens
+  `/api/v1/events/stream?ticket=…` (60 s, single-use, signed with `STREAM_TICKET_SECRET`).
+  `?access_token=` is no longer accepted.
+- Rate limiting (`RATE_LIMIT_*`): in-process sliding window **per replica** — auth 20/min per IP,
+  OPD + hospital pipeline 120/min and evidence search + tool invoke 120/min per principal (or IP).
+  429 responses carry `Retry-After`. A shared Redis-backed limiter is future work.
 - Multi-replica desk: `REDIS_URL` + `uv sync --extra realtime`
 - Pack export: `GET /api/v1/authorization/cases/{case_id}/export.pdf`
 - SLA: `PACKET_SLA_MINUTES` (default 240) on Today / ops metrics
@@ -68,10 +79,13 @@ Kubernetes ConfigMap (`deploy/kubernetes/configmap.yaml`) uses `ENVIRONMENT=prod
 ## Enabling live PHI (after program sign-off)
 
 1. Complete [OPD change-control](opd-ingest-roadmap.md#change-control-p26--before-any-live-ehr-feed)
-2. Set `ALLOW_PHI=true` and `PHI_PROGRAM_ATTESTED=true`
+   and every prerequisite in [GO_LIVE.md §2.1](GO_LIVE.md#21-non-code-prerequisites-all-signed-before-allow_phitrue)
+2. Set `ALLOW_PHI=true` and `PHI_PROGRAM_ATTESTED=true` plus the trial attestations
+   (`TRIAL_ETHICS_APPROVAL_REF`, `DPO_CONTACT`, `SECURITY_ASSESSMENT_REF`, `BREACH_RUNBOOK_URL`,
+   `DATA_RESIDENCY_REGION`, `TRIAL_SITE_ORG_CODE`, `TRIAL_END_DATE`). Boot fails otherwise
 3. Confirm `HOSPITAL_ALLOW_SIMULATE=false`
 4. Send HIS/FHIR packets with `synthetic=false` and `consent_attested=true`
-5. Re-check `/ready` → `phi_live=true`, `hospital_mode=production_phi`
+5. Re-check `/ready` → `phi_live=true`, `hospital_mode=production_phi`, `mode=trial`
 
 ## Operator checklist
 

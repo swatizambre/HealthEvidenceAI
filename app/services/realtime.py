@@ -488,7 +488,10 @@ async def event_stream(
 
                 break
 
-            if org_id and item.org_id and item.org_id != org_id:
+            # Tenant-bound subscribers only see events stamped with their org. Events
+            # without an org_id could belong to any tenant, so they are dropped rather
+            # than broadcast (fail closed). Unbound streams (org scope off) see all.
+            if org_id and item.org_id != org_id:
 
                 continue
 

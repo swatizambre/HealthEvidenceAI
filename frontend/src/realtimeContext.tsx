@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { getAccessToken } from "./api";
+import { getStreamTicket } from "./api";
 import { useRole } from "./roleContext";
 
 export type DeskRealtimeEvent = {
@@ -55,14 +55,28 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     let source: EventSource | null = null;
     let retryTimer: number | undefined;
 
+    function scheduleRetry() {
+      if (!closed) {
+        retryTimer = window.setTimeout(() => void connect(), 3_000);
+      }
+    }
+
     async function connect() {
-      const token = await getAccessToken();
+      // Fresh single-use ticket on every (re)connect — the bearer never enters the URL.
+      let ticket: string | null = null;
+      try {
+        ticket = await getStreamTicket();
+      } catch {
+        setConnected(false);
+        scheduleRetry();
+        return;
+      }
       if (closed) {
         return;
       }
       const params = new URLSearchParams();
-      if (token) {
-        params.set("access_token", token);
+      if (ticket) {
+        params.set("ticket", ticket);
       }
       const url = `/api/v1/events/stream${params.toString() ? `?${params}` : ""}`;
       source = new EventSource(url);
@@ -74,11 +88,10 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       };
 
       source.onerror = () => {
+        // Close so EventSource does not auto-retry with the spent ticket.
         setConnected(false);
         source?.close();
-        if (!closed) {
-          retryTimer = window.setTimeout(() => void connect(), 3_000);
-        }
+        scheduleRetry();
       };
 
       function onMessage(raw: MessageEvent) {

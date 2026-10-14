@@ -2,6 +2,10 @@
 
 Paths for **Demo** (sales) vs **Pilot** (shared tenant). Same product; different stack expectations.
 
+> **Going live?** Use [GO_LIVE.md](GO_LIVE.md): the step-by-step DEMO runbook and the
+> REAL-DATA TRIAL runbook (non-code prerequisites, `make go-live-check MODE=demo|trial`,
+> `docker-compose.trial.yml`, monitoring, stop criteria). Green CI is not clinical or legal approval.
+
 **Product:** prior-auth evidence prep + lifelong digital health record across hospitals.  
 **Stance:** decision support for documentation readiness — not a medical device; does not diagnose, approve, or deny care.
 
@@ -10,6 +14,7 @@ Paths for **Demo** (sales) vs **Pilot** (shared tenant). Same product; different
 | **Demo** | Stakeholder walkthrough, synthetic only | Postgres + `dev-jwt` + seed ([`docker-compose.demo.yml`](../docker-compose.demo.yml)) |
 | **Pilot** | Shared UAT / IdP | Postgres + **OIDC required** ([`PILOT_ROADMAP.md`](PILOT_ROADMAP.md), [`OIDC_PILOT.md`](OIDC_PILOT.md)) |
 | **Staging / prod** | Accountable environments | OIDC required ([`PRODUCTION_CHECKLIST.md`](PRODUCTION_CHECKLIST.md)) |
+| **Real-data trial** | One hospital, real patients, IEC-approved | [`docker-compose.trial.yml`](../docker-compose.trial.yml) + [`GO_LIVE.md`](GO_LIVE.md) |
 
 ## Prerequisites
 
@@ -37,6 +42,9 @@ cd frontend && npm ci
 Uses the **pilot Postgres path** with synthetic seed and PHI flags off:
 
 ```bash
+# Demo uses ENVIRONMENT=local + AUTH_MODE=dev-jwt (not pilot auth).
+# Set your own signing secret first (≥32 characters):
+export DEV_JWT_SECRET="$(openssl rand -hex 24)"   # Windows: set in .env
 docker compose -f docker-compose.yml -f docker-compose.pilot.yml -f docker-compose.demo.yml up --build
 ```
 
@@ -46,6 +54,7 @@ docker compose -f docker-compose.yml -f docker-compose.pilot.yml -f docker-compo
 Before a live stakeholder session on a shared host:
 
 ```bash
+make go-live-check MODE=demo GO_LIVE_FLAGS=--offline   # config gate (see GO_LIVE.md)
 make demo-gate
 # Windows: .\scripts\demo_gate.ps1
 # or: HE_API_BASE=http://127.0.0.1:8000 python scripts/_smoke_web_api.py
@@ -130,6 +139,7 @@ Checklist:
 
 ## Related
 
+- [Go-live runbooks (demo + real-data trial)](GO_LIVE.md)
 - [Operations](operations.md)
 - [Kubernetes](kubernetes.md)
 - [Safety notes](clinical-product-roadmap.md)

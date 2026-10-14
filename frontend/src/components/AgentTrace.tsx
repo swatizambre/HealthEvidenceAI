@@ -71,12 +71,12 @@ export function AgentTrace({ steps, aiBrief, compact, collapsed = true }: Props)
   return (
     <section
       className={`agent-desk ${compact ? "compact" : ""}`}
-      aria-label="AI assist preparation steps"
+      aria-label="Evidence preparation steps"
     >
       {collapsed ? (
         <details className="agent-desk-details">
           <summary className="agent-desk-summary">
-            <span className="panel-title">AI assist · preparation</span>
+            <span className="panel-title">Evidence prep · preparation</span>
             <span className="muted">
               {steps.length ? `${steps.length} steps · ` : ""}
               Decision support only — not an approval
@@ -87,8 +87,8 @@ export function AgentTrace({ steps, aiBrief, compact, collapsed = true }: Props)
       ) : (
         <>
           <header className="agent-desk-head">
-            <h3 className="panel-title">AI assist · preparation</h3>
-            <p className="muted">Grounded prep before clinician confirmation</p>
+            <h3 className="panel-title">Evidence prep · preparation</h3>
+            <p className="muted">Rule check and grounded prep before clinician confirmation</p>
           </header>
           {body}
         </>

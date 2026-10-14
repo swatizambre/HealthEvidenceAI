@@ -24,6 +24,7 @@ Canonical design and operations docs for HealthEvidence AI.
 
 | Document | Purpose |
 |----------|---------|
+| [GO_LIVE.md](GO_LIVE.md) | Go-live runbooks: synthetic demo + real-data hospital trial |
 | [LAUNCH.md](LAUNCH.md) | Demo vs pilot vs staging paths |
 | [operations.md](operations.md) | Day-2 ops, locales, imaging, HA/DR stub |
 | [kubernetes.md](kubernetes.md) | Cluster apply notes |
@@ -38,6 +39,7 @@ Canonical design and operations docs for HealthEvidence AI.
 | [clinical-product-roadmap.md](clinical-product-roadmap.md) | Safety boundary and org programs |
 | [opd-ingest-roadmap.md](opd-ingest-roadmap.md) | OPD/FHIR change control |
 | [data-privacy.md](data-privacy.md) | Patient vs care-team privacy notes |
+| [CONSENT_AND_RIGHTS.md](CONSENT_AND_RIGHTS.md) | Consent records, DPDP/HIPAA rights mapping, erasure vs retention |
 
 ## Related root files
 

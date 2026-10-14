@@ -107,6 +107,24 @@ textarea {
   flex-direction: column;
 }
 
+.deployment-banner {
+  padding: 6px clamp(16px, 2.5vw, 36px);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: #fff;
+  background: #3d5a80;
+}
+
+.deployment-banner-trial {
+  background: #9b2226;
+}
+
+.deployment-banner-practice {
+  background: #6c584c;
+}
+
 .topbar {
   position: sticky;
   top: 0;

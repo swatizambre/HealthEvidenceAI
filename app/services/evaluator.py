@@ -26,25 +26,80 @@ _REASONS = {
     ),
 }
 
-# Prefixed cues that reverse a nearby phrase (scoped to the clause, not the whole note).
+# Prefixed cues that reverse or weaken a nearby phrase (scoped to the clause).
+# Includes family history, uncertainty (rule-out / possible), and hard negation.
 _NEGATION_PREFIX = re.compile(
     r"(?:"
+    r"\bfamily\s+history\s+of\b|\bfamily\s+hx\s+of\b|\bfh(?:x)?\s+of\b|"
+    r"\brule\s+out\b|\br/o\b|\br\.o\.\b|"
+    r"\bpossible\b|\bprobable\b|\bsuspected\b|\bquestionable\b|\bquery\b|"
+    r"\bunlikely\b|\blikely\b|\bdoubtful\b|"
+    r"\bevaluate\s+for\b|\bevaluation\s+for\b|\bscreen(?:ing)?\s+for\b|"
     r"\bno\s+history\s+of\b|\bno\s+known\b|\bnegative\s+for\b|\bruled\s+out\b|"
     r"\babsence\s+of\b|\bfree\s+of\b|\bdenies\b|\bdenied\b|\bwithout\b|\bnever\b|"
     r"\bno\b|\bnot\b"
     r")\s+",
     re.I,
 )
-# "diabetes: none" / "Diabetes ruled out" style trailing negation.
+# "diabetes: none" / "Diabetes was excluded" / "diabetes?" trailing cues.
 _TRAILING_NONE = re.compile(
-    r"^\s*(?:[:\-–—]\s*)?(?:none|nil|negative|absent|denies|denied|ruled\s+out)\b",
+    r"^\s*(?:[:\-–—]\s*)?(?:"
+    r"\?|"
+    r"(?:none|nil|negative|absent|denies|denied|"
+    r"ruled\s+out|was\s+ruled\s+out|excluded|was\s+excluded)\b"
+    r")",
     re.I,
 )
-_CLAUSE_BREAK = re.compile(r"[.;\n]|,\s*but\b|\bbut\b|\bhowever\b|\balthough\b", re.I)
+# Hedges that directly follow the phrase: "Diabetes unlikely", "Diabetes (?)",
+# "Diabetes - not confirmed", "Diabetes to be ruled out".
+_TRAILING_HEDGE = re.compile(
+    r"^\s*(?:[,:(\-–—]\s*)*(?:is\s+|was\s+|remains\s+)?(?:"
+    r"\?|"
+    r"(?:unlikely|doubtful|questionable|unconfirmed|"
+    # "Diabetes, uncertain type" still affirms diabetes; "Diabetes uncertain" does not.
+    r"(?:uncertain|unclear)(?!\s+(?:type|etiology|aetiology|cause|duration|onset|severity))|"
+    r"not\s+(?:confirmed|established|likely)|"
+    r"to\s+be\s+(?:ruled\s+out|excluded|confirmed))\b"
+    r")",
+    re.I,
+)
+# A "?" directly before the phrase: "?diabetes", "? diabetes".
+_LEADING_QUERY = re.compile(r"(?:^|\s|[(:])\?\s?$")
+# Someone other than the patient is the experiencer (family history).
+_RELATIVE = (
+    r"(?:mother|mom|father|dad|sister|brother|siblings?|aunt|uncle|cousin|son|daughter|"
+    r"grandmother|grandfather|grandparents?|parents?|"
+    r"family(?!\s+(?:physician|doctor|medicine|practice|practitioner|planning|meeting)))"
+)
+_EXPERIENCER_BEFORE = re.compile(
+    rf"\b{_RELATIVE}(?:'s)?\b|\bfhx\b|\bfh\s*:|\bfamily\s+hx\b", re.I
+)
+# Mentioning the patient again resets the experiencer ("Mother reports patient has ...").
+_PATIENT_SUBJECT = re.compile(r"\b(?:patient|pt)\b", re.I)
+# "diabetes in mother", "diabetes (father)", "h/o diabetes in family".
+_EXPERIENCER_AFTER = re.compile(
+    rf"^\s*(?:[(:\-–—]\s*)?(?:in\s+(?:(?:his|her|their|the|patient's)\s+)?)?{_RELATIVE}\b",
+    re.I,
+)
+# A comma followed by a new predicate starts a new clause ("Denies chest pain, has
+# diabetes"), while a plain list stays in scope ("Denies fever, chills, or diabetes").
+_CLAUSE_BREAK = re.compile(
+    r"[.;\n]|,\s*but\b|\bbut\b|\bhowever\b|\balthough\b|"
+    r",\s*(?:and\s+)?(?:has|have|had|with|known|reports?|diagnosed)\b",
+    re.I,
+)
+# Censored lab values ("<7.5", ">14") cannot be compared to a threshold safely.
+_CENSORED = re.compile(r"^\s*(?:<|>|≤|≥|less\s+than|greater\s+than)", re.I)
+# Lab rows that exist but carry no reportable result.
+_NO_RESULT = re.compile(
+    r"\b(?:pending|not\s+reported|hemoly[sz]ed|haemoly[sz]ed|cancel+ed|insufficient|"
+    r"unable|see\s+note|not\s+done|qns)\b",
+    re.I,
+)
 _NUMERIC = re.compile(r"[-+]?\d+(?:\.\d+)?")
 _UNIT_TOKEN = re.compile(
-    r"\b(?:%|percent|mmol\s*/\s*mol|mmol/mol|mg\s*/\s*d[lL]|mg/dl|g\s*/\s*d[lL]|g/dl|"
-    r"mmol\s*/\s*[lL]|mmol/l|u\s*/\s*[lL]|iu\s*/\s*[lL])\b",
+    r"(?:%|\bpercent\b|\b(?:mmol\s*/\s*mol|mmol/mol|mg\s*/\s*d[lL]|mg/dl|g\s*/\s*d[lL]|g/dl|"
+    r"mmol\s*/\s*[lL]|mmol/l|u\s*/\s*[lL]|iu\s*/\s*[lL])\b)",
     re.I,
 )
 
@@ -238,6 +293,16 @@ def _evaluate_lab(
             reason=_REASONS[STATUS_MISSING],
             missing_label=missing_label,
         )
+    unknown = Evaluation(
+        criterion_id=criterion.code,
+        criterion=criterion.description,
+        status=STATUS_UNKNOWN,
+        evidence=[evidence],
+        reason=_REASONS[STATUS_UNKNOWN],
+    )
+    # A row with no reportable result (pending, hemolyzed, cancelled) is not a result.
+    if _NO_RESULT.search(lab.value) or (not lab.value.strip() and _NO_RESULT.search(lab.content)):
+        return unknown
     # Explicit presence checks (not numeric). Bare lab_test without comparator → UNKNOWN.
     if presence_only and not comparator:
         return Evaluation(
@@ -255,7 +320,10 @@ def _evaluate_lab(
             evidence=[evidence],
             reason=_REASONS[STATUS_UNKNOWN],
         )
-    if max_age_days is not None and lab.collected_at is not None:
+    if max_age_days is not None:
+        # Policy requires a recent result but the collection date is unknown.
+        if lab.collected_at is None:
+            return unknown
         collected = lab.collected_at
         if collected.tzinfo is None:
             collected = collected.replace(tzinfo=UTC)
@@ -277,7 +345,17 @@ def _evaluate_lab(
             evidence=[evidence],
             reason=_REASONS[STATUS_UNKNOWN],
         )
-    target_unit = _normalize_unit(expected_unit) or _normalize_unit(lab_unit)
+    expected_norm = _normalize_unit(expected_unit)
+    # Policy named a unit but the lab result has none — do not assume they match.
+    if expected_norm and not lab_unit:
+        return Evaluation(
+            criterion_id=criterion.code,
+            criterion=criterion.description,
+            status=STATUS_UNKNOWN,
+            evidence=[evidence],
+            reason=_REASONS[STATUS_UNKNOWN],
+        )
+    target_unit = expected_norm or lab_unit
     converted = _convert_lab_value(measured, lab_unit, target_unit or lab_unit)
     if converted is None:
         return Evaluation(
@@ -287,9 +365,7 @@ def _evaluate_lab(
             evidence=[evidence],
             reason=_REASONS[STATUS_UNKNOWN],
         )
-    if expected_unit and _normalize_unit(expected_unit) and converted[1] != _normalize_unit(
-        expected_unit
-    ):
+    if expected_norm and converted[1] != expected_norm:
         return Evaluation(
             criterion_id=criterion.code,
             criterion=criterion.description,
@@ -358,14 +434,20 @@ def _cite_text(
 ) -> EvidenceItem | None:
     if not chunks or not document_id:
         return None
-    snippet = _snippet(content, phrase)
+    # Cite the affirmed mention, not an earlier negated/hedged one ("No X ... has X").
+    snippet = _snippet(content, phrase, _affirmed_index(content, phrase))
     if not snippet:
         return None
     chunk_id = ""
     for code, chunk_content in chunks:
-        if snippet in chunk_content or phrase.lower() in chunk_content.lower():
+        if snippet in chunk_content and _affirmed_index(chunk_content, phrase) is not None:
             chunk_id = code
             break
+    if not chunk_id:
+        for code, chunk_content in chunks:
+            if snippet in chunk_content or phrase.lower() in chunk_content.lower():
+                chunk_id = code
+                break
     if not chunk_id:
         return None
     return EvidenceItem(
@@ -376,18 +458,33 @@ def _cite_text(
     )
 
 
+def find_affirmed_phrase(text: str, phrases: list[str]) -> str | None:
+    """Return the first phrase affirmed about the patient in ``text``, else None.
+
+    A mention that is negated, hedged, or about a family member does not count.
+    Public so citation verification reuses the exact assertion logic of the rules path.
+    """
+    return _find_phrase(text, phrases)
+
+
 def _find_phrase(text: str, phrases: list[str]) -> str | None:
-    lowered = text.lower()
     for phrase in phrases:
-        needle = phrase.lower()
-        start = 0
-        while True:
-            index = lowered.find(needle, start)
-            if index < 0:
-                break
-            if not _is_negated(lowered, index, len(needle)):
-                return phrase
-            start = index + len(needle)
+        if _affirmed_index(text, phrase) is not None:
+            return phrase
+    return None
+
+
+def _affirmed_index(text: str, phrase: str) -> int | None:
+    """Index of the first occurrence of ``phrase`` that is not negated/hedged/familial."""
+    lowered = text.lower()
+    needle = phrase.lower().strip()
+    if not needle:
+        return None
+    # Whole-word match: "diabetes" must not hit "prediabetes", nor "mi" hit "minimal".
+    pattern = re.compile(rf"(?<![a-z0-9]){re.escape(needle)}(?![a-z0-9])")
+    for match in pattern.finditer(lowered):
+        if not _is_negated(lowered, match.start(), len(needle)):
+            return match.start()
     return None
 
 
@@ -406,22 +503,42 @@ def _clause_span(text: str, match_index: int) -> tuple[int, int]:
 
 
 def _is_negated(lowered: str, match_index: int, match_len: int) -> bool:
-    """Negation applies only within the same clause / nearby window."""
+    """True when the mention is not an affirmed finding about the patient.
+
+    Covers negation, hedging/uncertainty, and family-history experiencers. Every check
+    is scoped to the clause that contains the mention so cues in neighbouring
+    sentences ("Diabetes. No history of hypertension.") do not leak across.
+    """
     clause_start, clause_end = _clause_span(lowered, match_index)
-    before = lowered[clause_start:match_index]
+    clause_before = lowered[clause_start:match_index]
     after = lowered[match_index + match_len : clause_end]
+    return (
+        _negated_or_hedged(clause_before, after)
+        or _other_experiencer(clause_before, after)
+    )
+
+
+def _negated_or_hedged(clause_before: str, after: str) -> bool:
     # Keep only the last ~40 chars before the phrase inside the clause.
-    before = before[-40:]
-    if _NEGATION_PREFIX.search(before):
-        # Ensure no clause-breaking word sits between the cue and the phrase.
-        last = None
-        for match in _NEGATION_PREFIX.finditer(before):
-            last = match
-        if last is not None and not _CLAUSE_BREAK.search(before[last.end() :]):
-            return True
-    if _TRAILING_NONE.match(after):
+    before = clause_before[-40:]
+    last = None
+    for match in _NEGATION_PREFIX.finditer(before):
+        last = match
+    # Ensure no clause-breaking word sits between the cue and the phrase.
+    if last is not None and not _CLAUSE_BREAK.search(before[last.end() :]):
         return True
-    return False
+    if _LEADING_QUERY.search(before):
+        return True
+    return bool(_TRAILING_NONE.match(after) or _TRAILING_HEDGE.match(after))
+
+
+def _other_experiencer(clause_before: str, after: str) -> bool:
+    last = None
+    for match in _EXPERIENCER_BEFORE.finditer(clause_before):
+        last = match
+    if last is not None and not _PATIENT_SUBJECT.search(clause_before[last.end() :]):
+        return True
+    return bool(_EXPERIENCER_AFTER.match(after))
 
 
 def _optional_float(raw: Any) -> float | None:
@@ -452,6 +569,8 @@ def _normalize_unit(unit: str) -> str:
 
 def _parse_lab_measurement(lab: LabRecord) -> tuple[float | None, str]:
     if lab.value.strip():
+        if _CENSORED.match(lab.value):
+            return None, _normalize_unit(lab.unit)
         match = _NUMERIC.search(lab.value)
         if match is None:
             return None, _normalize_unit(lab.unit)
@@ -460,8 +579,14 @@ def _parse_lab_measurement(lab: LabRecord) -> tuple[float | None, str]:
         except ValueError:
             return None, _normalize_unit(lab.unit)
     text = lab.content
+    # Drop the test name so digits inside it ("HbA1c") are not read as the value.
+    if text.lower().lstrip().startswith(lab.test_name.lower()) and lab.test_name:
+        text = text.lstrip()[len(lab.test_name) :]
     if ":" in text:
         text = text.split(":", 1)[1]
+    text = text.lstrip(" -–—=")
+    if _CENSORED.match(text):
+        return None, _normalize_unit(lab.unit)
     match = _NUMERIC.search(text)
     if match is None:
         return None, _normalize_unit(lab.unit)
@@ -483,17 +608,19 @@ def _convert_lab_value(
     dst = _normalize_unit(to_unit)
     if not src and not dst:
         return value, ""
-    if not src:
-        src = dst
+    # Policy unit without a lab unit must not be assumed identical (e.g. 53 vs 53%).
+    if dst and not src:
+        return None
     if not dst:
         dst = src
     if src == dst:
         return value, src
-    # HbA1c IFCC (mmol/mol) ↔ NGSP (%)
+    # HbA1c IFCC (mmol/mol) ↔ NGSP (%), rounded to reporting precision so that
+    # 53 mmol/mol reads as 7.0 % (not 7.0004 %) at a "> 7 %" threshold.
     if src == "mmol/mol" and dst == "%":
-        return (0.09148 * value) + 2.152, "%"
+        return round((0.09148 * value) + 2.152, 1), "%"
     if src == "%" and dst == "mmol/mol":
-        return (value - 2.152) / 0.09148, "mmol/mol"
+        return float(round((value - 2.152) / 0.09148)), "mmol/mol"
     return None
 
 
@@ -529,9 +656,8 @@ def _compare_lab(measured: float, comparator: str, threshold: float) -> bool:
     return False
 
 
-def _snippet(text: str, phrase: str) -> str:
-    lowered = text.lower()
-    index = lowered.find(phrase.lower())
+def _snippet(text: str, phrase: str, at: int | None = None) -> str:
+    index = at if at is not None else text.lower().find(phrase.lower())
     if index < 0:
         return text.strip()[:240]
     line_start = text.rfind("\n", 0, index) + 1

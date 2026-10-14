@@ -1,5 +1,5 @@
 import { Navigate, NavLink, Route, Routes } from "react-router-dom";
-import { FOOTER_DISCLAIMER } from "./api";
+import { FOOTER_DISCLAIMER, deploymentBannerText } from "./api";
 import { HelpChat } from "./components/HelpChat";
 import { facilityOptions, useRole, type DeskRole, type FacilityType } from "./roleContext";
 import { AuthorizationPage } from "./pages/Authorization";
@@ -23,6 +23,7 @@ export function App() {
     signedInSubject,
     authMode,
     loadingAuth,
+    deployment,
   } = useRole();
 
   if (loadingAuth) {
@@ -40,6 +41,16 @@ export function App() {
       <a className="skip-link" href="#main-content">
         Skip to main content
       </a>
+      {deployment ? (
+        <div
+          className={`deployment-banner deployment-banner-${deployment.mode}`}
+          role="status"
+          aria-live="polite"
+          data-mode={deployment.mode}
+        >
+          {deploymentBannerText(deployment)}
+        </div>
+      ) : null}
       <header className="topbar">
         <div className="topbar-inner">
           <NavLink to="/" className="brand" end>

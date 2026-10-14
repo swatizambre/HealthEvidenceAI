@@ -12,6 +12,11 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.26 /uv /usr/local/bin/uv
 COPY pyproject.toml README.md uv.lock ./
 COPY app ./app
 RUN uv sync --frozen --no-dev --no-editable
+# Alembic scripts: pilot / shared-live boot runs `alembic upgrade head` and fails closed
+# without them. evaluation/: gold gate result for `python -m app.cli.go_live_check`.
+COPY alembic.ini ./
+COPY alembic ./alembic
+COPY evaluation ./evaluation
 
 ENV PATH="/app/.venv/bin:$PATH"
 

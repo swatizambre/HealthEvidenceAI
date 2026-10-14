@@ -97,6 +97,8 @@ def invoke_tool(
         else:
             # Opening a pause is fine for care team; final decisions are senior-only.
             arguments["decision"] = "pending"
+        # Attribute the audit row to the authenticated senior/caller, not a generic label.
+        arguments["actor"] = str(getattr(principal, "subject", None) or "care_team")[:64]
     patient_code = _patient_code_for_tool(db, payload.tool_name, arguments)
     if patient_code:
         enforce_patient_access(request, patient_code, db, action=f"mcp_{payload.tool_name}")

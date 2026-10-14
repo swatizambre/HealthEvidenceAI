@@ -7,8 +7,8 @@ from typing import Any
 
 PROTOTYPE_BANNER = "Not for clinical use or diagnosis."
 DISCLAIMER = (
-    "This output is AI-generated decision support. It is not a diagnosis or clinical decision. "
-    "Human review is required."
+    "This output is decision support for prior-auth paperwork (rule check and/or optional AI). "
+    "It is not a diagnosis or clinical decision. Human review is required."
 )
 
 AUTONOMOUS_DECISION_VALUES = frozenset(

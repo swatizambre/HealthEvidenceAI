@@ -97,7 +97,11 @@ def auth_capabilities(request: Request) -> dict[str, object]:
         "demo_signin_allowed": settings.dev_token_allowed(),
         "enforce_org_scope": settings.org_scope_enforced(),
         "docs_exposed": settings.docs_exposed(),
+        # PHI live desks require a stored consent (consent_id or inline new-patient consent).
+        "phi_live": not settings.hospital_practice_mode(),
+        "consent_mode": "stored_required" if not settings.hospital_practice_mode() else "attestation",
         "ai": describe_ai_scope(settings),
+        "deployment": settings.deployment_banner(),
     }
 
 

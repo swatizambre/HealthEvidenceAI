@@ -39,7 +39,11 @@ def test_gemini_complete_report_uses_generate_content(monkeypatch: pytest.Monkey
 
     def fake_post(url: str, **kwargs: object) -> FakeResponse:
         assert url.endswith("/models/gemini-3.1-flash-lite:generateContent")
-        assert kwargs["params"] == {"key": "test-key"}
+        assert "params" not in kwargs
+        assert "key=" not in url
+        headers = kwargs["headers"]
+        assert isinstance(headers, dict)
+        assert headers["x-goog-api-key"] == "test-key"
         body = kwargs["json"]
         assert isinstance(body, dict)
         assert "contents" in body
@@ -51,6 +55,25 @@ def test_gemini_complete_report_uses_generate_content(monkeypatch: pytest.Monkey
     assert provider.chat_api == "google_genai"
     text = provider.complete_report("Summarize", ["SUPPORTED=5"])
     assert "Grounded summary" in text
+
+
+def test_gemini_error_redacts_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = Settings(
+        llm_provider="gemini",
+        gemini_api_key="AIzaSyFAKEKEYFAKEKEYFAKEKEY",
+        gemini_model_name="gemini-3.1-flash-lite",
+        model_name="",
+    )
+
+    def fake_post(url: str, **kwargs: object) -> object:
+        del kwargs
+        raise httpx.ConnectError(f"boom {url}?key=AIzaSyFAKEKEYFAKEKEYFAKEKEY")
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    provider = build_llm(settings)
+    with pytest.raises(LLMUnavailable) as excinfo:
+        provider.complete_report("Summarize", ["SUPPORTED=5"])
+    assert "AIzaSyFAKEKEY" not in str(excinfo.value.message)
 
 
 def test_ollama_uses_chat_api_not_genai(monkeypatch: pytest.MonkeyPatch) -> None:

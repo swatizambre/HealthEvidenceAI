@@ -23,4 +23,19 @@ data:
   ENABLE_TRACING: "true"
   DEFAULT_LOCALE: "en"
   SUPPORTED_LOCALES: "en,es,fr,de,pt,hi,ar,zh,ja"
+  # In-process limiter is per pod: effective ceiling = limit x replicas.
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_AUTH_PER_MINUTE: "20"
+  RATE_LIMIT_INGEST_PER_MINUTE: "120"
+  RATE_LIMIT_SEARCH_PER_MINUTE: "120"
+  # Ingress appends the client IP to X-Forwarded-For; trust it for anonymous keys.
+  RATE_LIMIT_TRUST_PROXY_HEADERS: "true"
   CORS_ORIGINS: "https://healthevidence.example.com"
+  # Real-data trial attestations (required only when ALLOW_PHI and
+  # PHI_PROGRAM_ATTESTED are both "true"; see docs/GO_LIVE.md). Non-secret references.
+  TRIAL_ETHICS_APPROVAL_REF: ""
+  SECURITY_ASSESSMENT_REF: ""
+  BREACH_RUNBOOK_URL: ""
+  DATA_RESIDENCY_REGION: "global"
+  TRIAL_SITE_ORG_CODE: ""
+  TRIAL_END_DATE: ""

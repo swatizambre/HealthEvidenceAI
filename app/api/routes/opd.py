@@ -6,10 +6,11 @@ from sqlalchemy.orm import Session
 from app.api.deps import enforce_patient_write, get_db, get_principal, require_any_role
 from app.auth.oidc import AuthPrincipal
 from app.auth.rbac import ROLES_CHART_WRITE
+from app.core.exceptions import AppError
 from app.schemas.api import OpdFhirIngestRequest, OpdIngestRequest, OpdIngestResponse
 from app.services.fhir_opd import fhir_bundle_to_opd_request
 from app.services.opd_ingest import ingest_opd_packet
-from app.services.org_scope import resolve_org_id
+from app.services.org_scope import org_scope_active, resolve_org_id
 from app.services.realtime import publish_desk_event
 
 router = APIRouter(prefix="/opd", tags=["opd"])
@@ -18,8 +19,21 @@ router = APIRouter(prefix="/opd", tags=["opd"])
 def _ingest_org_id(request: Request, db: Session) -> str | None:
     principal = get_principal(request)
     if principal is None:
+        if org_scope_active(request.app.state.settings):
+            raise AppError(
+                "ORG_SCOPE_REQUIRED",
+                "OPD ingest requires an authenticated organization binding when org scope is on.",
+                403,
+            )
         return None
-    return resolve_org_id(db, principal)
+    org_id = resolve_org_id(db, principal)
+    if org_id is None and org_scope_active(request.app.state.settings):
+        raise AppError(
+            "ORG_SCOPE_REQUIRED",
+            "OPD ingest requires an organization binding (org_id or org_code claim).",
+            403,
+        )
+    return org_id
 
 
 @router.post("/ingest", response_model=OpdIngestResponse)
@@ -37,10 +51,10 @@ def create_opd_ingest(
     elif scoped and not payload.patient_id:
         payload = payload.model_copy(update={"patient_id": scoped})
     org_id = _ingest_org_id(request, db)
-    result = ingest_opd_packet(db, payload, org_id=org_id)
-    response.status_code = status.HTTP_201_CREATED if result.created else status.HTTP_200_OK
     principal = get_principal(request)
     actor = getattr(principal, "subject", None) if principal else "care-team"
+    result = ingest_opd_packet(db, payload, org_id=org_id, actor=str(actor or "care-team"))
+    response.status_code = status.HTTP_201_CREATED if result.created else status.HTTP_200_OK
     publish_desk_event(
         "visit_note_saved",
         org_id=org_id,
@@ -66,9 +80,9 @@ def create_opd_ingest_fhir(
     if scoped:
         mapped = mapped.model_copy(update={"patient_id": scoped})
     org_id = _ingest_org_id(request, db)
-    result = ingest_opd_packet(db, mapped, org_id=org_id)
-    response.status_code = status.HTTP_201_CREATED if result.created else status.HTTP_200_OK
     actor = getattr(get_principal(request), "subject", None) if get_principal(request) else "care-team"
+    result = ingest_opd_packet(db, mapped, org_id=org_id, actor=str(actor or "care-team"))
+    response.status_code = status.HTTP_201_CREATED if result.created else status.HTTP_200_OK
     publish_desk_event(
         "visit_note_saved",
         org_id=org_id,

@@ -1,4 +1,4 @@
-.PHONY: setup sync seed demo test coverage lint typecheck frontend launch launch-check eval-rag eval-agent mcp-server pilot-up pilot-oidc-up pilot-gate demo-up demo-gate quality-gate e2e-smoke
+.PHONY: setup sync seed demo test coverage lint typecheck frontend launch launch-check eval-rag eval-agent eval-gold mcp-server pilot-up pilot-oidc-up pilot-gate demo-up demo-gate quality-gate e2e-smoke go-live-check eval-gold-report
 
 setup: sync
 	uv run python -m app.cli.seed
@@ -35,6 +35,20 @@ eval-rag:
 eval-agent:
 	uv run python -m evaluation.run_agent
 
+eval-gold:
+	uv run python -m evaluation.run_gold --path rules
+
+eval-gold-report:
+	uv run python -m evaluation.run_gold --path rules --out data/gold_gate_result.json
+
+# Configuration gate before a demo or a real-data trial (docs/GO_LIVE.md).
+#   make go-live-check MODE=demo
+#   make go-live-check MODE=trial            # add GO_LIVE_FLAGS=--offline to skip IdP probe
+MODE ?= demo
+GO_LIVE_FLAGS ?=
+go-live-check:
+	uv run python -m app.cli.go_live_check --mode $(MODE) $(GO_LIVE_FLAGS)
+
 mcp-server:
 	uv run python -m app.mcp.server
 
@@ -47,6 +61,7 @@ launch:
 launch-check:
 	uv run pytest -q
 	cd frontend && npm run build
+	uv run python -m app.cli.go_live_check --mode demo --offline --skip-db
 	@echo "Launch gate OK — see docs/LAUNCH.md"
 
 PILOT_DATABASE_URL ?= postgresql+psycopg://healthevidence:healthevidence@127.0.0.1:5432/healthevidence
@@ -54,9 +69,11 @@ HE_API_BASE ?= http://127.0.0.1:8000
 HE_WEB_BASE ?= http://127.0.0.1:3000
 
 pilot-up:
+	@test -n "$$STREAM_TICKET_SECRET" || grep -Eq '^STREAM_TICKET_SECRET=.{32,}' .env 2>/dev/null || (echo "Set STREAM_TICKET_SECRET (>=32 chars) in your shell or .env before pilot-up — e.g. export STREAM_TICKET_SECRET=\$$(openssl rand -hex 24)" && exit 1)
 	docker compose -f docker-compose.yml -f docker-compose.pilot.yml up --build -d
 
 pilot-oidc-up:
+	@test -n "$$STREAM_TICKET_SECRET" || grep -Eq '^STREAM_TICKET_SECRET=.{32,}' .env 2>/dev/null || (echo "Set STREAM_TICKET_SECRET (>=32 chars) in your shell or .env before pilot-oidc-up — e.g. export STREAM_TICKET_SECRET=\$$(openssl rand -hex 24)" && exit 1)
 	docker compose -f docker-compose.yml -f docker-compose.pilot.yml -f docker-compose.oidc.yml up --build -d
 
 pilot-gate:
@@ -65,6 +82,7 @@ pilot-gate:
 	@echo "Pilot gate OK — see docs/PILOT_ROADMAP.md and docs/OIDC_PILOT.md"
 
 demo-up:
+	@test -n "$$DEV_JWT_SECRET" || grep -Eq '^DEV_JWT_SECRET=.{32,}' .env 2>/dev/null || (echo "Set DEV_JWT_SECRET (>=32 chars) in your shell or .env before demo-up — e.g. export DEV_JWT_SECRET=\$$(openssl rand -hex 24)" && exit 1)
 	docker compose -f docker-compose.yml -f docker-compose.pilot.yml -f docker-compose.demo.yml up --build -d
 
 demo-gate:
@@ -83,5 +101,6 @@ quality-gate:
 	uv run mypy .
 	uv run coverage run -m pytest -q
 	uv run coverage report --fail-under=80
+	uv run python -m evaluation.run_gold --path rules
 	cd frontend && npm run build
 	@echo "Quality gate OK (start API then make demo-gate for live API)"

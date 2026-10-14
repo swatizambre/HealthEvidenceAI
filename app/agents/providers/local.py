@@ -1,8 +1,8 @@
 """Always-on grounded phrasing provider (no external network).
 
 Used so the authorization pipeline stays runnable when cloud/local LLM
-daemons are unavailable. Clinical scoring uses grounded rule intelligence
-over source text as an offline AI-primary fallback.
+daemons are unavailable. Clinical scoring is the deterministic rule engine
+over source text — this provider does not call a model.
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ class LocalGroundedProvider:
         return (
             f"Chart check summary: {supported}/{total} checklist items were found in the chart. "
             f"Highlights: {bullets}. "
-            "Prepared with AI assist over the stored chart (synthetic demo data). "
+            "Prepared with rule check over the stored chart (synthetic demo data). "
             "This is decision support for paperwork — not a clinical decision."
         )
 
@@ -79,7 +79,7 @@ class LocalGroundedProvider:
             retrieved_hits=retrieved_hits,
         )
         for item in scored:
-            item.reason = f"AI chart check: {item.reason}"
+            item.reason = f"Rule check: {item.reason}"
         return scored
 
 

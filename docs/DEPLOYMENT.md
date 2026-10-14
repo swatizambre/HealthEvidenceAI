@@ -21,14 +21,14 @@ Validated in `app/core/config.py` (`validate_live_configuration`):
 |---------|---------|
 | `docker compose up --build` | Base: Postgres + Ollama + API + frontend |
 | `… -f docker-compose.pilot.yml` | `ENVIRONMENT=pilot`, Postgres URL |
-| `… -f docker-compose.demo.yml` | Sales demo: synthetic PHI flags off, seed on |
+| `… -f docker-compose.demo.yml` | Sales demo: `ENVIRONMENT=local` + `dev-jwt` (set `DEV_JWT_SECRET`), synthetic seed |
 | `… -f docker-compose.staging.yml` | Staging: OIDC required |
 | `… -f docker-compose.oidc.yml` | Local Keycloak + realm import |
 
 Make targets:
 
 ```bash
-make demo-up      # pilot + demo overlays
+make demo-up      # Postgres + demo overlay (requires DEV_JWT_SECRET)
 make pilot-up
 make pilot-oidc-up
 make demo-gate    # pytest + personas + live smoke (API up)

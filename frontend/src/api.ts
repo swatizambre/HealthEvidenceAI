@@ -244,13 +244,32 @@ export function clearAuthToken(): void {
   tokenPromise = null;
 }
 
-/** Current bearer for SSE EventSource (query param) — mint if needed. */
+/** Current bearer for the signed-in desk — mint if needed. */
 export async function getAccessToken(): Promise<string | null> {
   try {
     return await ensureDevToken();
   } catch {
     return cachedToken;
   }
+}
+
+/**
+ * Short-lived (~60 s), single-use SSE ticket. EventSource cannot send an
+ * Authorization header, so the bearer token never goes into the stream URL.
+ * Returns null when auth is off (the stream then needs no credential).
+ */
+export async function getStreamTicket(): Promise<string | null> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token = await getAccessToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  const response = await fetch("/api/v1/events/stream-ticket", { method: "POST", headers });
+  if (!response.ok) {
+    throw new Error(`Stream ticket request failed (${response.status})`);
+  }
+  const body = (await response.json()) as { ticket?: string };
+  return typeof body.ticket === "string" && body.ticket ? body.ticket : null;
 }
 
 async function ensureDevToken(): Promise<string | null> {
@@ -371,6 +390,9 @@ function friendlyApiMessage(
   if (errorCode === "ORG_SCOPE_FORBIDDEN") {
     return "This chart belongs to another facility.";
   }
+  if (errorCode === "CONSENT_REQUIRED") {
+    return raw || "A recorded, active patient consent is required before saving this visit.";
+  }
   if (raw) {
     return raw;
   }
@@ -390,13 +412,43 @@ export interface AuthMe {
   enforce_org_scope: boolean;
 }
 
-/** Public capabilities for chrome (demo sign-in vs OIDC identity). */
-export async function getAuthCapabilities(): Promise<{
+/** Deployment mode banner contract (server: Settings.deployment_banner). */
+export type DeploymentMode = "demo" | "trial" | "practice";
+
+export interface DeploymentInfo {
+  mode: DeploymentMode;
+  trial_site_org_code: string;
+  trial_end_date: string;
+  banner: string;
+}
+
+/** Text shown in the always-visible top banner for each deployment mode. */
+export function deploymentBannerText(info: DeploymentInfo): string {
+  // Server text is authoritative (it knows when a real-data trial has ended).
+  if (info.banner) {
+    return info.banner;
+  }
+  if (info.mode === "trial") {
+    const site = info.trial_site_org_code || "unconfigured site";
+    const until = info.trial_end_date || "unset date";
+    return `REAL-DATA TRIAL — ${site} until ${until}`;
+  }
+  if (info.mode === "demo") {
+    return "DEMO — synthetic data";
+  }
+  return "PRACTICE — synthetic / consented test data only";
+}
+
+export interface AuthCapabilities {
   auth_mode: string;
   demo_signin_allowed: boolean;
   enforce_org_scope: boolean;
   docs_exposed: boolean;
-}> {
+  deployment: DeploymentInfo | null;
+}
+
+/** Public capabilities for chrome (demo sign-in vs OIDC identity). */
+export async function getAuthCapabilities(): Promise<AuthCapabilities> {
   const response = await fetch("/api/v1/auth/capabilities");
   if (!response.ok) {
     return {
@@ -404,13 +456,16 @@ export async function getAuthCapabilities(): Promise<{
       demo_signin_allowed: true,
       enforce_org_scope: false,
       docs_exposed: true,
+      deployment: null,
     };
   }
-  return (await response.json()) as {
-    auth_mode: string;
-    demo_signin_allowed: boolean;
-    enforce_org_scope: boolean;
-    docs_exposed: boolean;
+  const body = (await response.json()) as Partial<AuthCapabilities>;
+  return {
+    auth_mode: body.auth_mode ?? "dev-jwt",
+    demo_signin_allowed: body.demo_signin_allowed ?? true,
+    enforce_org_scope: body.enforce_org_scope ?? false,
+    docs_exposed: body.docs_exposed ?? false,
+    deployment: body.deployment ?? null,
   };
 }
 
@@ -853,6 +908,7 @@ export interface OpdIngestResult {
   case_id: string | null;
   created: boolean;
   source?: string;
+  consent_id?: string | null;
   disclaimer: string;
 }
 
@@ -888,6 +944,8 @@ export type OpdIngestBody = {
   source?: "opd_manual" | "opd_export" | "his_export" | "fhir_r4" | "hl7_mapped";
   synthetic: boolean;
   consent_attested: boolean;
+  consent_id?: string;
+  consent?: ConsentInput;
 };
 
 export function getPolicies(): Promise<{ policies: PolicySummary[]; total: number }> {
@@ -956,6 +1014,9 @@ export function ingestOpdFhir(body: {
   policy_id?: string;
   synthetic: boolean;
   consent_attested: boolean;
+  consent_id?: string;
+  consent?: ConsentInput;
+  patient_id?: string;
 }): Promise<OpdIngestResult> {
   return request("/api/v1/opd/ingest/fhir", {
     method: "POST",
@@ -1022,4 +1083,153 @@ export function askHelp(
       policy_id: options?.policy_id,
     }),
   });
+}
+
+/* ---------- Consent records & patient rights (DPDP / HIPAA) ---------- */
+
+export type ConsentPurpose = "prior_auth_evidence" | "continuity_of_care" | "research_trial";
+export type ConsentMethod = "written" | "electronic" | "verbal_witnessed";
+
+export interface ConsentInput {
+  purpose: ConsentPurpose;
+  method: ConsentMethod;
+  notice_version: string;
+  granted_by_name: string;
+  language?: string;
+  scope?: string;
+  evidence_ref?: string;
+  granted_at?: string;
+  expires_at?: string;
+}
+
+export interface ConsentRecord {
+  consent_id: string;
+  patient_id: string;
+  purpose: string;
+  scope: string;
+  method: string;
+  language: string;
+  notice_version: string;
+  granted_by_name: string;
+  recorded_by: string;
+  granted_at: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+  revoked_reason: string;
+  evidence_ref: string;
+  created_at: string;
+  active: boolean;
+}
+
+export interface ConsentList {
+  patient_id: string;
+  consents: ConsentRecord[];
+  total: number;
+}
+
+export function listConsents(patientId: string): Promise<ConsentList> {
+  return request(`/api/v1/patients/${encodeURIComponent(patientId)}/consents`);
+}
+
+export function recordConsent(patientId: string, body: ConsentInput): Promise<ConsentRecord> {
+  return request(`/api/v1/patients/${encodeURIComponent(patientId)}/consents`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function revokeConsent(
+  patientId: string,
+  consentId: string,
+  reason: string,
+): Promise<ConsentRecord> {
+  const path =
+    `/api/v1/patients/${encodeURIComponent(patientId)}` +
+    `/consents/${encodeURIComponent(consentId)}/revoke`;
+  return request(path, { method: "POST", body: JSON.stringify({ reason }) });
+}
+
+/** Consent policy for visit ingest: "stored_required" on attested PHI desks. */
+export interface ConsentCapabilities {
+  phi_live: boolean;
+  consent_mode: "stored_required" | "attestation";
+}
+
+export async function getConsentCapabilities(): Promise<ConsentCapabilities> {
+  try {
+    const response = await fetch("/api/v1/auth/capabilities");
+    if (!response.ok) {
+      return { phi_live: false, consent_mode: "attestation" };
+    }
+    const body = (await response.json()) as Partial<ConsentCapabilities>;
+    return {
+      phi_live: Boolean(body.phi_live),
+      consent_mode: body.consent_mode === "stored_required" ? "stored_required" : "attestation",
+    };
+  } catch {
+    return { phi_live: false, consent_mode: "attestation" };
+  }
+}
+
+export interface AccessLogEntry {
+  event_id: string;
+  occurred_at: string;
+  actor_label: string;
+  actor_category:
+    | "you"
+    | "care_team"
+    | "care_team_emergency"
+    | "system"
+    | "other_patient"
+    | "unknown";
+  action: string;
+  action_label: string;
+  outcome: "allowed" | "denied";
+}
+
+export interface AccessLog {
+  patient_id: string;
+  total: number;
+  limit: number;
+  offset: number;
+  entries: AccessLogEntry[];
+  disclaimer: string;
+}
+
+export function getMyAccessLog(options?: { limit?: number; offset?: number }): Promise<AccessLog> {
+  const params = new URLSearchParams();
+  params.set("limit", String(options?.limit ?? 20));
+  params.set("offset", String(options?.offset ?? 0));
+  return request(`/api/v1/me/access-log?${params.toString()}`);
+}
+
+/** Full JSON copy of the signed-in patient's own record. */
+export function getMyExport(): Promise<Record<string, unknown> & { generated_at: string }> {
+  return request("/api/v1/me/export");
+}
+
+export type DataSubjectRequestType = "correction" | "erasure" | "grievance" | "nominee";
+
+export interface DataSubjectRequest {
+  request_id: string;
+  patient_id: string;
+  request_type: string;
+  details: string;
+  status: string;
+  created_at: string;
+  resolved_at: string | null;
+  resolution_note: string;
+  outcome: string;
+  handled_by: string | null;
+}
+
+export function getMyRequests(): Promise<{ total: number; requests: DataSubjectRequest[] }> {
+  return request("/api/v1/me/requests");
+}
+
+export function createMyRequest(body: {
+  request_type: DataSubjectRequestType;
+  details: string;
+}): Promise<DataSubjectRequest> {
+  return request("/api/v1/me/requests", { method: "POST", body: JSON.stringify(body) });
 }

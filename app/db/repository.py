@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from app.models import (
@@ -26,30 +26,31 @@ _CODE = re.compile(r"^([A-Z]+)-(\d+)$")
 
 
 def next_public_code(session: Session, column: InstrumentedAttribute[str], prefix: str) -> str:
-    """Allocate the next zero-padded public code (collision-resistant under concurrency)."""
-    import secrets
-
-    # Prefer a locked max read when the dialect supports it (Postgres).
-    try:
-        statement = select(column).execution_options(populate_existing=True)
-        values = list(session.scalars(statement.with_for_update(read=True)).all())
-    except Exception:  # noqa: BLE001 — SQLite / dialects without FOR UPDATE
-        values = list(session.scalars(select(column)).all())
+    """Allocate the next zero-padded public code (serialized per prefix on PostgreSQL)."""
+    if _dialect_name(session) == "postgresql":
+        # Transaction-scoped advisory lock keyed on the prefix: concurrent allocators for
+        # the same prefix (e.g. two OPD ingests minting NOTE-xxxxxx) queue here until the
+        # holder commits, so they never read the same max. Unlike FOR SHARE on the whole
+        # column, it does not lock table rows and different prefixes do not contend.
+        session.execute(text("SELECT pg_advisory_xact_lock(hashtext(:prefix))"), {"prefix": prefix})
+    # SQLite serializes writers at the database level; a plain read is sufficient there.
+    values = list(session.scalars(select(column).where(column.like(f"{prefix}-%"))).all())
     highest = 0
-    existing = set()
     for value in values:
         if not isinstance(value, str):
             continue
-        existing.add(value)
         match = _CODE.fullmatch(value)
         if match and match.group(1) == prefix:
             highest = max(highest, int(match.group(2)))
-    for offset in range(0, 64):
-        candidate = f"{prefix}-{highest + 1 + offset:06d}"
-        if candidate not in existing:
-            return candidate
-    # Extremely unlikely fallback — still unique within the prefix namespace.
-    return f"{prefix}-{highest + 1:06d}-{secrets.token_hex(3).upper()}"
+    # max + 1 is never taken, and always matches the PREFIX-NNNNNN schema patterns.
+    return f"{prefix}-{highest + 1:06d}"
+
+
+def _dialect_name(session: Session) -> str:
+    try:
+        return str(session.get_bind().dialect.name)
+    except Exception:  # noqa: BLE001 — unbound session: treat as generic dialect
+        return ""
 
 
 def count_rows(session: Session, model: type[object]) -> int:

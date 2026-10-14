@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import enforce_patient_write, get_db, get_principal, require_any_role
 from app.auth.oidc import AuthPrincipal
 from app.auth.rbac import ROLES_CHART_WRITE, ROLES_PACKET_PREP
+from app.core.exceptions import AppError
 from app.schemas.api import (
     HospitalFhirPipelineRequest,
     HospitalHisPipelineRequest,
@@ -23,16 +24,31 @@ from app.services.hospital_pipeline import (
     run_his_visit,
     simulate_visit,
 )
-from app.services.org_scope import resolve_org_id
+from app.services.org_scope import org_scope_active, resolve_org_id
 
 router = APIRouter(prefix="/hospital", tags=["hospital"])
 
 
 def _org_id(request: Request, db: Session) -> str | None:
+    """Org for hospital-feed writes; never fall back to the default org under org scope."""
     principal = get_principal(request)
+    scoped = org_scope_active(request.app.state.settings)
     if principal is None:
+        if scoped:
+            raise AppError(
+                "ORG_SCOPE_REQUIRED",
+                "Hospital feed requires an authenticated organization binding when org scope is on.",
+                403,
+            )
         return None
-    return resolve_org_id(db, principal)
+    org_id = resolve_org_id(db, principal)
+    if org_id is None and scoped:
+        raise AppError(
+            "ORG_SCOPE_REQUIRED",
+            "Hospital feed requires a known organization (per-org interface key or org claim).",
+            403,
+        )
+    return org_id
 
 
 def _actor(request: Request) -> str:

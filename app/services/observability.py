@@ -44,6 +44,7 @@ _COUNTERS: dict[str, float] = {
     "review_runs_error_total": 0.0,
     "agent_span_total": 0.0,
     "agent_span_latency_ms_sum": 0.0,
+    "audit_durable_write_failures_total": 0.0,
 }
 
 
@@ -98,8 +99,10 @@ def _export_span(span: SpanRecord) -> None:
             if os.environ.get("HE_TRACE_LOG", "").lower() in {"1", "true", "yes"}:
                 logger.info("agent_span_local_only %s", json.dumps(asdict(span), default=str))
             return
-    except Exception:  # noqa: BLE001 — never fail the desk for settings lookup
-        pass
+    except Exception:  # noqa: BLE001 — fail closed: never export when the PHI gate is unknown
+        if os.environ.get("HE_TRACE_LOG", "").lower() in {"1", "true", "yes"}:
+            logger.info("agent_span_local_only %s", json.dumps(asdict(span), default=str))
+        return
     endpoint = (os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT") or "").strip()
     langfuse_host = (os.environ.get("LANGFUSE_HOST") or "").strip()
     payload = asdict(span)
@@ -179,5 +182,9 @@ def prometheus_text() -> str:
         "# HELP healthevidence_review_runs_error_total Agent spans marked error.",
         "# TYPE healthevidence_review_runs_error_total counter",
         f"healthevidence_review_runs_error_total {counters.get('review_runs_error_total', 0.0)}",
+        "# HELP healthevidence_audit_durable_write_failures_total Durable audit rows that failed to commit.",
+        "# TYPE healthevidence_audit_durable_write_failures_total counter",
+        "healthevidence_audit_durable_write_failures_total "
+        f"{counters.get('audit_durable_write_failures_total', 0.0)}",
     ]
     return "\n".join(lines) + "\n"

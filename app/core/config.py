@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+from datetime import UTC, date, datetime
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -80,10 +82,38 @@ class Settings(BaseSettings):
     # Hospital interface simulator (POST /hospital/pipeline/simulate).
     # Unset → allowed only on local/test/pilot practice desks; off in shared live.
     hospital_allow_simulate: bool | None = None
-    # Shared secret for HIS/FHIR machine clients (header X-Hospital-Api-Key).
+    # Legacy single shared secret for HIS/FHIR machine clients (header X-Hospital-Api-Key).
+    # Carries no org binding, so it is only accepted while org scope is NOT enforced.
     hospital_interface_api_key: str = ""
+    # Per-org interface keys: "ORG-000001:key1,ORG-000002:key2" (each key >= 32 chars).
+    # A matched key authenticates as subject "hospital-interface:<ORG>" bound to that org.
+    hospital_interface_keys: str = ""
+    # HMAC secret for short-lived SSE stream tickets (>= 32 chars; required in pilot/live).
+    # Empty → falls back to the dev-JWT secret on local/test laptops only.
+    stream_ticket_secret: str = ""
+    stream_ticket_ttl_seconds: int = 60
+    # HMAC key for patient-facing staff pseudonyms in access logs (>= 32 chars in real-data
+    # trials). Keyed so a patient cannot recover a staff email by hashing guesses.
+    staff_pseudonym_secret: str = ""
+    # In-process (per-replica) sliding-window rate limiting. Unset → on everywhere except
+    # ENVIRONMENT=test. Limits are requests per minute per client IP or principal.
+    rate_limit_enabled: bool | None = None
+    rate_limit_auth_per_minute: int = 20
+    rate_limit_ingest_per_minute: int = 120
+    rate_limit_search_per_minute: int = 120
+    # Behind a trusted ingress: key anonymous clients by the last X-Forwarded-For hop.
+    rate_limit_trust_proxy_headers: bool = False
     # Desk SLA for open evidence packs (minutes). Breach flags Today / ops metrics.
     packet_sla_minutes: int = 240
+    # Real-data trial attestations (required when ALLOW_PHI + PHI_PROGRAM_ATTESTED).
+    # These are references to signed, human-owned artefacts — the app only checks
+    # that they are recorded, never that the underlying approval is valid.
+    trial_ethics_approval_ref: str = ""  # IEC / IRB approval number
+    dpo_contact: str = ""  # Data protection officer / grievance officer contact
+    security_assessment_ref: str = ""  # VAPT / pen-test report id
+    breach_runbook_url: str = ""  # Incident & breach response runbook location
+    trial_site_org_code: str = ""  # The single organizations.org_code in the trial
+    trial_end_date: str = ""  # ISO date (YYYY-MM-DD); trial stops after this day
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -102,12 +132,168 @@ class Settings(BaseSettings):
         """True until PHI program is attested — synthetic/consent feeds only."""
         return not (self.allow_phi and self.phi_program_attested)
 
+    def real_data_mode(self) -> bool:
+        """ALLOW_PHI + PHI_PROGRAM_ATTESTED: real patient data may be stored."""
+        return bool(self.allow_phi and self.phi_program_attested)
+
+    def deployment_mode(self) -> str:
+        """Operator-facing mode for banners and /ready: demo | trial | practice."""
+        if self.real_data_mode():
+            return "trial"
+        if self.env_name() in {"local", "test", "docker"}:
+            return "demo"
+        return "practice"
+
+    def deployment_banner(self) -> dict[str, str]:
+        """Public, secret-free mode facts for /ready, capabilities, and the UI banner."""
+        mode = self.deployment_mode()
+        site = self.trial_site_org_code.strip() if mode == "trial" else ""
+        end = self.trial_end_date.strip() if mode == "trial" else ""
+        if mode == "trial" and self.trial_expired():
+            text = f"REAL-DATA TRIAL ENDED ({end or 'unset date'}) — new patient records are blocked"
+        elif mode == "trial":
+            text = f"REAL-DATA TRIAL — {site or 'unconfigured site'} until {end or 'unset date'}"
+        elif mode == "demo":
+            text = "DEMO — synthetic data"
+        else:
+            text = "PRACTICE — synthetic / consented test data only"
+        return {
+            "mode": mode,
+            "trial_site_org_code": site,
+            "trial_end_date": end,
+            "banner": text,
+        }
+
+    def trial_end(self) -> date | None:
+        raw = self.trial_end_date.strip()
+        if not raw:
+            return None
+        try:
+            return date.fromisoformat(raw)
+        except ValueError:
+            return None
+
+    def real_data_trial_problems(self, today: date | None = None) -> list[str]:
+        """Every unmet requirement for storing real patient data (empty → OK).
+
+        Applies in any ENVIRONMENT once ALLOW_PHI and PHI_PROGRAM_ATTESTED are both true.
+        """
+        if not self.real_data_mode():
+            return []
+        problems: list[str] = []
+        env = self.env_name()
+        if env not in REAL_DATA_ENVIRONMENTS:
+            problems.append(
+                f"ENVIRONMENT must be one of {', '.join(sorted(REAL_DATA_ENVIRONMENTS))} "
+                f"for real data (got {env!r})"
+            )
+        if self.auth_mode.strip().lower() != "oidc":
+            problems.append("AUTH_MODE=oidc")
+        if "postgresql" not in self.database_url.lower():
+            problems.append("DATABASE_URL must be PostgreSQL")
+        if not self.org_scope_enforced():
+            problems.append("ENFORCE_ORG_SCOPE=true")
+        if self.seed_on_startup:
+            problems.append("SEED_ON_STARTUP=false")
+        if self.synthetic_lifelong is True:
+            problems.append("SYNTHETIC_LIFELONG must not be enabled")
+        for env_var, value in (
+            ("TRIAL_ETHICS_APPROVAL_REF", self.trial_ethics_approval_ref),
+            ("DPO_CONTACT", self.dpo_contact),
+            ("SECURITY_ASSESSMENT_REF", self.security_assessment_ref),
+            ("BREACH_RUNBOOK_URL", self.breach_runbook_url),
+            ("TRIAL_SITE_ORG_CODE", self.trial_site_org_code),
+        ):
+            if not value.strip():
+                problems.append(env_var)
+        pseudonym_key = self.staff_pseudonym_secret.strip()
+        if len(pseudonym_key) < 32:
+            problems.append("STAFF_PSEUDONYM_SECRET (>= 32 chars) for patient access-log references")
+        elif pseudonym_key == self.stream_ticket_secret.strip():
+            problems.append("STAFF_PSEUDONYM_SECRET must differ from STREAM_TICKET_SECRET")
+        region = self.data_residency_region.strip().lower()
+        if not region or region == "global":
+            problems.append("DATA_RESIDENCY_REGION (a concrete region, not 'global')")
+        end = self.trial_end()
+        if not self.trial_end_date.strip():
+            problems.append("TRIAL_END_DATE (YYYY-MM-DD)")
+        elif end is None:
+            problems.append(f"TRIAL_END_DATE must be an ISO date YYYY-MM-DD (got {self.trial_end_date!r})")
+        else:
+            current = today or datetime.now(UTC).date()
+            if end < current:
+                problems.append(f"TRIAL_END_DATE {end.isoformat()} is in the past")
+        return problems
+
+    def trial_expired(self, today: date | None = None) -> bool:
+        """Real-data mode past TRIAL_END_DATE (checked at runtime, not only at boot).
+
+        A missing date is not "expired" here: the boot gate already refuses real-data
+        environments without TRIAL_END_DATE, and unit suites run PHI mode without one.
+        """
+        if not self.real_data_mode():
+            return False
+        end = self.trial_end()
+        current = today or datetime.now(UTC).date()
+        return end is not None and end < current
+
+    def validate_real_data_trial(self, today: date | None = None) -> None:
+        problems = self.real_data_trial_problems(today)
+        if problems:
+            raise AppError(
+                "LIVE_CONFIG_INVALID",
+                "Real-data trial (ALLOW_PHI + PHI_PROGRAM_ATTESTED) is missing: "
+                + "; ".join(problems)
+                + ". See docs/GO_LIVE.md.",
+                503,
+            )
+
     def hospital_simulate_allowed(self) -> bool:
         if self.hospital_allow_simulate is not None:
             return bool(self.hospital_allow_simulate)
         if not self.hospital_practice_mode():
             return False
         return self.env_name() in {"local", "test", "pilot"}
+
+    def rate_limit_active(self) -> bool:
+        """Rate limiting: on by default, off for ENVIRONMENT=test unless explicitly enabled."""
+        if self.rate_limit_enabled is not None:
+            return bool(self.rate_limit_enabled)
+        return self.env_name() != "test"
+
+    def hospital_interface_key_map(self) -> list[tuple[str, str]]:
+        """Parse HOSPITAL_INTERFACE_KEYS into (org_code, key) pairs; malformed entries skipped."""
+        pairs: list[tuple[str, str]] = []
+        for entry in self.hospital_interface_keys.split(","):
+            org_code, sep, key = entry.strip().partition(":")
+            org_code = org_code.strip().upper()
+            key = key.strip()
+            if sep and _ORG_CODE.fullmatch(org_code) and key:
+                pairs.append((org_code, key))
+        return pairs
+
+    def resolve_stream_ticket_secret(self) -> str:
+        """HMAC key for SSE stream tickets — dev-JWT fallback only on laptops / CI harness."""
+        secret = (self.stream_ticket_secret or "").strip()
+        if secret:
+            if len(secret) < 32:
+                raise AppError(
+                    "STREAM_TICKET_SECRET_REQUIRED",
+                    "STREAM_TICKET_SECRET must be at least 32 characters.",
+                    503,
+                )
+            return secret
+        # Laptop / CI desks (local, test, docker compose) reuse the dev-JWT HMAC. Pilot and
+        # shared live must configure a dedicated secret (enforced at startup as well).
+        live = self.env_name() == "pilot" or self.is_shared_live_env()
+        if not live or self.pilot_postgres_harness():
+            return self.require_dev_jwt_secret()
+        raise AppError(
+            "STREAM_TICKET_SECRET_REQUIRED",
+            "STREAM_TICKET_SECRET (at least 32 characters) is required to issue SSE stream "
+            "tickets in this environment.",
+            503,
+        )
 
     def org_scope_enforced(self) -> bool:
         """Tenant isolation: on by default outside local/test UAT."""
@@ -166,9 +352,8 @@ class Settings(BaseSettings):
     def require_dev_jwt_secret(self) -> str:
         """HMAC for dev-jwt — never a hard-coded production-shared secret."""
         secret = (self.dev_jwt_secret or self.oidc_client_secret or "").strip()
-        if not secret and (
-            self.env_name() == "test" or self.pilot_postgres_harness()
-        ):
+        # Built-in key only for ENVIRONMENT=test unit suites — never for pilot harness.
+        if not secret and self.env_name() == "test":
             return "test-only-healthevidence-hmac-do-not-reuse"
         if len(secret) < 32:
             raise AppError(
@@ -263,6 +448,13 @@ class Settings(BaseSettings):
                     503,
                 )
             harness = self.pilot_postgres_harness()
+            if harness and self.allow_phi:
+                raise AppError(
+                    "LIVE_CONFIG_INVALID",
+                    "PILOT_POSTGRES_TEST cannot be combined with ALLOW_PHI "
+                    "(harness minting must stay synthetic-only).",
+                    503,
+                )
             if auth != "oidc" and not (harness and auth == "dev-jwt"):
                 raise AppError(
                     "LIVE_CONFIG_INVALID",
@@ -355,6 +547,57 @@ class Settings(BaseSettings):
                     "LLM_PHI_EGRESS_ALLOWED (or use LLM_PROVIDER=local/ollama).",
                     503,
                 )
+        # Real-data trial checklist first so operators see every missing attestation at once.
+        self.validate_real_data_trial()
+        if env == "pilot" or self.is_shared_live_env():
+            self._validate_machine_secrets()
+
+    def _validate_machine_secrets(self) -> None:
+        """Pilot / shared live: SSE ticket secret and HIS interface keys must be strong."""
+        if not self.pilot_postgres_harness():
+            ticket_secret = (self.stream_ticket_secret or "").strip()
+            if len(ticket_secret) < 32:
+                raise AppError(
+                    "LIVE_CONFIG_INVALID",
+                    "STREAM_TICKET_SECRET must be set and at least 32 characters in pilot, "
+                    "staging, and production (SSE stream tickets).",
+                    503,
+                )
+        raw_entries = [item.strip() for item in self.hospital_interface_keys.split(",") if item.strip()]
+        pairs = self.hospital_interface_key_map()
+        if len(pairs) != len(raw_entries):
+            raise AppError(
+                "LIVE_CONFIG_INVALID",
+                "HOSPITAL_INTERFACE_KEYS must be comma-separated ORG-NNNNNN:key entries.",
+                503,
+            )
+        if any(len(key) < 32 for _, key in pairs):
+            raise AppError(
+                "LIVE_CONFIG_INVALID",
+                "Each HOSPITAL_INTERFACE_KEYS key must be at least 32 characters.",
+                503,
+            )
+        legacy = (self.hospital_interface_api_key or "").strip()
+        if legacy:
+            if self.org_scope_enforced() and not pairs:
+                raise AppError(
+                    "LIVE_CONFIG_INVALID",
+                    "HOSPITAL_INTERFACE_API_KEY has no organization binding and is rejected "
+                    "while org scope is enforced. Use HOSPITAL_INTERFACE_KEYS "
+                    "(ORG-NNNNNN:key,...) instead.",
+                    503,
+                )
+            if len(legacy) < 32:
+                raise AppError(
+                    "LIVE_CONFIG_INVALID",
+                    "HOSPITAL_INTERFACE_API_KEY must be at least 32 characters.",
+                    503,
+                )
+
+
+_ORG_CODE = re.compile(r"^ORG-\d{6}$")
+
+REAL_DATA_ENVIRONMENTS = frozenset({"pilot", "staging", "production", "prod", "kubernetes"})
 
 
 def _looks_like_ollama_tag(value: str) -> bool:

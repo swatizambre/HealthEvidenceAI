@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -12,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.a2a.handlers import register_default_handlers
 from app.api.errors import register_exception_handlers
 from app.api.middleware import AccessLogMiddleware
+from app.api.rate_limit import RateLimitMiddleware
 from app.api.routes import (
     a2a,
     ai,
@@ -30,11 +32,13 @@ from app.api.routes import (
     opd,
     patients,
     policies,
+    privacy,
     security,
     tools,
 )
 from app.auth.middleware import AuthMiddleware
 from app.core.config import get_settings
+from app.core.exceptions import AppError
 from app.core.logging import configure_logging
 from app.core.safety import DISCLAIMER, PROTOTYPE_BANNER
 from app.db.session import create_db_engine, create_session_factory, init_db, prepare_sqlite_path
@@ -53,6 +57,14 @@ def create_app() -> FastAPI:
     configure_logging(settings.log_level)
     if settings.environment.strip().lower() not in {"test"}:
         settings.validate_live_configuration()
+    elif settings.real_data_mode() and "pytest" not in sys.modules:
+        # ENVIRONMENT=test skips live gates for unit suites only; never with real patient data.
+        raise AppError(
+            "LIVE_CONFIG_INVALID",
+            "ENVIRONMENT=test cannot run with ALLOW_PHI + PHI_PROGRAM_ATTESTED outside pytest. "
+            "Use ENVIRONMENT=pilot with the real-data trial gate.",
+            503,
+        )
     prepare_sqlite_path(settings.database_url)
     engine = create_db_engine(settings.database_url)
     session_factory = create_session_factory(engine)
@@ -102,6 +114,9 @@ def create_app() -> FastAPI:
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = session_factory
+    # Starlette runs the last-added middleware first: CORS → Auth → AccessLog → RateLimit.
+    # Rate limiting sits inside Auth so per-principal groups can key on the subject.
+    app.add_middleware(RateLimitMiddleware, settings=settings)
     app.add_middleware(AccessLogMiddleware)
     app.add_middleware(AuthMiddleware, settings=settings)
     app.add_middleware(
@@ -131,6 +146,7 @@ def create_app() -> FastAPI:
         ai.router,
         meta.router,
         opd.router,
+        privacy.router,
         help.router,
     )
     for router in api_routers:

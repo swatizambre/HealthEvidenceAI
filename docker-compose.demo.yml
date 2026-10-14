@@ -1,18 +1,22 @@
 # Demo overlay (Phase 3) — sales / stakeholder walkthrough
-# Same Postgres + auth path as pilot; synthetic data only (no PHI).
+# Postgres from the pilot overlay; auth is local + dev-jwt (pilot rejects
+# mintable tokens unless PILOT_POSTGRES_TEST=1, which is not for sales demos).
 #
-# One command:
+# One command (set DEV_JWT_SECRET ≥32 chars first):
+#   export DEV_JWT_SECRET="$(openssl rand -hex 24)"   # or set in .env
 #   docker compose -f docker-compose.yml -f docker-compose.pilot.yml -f docker-compose.demo.yml up --build
 #
 # Then open http://127.0.0.1:3000 and follow docs/LAUNCH.md (Demo path).
-# Before a live demo on a shared tenant: run personas against the pilot URL
+# Before a live demo on a shared tenant: run personas against the demo URL
 #   HE_API_BASE=http://127.0.0.1:8000 python scripts/_smoke_web_api.py
 
 services:
   backend:
     environment:
-      ENVIRONMENT: pilot
+      # local + dev-jwt: mintable tokens for the desk walkthrough (not a shared pilot).
+      ENVIRONMENT: local
       AUTH_MODE: ${AUTH_MODE:-dev-jwt}
+      DEV_JWT_SECRET: ${DEV_JWT_SECRET:?Set DEV_JWT_SECRET to ≥32 characters before demo-up}
       ALLOW_PHI: "false"
       PHI_PROGRAM_ATTESTED: "false"
       ENFORCE_ORG_SCOPE: "false"

@@ -118,6 +118,8 @@ def fhir_bundle_to_opd_request(payload: OpdFhirIngestRequest) -> OpdIngestReques
         source="fhir_r4",
         synthetic=payload.synthetic,
         consent_attested=payload.consent_attested,
+        consent_id=payload.consent_id,
+        consent=payload.consent,
         sex=sex,
         birth_date=birth,
         display_name=display,

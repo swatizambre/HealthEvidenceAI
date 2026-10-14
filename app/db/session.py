@@ -81,17 +81,31 @@ def init_db(engine: Engine) -> None:
             ) from exc
 
 
-def run_alembic_upgrade() -> None:
-    """Apply pending Alembic revisions (no-op when already current)."""
-    from pathlib import Path
-
-    from alembic import command
+def _alembic_config() -> Any:
     from alembic.config import Config
 
     root = Path(__file__).resolve().parents[2]
     cfg = Config(str(root / "alembic.ini"))
     cfg.set_main_option("script_location", str(root / "alembic"))
-    command.upgrade(cfg, "head")
+    return cfg
+
+
+def run_alembic_upgrade() -> None:
+    """Apply pending Alembic revisions (no-op when already current)."""
+    from alembic import command
+
+    command.upgrade(_alembic_config(), "head")
+
+
+def alembic_revision_status(engine: Engine) -> tuple[set[str], set[str]]:
+    """Return (revisions stamped in the database, head revisions in alembic/versions)."""
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+
+    heads = set(ScriptDirectory.from_config(_alembic_config()).get_heads())
+    with engine.connect() as connection:
+        current = set(MigrationContext.configure(connection).get_current_heads())
+    return current, heads
 
 
 def ensure_authorization_case_columns(engine: Engine) -> None:
