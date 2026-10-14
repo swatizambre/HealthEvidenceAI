@@ -3,6 +3,7 @@
 from app.models.entities import (
     AuditEvent,
     AuthorizationCase,
+    CaseQuery,
     Claim,
     ClinicalNote,
     ConsentRecord,
@@ -24,6 +25,7 @@ from app.models.entities import (
 __all__ = [
     "AuditEvent",
     "AuthorizationCase",
+    "CaseQuery",
     "Claim",
     "ClinicalNote",
     "ConsentRecord",

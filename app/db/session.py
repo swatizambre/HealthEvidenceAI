@@ -149,6 +149,43 @@ def ensure_authorization_case_columns(engine: Engine) -> None:
             connection.execute(
                 text("ALTER TABLE authorization_cases ADD COLUMN assigned_to VARCHAR(120)")
             )
+        # India TPA desk fields (see alembic 20261013_0004).
+        for name, ddl in _TPA_DESK_CASE_COLUMNS:
+            if name not in names:
+                connection.execute(
+                    text(f"ALTER TABLE authorization_cases ADD COLUMN {name} {ddl}")
+                )
+
+
+_TPA_DESK_CASE_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("payer_type", "VARCHAR(16)"),
+    ("insurer_name", "VARCHAR(160) DEFAULT ''"),
+    ("tpa_name", "VARCHAR(160) DEFAULT ''"),
+    ("policy_number", "VARCHAR(64) DEFAULT ''"),
+    ("admission_type", "VARCHAR(16) DEFAULT 'planned'"),
+    ("admitted_at", "DATETIME"),
+    ("expected_discharge_at", "DATETIME"),
+    ("treating_doctor", "VARCHAR(160) DEFAULT ''"),
+    ("provisional_diagnosis", "VARCHAR(300) DEFAULT ''"),
+    ("icd10_code", "VARCHAR(16) DEFAULT ''"),
+    ("proposed_treatment", "VARCHAR(300) DEFAULT ''"),
+    ("estimated_cost_inr", "INTEGER"),
+    ("approved_amount_inr", "INTEGER"),
+    ("stage", "VARCHAR(32) DEFAULT 'draft'"),
+    ("sent_at", "DATETIME"),
+    ("decision_due_at", "DATETIME"),
+    ("approved_at", "DATETIME"),
+    ("discharge_requested_at", "DATETIME"),
+    ("final_due_at", "DATETIME"),
+    ("revised_estimate_inr", "INTEGER"),
+    ("enhancement_reason", "VARCHAR(500) DEFAULT ''"),
+    ("enhancement_requested_at", "DATETIME"),
+    ("enhancement_count", "INTEGER DEFAULT 0"),
+    ("discharge_override_reason", "VARCHAR(500) DEFAULT ''"),
+    ("closed_at", "DATETIME"),
+    ("cost_breakdown_inr", "JSON"),
+    ("form_extra", "JSON"),
+)
 
 
 def ensure_patient_org_column(engine: Engine) -> None:

@@ -184,7 +184,30 @@ _NON_CLINICAL_MARKERS: tuple[str, ...] = (
     "stress (finding)",
     "received higher education",
     "limited social contact",
+    # More Synthea social-determinant findings (also caught by "(finding)").
+    "received certificate of high school",
+    "not in labor force",
+    "criminal record",
+    "violence in the environment",
+    "intimate partner",
+    "served in armed forces",
+    "lack of access to transportation",
+    "risk activity involvement",
+    "(person)",
+    "(social concept)",
+    "(life style)",
 )
+
+
+def is_social_finding(condition: str) -> bool:
+    """Synthea social / admin finding (education, employment, stress, isolation, …)."""
+    lower = (condition or "").strip().lower()
+    return bool(lower) and any(marker in lower for marker in _NON_CLINICAL_MARKERS)
+
+
+def clinical_conditions(conditions: list[str] | tuple[str, ...] | None) -> list[str]:
+    """Conditions safe to show as clinical problems (patients list, chart, problem list)."""
+    return [str(item) for item in (conditions or []) if is_clinical_condition(str(item))]
 
 
 def is_clinical_condition(condition: str) -> bool:

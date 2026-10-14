@@ -226,6 +226,16 @@ def _sync_case_lifecycle(
         run_id=response.run_id or None,
         note=note,
     )
+    # India TPA desk: senior acknowledgment moves a draft to ready_to_send (and a fresh
+    # pause / send-back moves it back) — the stage follows the HITL record.
+    from app.services.tpa_desk import on_review_decision
+
+    on_review_decision(
+        session,
+        response.case_id,
+        decision=clinician_decision,
+        awaiting=response.awaiting_human_review,
+    )
 
 
 def _audit(
