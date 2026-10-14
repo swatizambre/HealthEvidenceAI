@@ -28,7 +28,23 @@ function yearLabel(value: string | null): string {
   return value ? value.slice(0, 4) : "Ongoing";
 }
 
-function EventRow({ event, markDemo }: { event: LifelongEvent; markDemo: boolean }) {
+/** The DEMO disclaimer is shown once at the top; strip repeats from briefs and events. */
+function withoutDisclaimer(text: string | null | undefined, disclaimer: string): string {
+  const value = (text || "").trim();
+  if (!disclaimer) return value;
+  return value.split(disclaimer).join(" ").replace(/\s{2,}/g, " ").trim();
+}
+
+function EventRow({
+  event,
+  markDemo,
+  disclaimer,
+}: {
+  event: LifelongEvent;
+  markDemo: boolean;
+  disclaimer: string;
+}) {
+  const why = withoutDisclaimer(event.why_it_matters, disclaimer);
   const labels = event.disorders ?? [];
   return (
     <li className="record-event">
@@ -43,7 +59,7 @@ function EventRow({ event, markDemo }: { event: LifelongEvent; markDemo: boolean
           {event.facility_name ? `, ${event.facility_name}` : ""}
         </p>
         {event.summary ? <p>{event.summary}</p> : null}
-        {event.why_it_matters ? <p className="muted small">Why it matters: {event.why_it_matters}</p> : null}
+        {why ? <p className="muted small">Why it matters: {why}</p> : null}
         {labels.length > 0 ? (
           <div className="chip-row" aria-label="Related to">
             {labels.map((label) => (
@@ -118,6 +134,11 @@ export function MyRecordPage() {
     summary && summary.events.some((event) => event.demo_synthetic) && summary.events.some((event) => !event.demo_synthetic),
   );
 
+  const disclaimer = (summary?.demo_synthetic_disclaimer || "").trim();
+  const brief = summary
+    ? withoutDisclaimer(isPatient ? summary.patient_brief : summary.doctor_brief, disclaimer)
+    : "";
+
   function onOpen(event: FormEvent) {
     event.preventDefault();
     if (!isPatient) setMyPatientId(patientId);
@@ -178,9 +199,7 @@ export function MyRecordPage() {
               </p>
             </div>
           </div>
-          {(isPatient ? summary.patient_brief : summary.doctor_brief) ? (
-            <p className="lead">{isPatient ? summary.patient_brief : summary.doctor_brief}</p>
-          ) : null}
+          {brief ? <p className="lead">{brief}</p> : null}
           {labels.length > 0 ? (
             <div className="chip-row" role="group" aria-label="Filter by health topic">
               {["all", ...labels].map((label) => (
@@ -201,7 +220,7 @@ export function MyRecordPage() {
           ) : (
             <ul className="record-events">
               {visibleEvents.map((event) => (
-                <EventRow key={event.event_id} event={event} markDemo={mixedDemo} />
+                <EventRow key={event.event_id} event={event} markDemo={mixedDemo} disclaimer={disclaimer} />
               ))}
             </ul>
           )}
