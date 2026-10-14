@@ -155,3 +155,39 @@ insurer/TPA". Never call them Medicare or US payer policies.
 - Synthetic Synthea social findings (e.g. "Received higher education", "Full-time
   employment", "(finding)" social items) are not clinical conditions and must not show
   as conditions.
+
+## Backend additions (v1.1 — additive only)
+
+Nothing above was renamed or removed. Extra fields the backend returns / accepts:
+
+- Desk cases are cases with `payer_type` set; `/desk/worklist` lists only those.
+  `stage` filter also accepts `overdue`; unknown stage → 422.
+- Worklist item: `approved_amount_inr`, `readiness_label`, `open_queries`.
+  `counts` also has `closed`.
+- Workspace `case`: `policy_id` (checklist), `checklist_title`, `procedure`,
+  `policy_last4`, `revised_estimate_inr`, `enhancement_reason`,
+  `enhancement_requested_at`, `enhancement_count`, `discharge_override_reason`,
+  `closed_at`, `cost_breakdown_inr` (`room`, `icu`, `ot`, `professional_fees`,
+  `medicines_consumables`, `investigations`, `implants`), `form_extra` (free-form
+  pre-auth fields: `room_type`, `illness_duration`, `nature_of_illness`,
+  `route_of_drug_administration`, `surgery_icd10_pcs`, `injury_date`, `injury_cause`,
+  `mlc_number`, `police_report`, `alcohol_involved`, `gpla`, `expected_delivery_date`,
+  `expected_days`, `investigations`), `assigned_to`, `last_run_id`, `created_at`,
+  `updated_at`. Workspace also has `payer_label`.
+- `review.run_id`: the review run a senior resumes with
+  `POST /authorization/review/{run_id}/resume` (senior-only; acknowledgment there moves
+  `draft → ready_to_send`, a fresh pause / send-back moves `ready_to_send → draft`).
+- `queries[]`: `raised_by`, `responded_by`.
+- `PATCH` / `POST /desk/cases` accept `cost_breakdown_inr` and `form_extra` (merged;
+  a `null` value removes a key). `POST /desk/cases` without `policy_id` picks the
+  illustrative checklist matching `proposed_treatment`. Returns 201.
+- Stage body extras: `raised_by` (record_query). Errors: invalid transition **and**
+  `mark_sent` without senior acknowledgment → 409 `STAGE_TRANSITION_INVALID`;
+  `mark_discharge_sent` with blocker findings and no `override_reason` → 409
+  `DISCHARGE_CHECK_BLOCKED`; missing action fields → 422 `VALIDATION_ERROR`.
+  After the last open query is answered the case returns to the stage it was in
+  (`sent` / `enhancement` / `discharge_sent`) and that insurer clock restarts.
+- Clocks: `prep` for `draft`/`ready_to_send` = prep start + `PACKET_SLA_MINUTES`;
+  `discharge_pending` uses `prep` with `expected_discharge_at`.
+- Pre-auth form: `case_id`, `disclaimer`; attachments carry `required`.
+- Stats: `total_cases`.
