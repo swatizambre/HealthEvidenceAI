@@ -27,6 +27,11 @@ export function formatInrPlain(value: number | null | undefined): string {
 
 export function parseDate(value: string | null | undefined): Date | null {
   if (!value) return null;
+  // Date-only values (DOB, expected delivery) are calendar days, not UTC midnights.
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (dateOnly) {
+    return new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
+  }
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }
@@ -42,6 +47,21 @@ export function formatDateTime(value: string | null | undefined): string {
     minute: "2-digit",
     hour12: false,
   });
+}
+
+/** 15 Oct 2026, 08:54 (with the year, for printed forms). */
+export function formatDateTimeLong(value: string | null | undefined): string {
+  const date = parseDate(value);
+  if (!date) return "—";
+  const day = date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  const time = date.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return `${day}, ${time}`;
+}
+
+/** "male" → "Male", "self_pay" → "Self pay". */
+export function humanize(value: string | null | undefined): string {
+  const text = (value || "").trim().replace(/_/g, " ");
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
 }
 
 /** 14 Oct 2026 */

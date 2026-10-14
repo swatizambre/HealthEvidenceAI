@@ -109,6 +109,7 @@ export function Drawer({
   children,
   footer,
   width = "md",
+  variant = "drawer",
 }: {
   open: boolean;
   title: string;
@@ -116,6 +117,8 @@ export function Drawer({
   children: ReactNode;
   footer?: ReactNode;
   width?: "md" | "lg";
+  /** "dialog" renders a centered confirm dialog (same focus handling). */
+  variant?: "drawer" | "dialog";
 }) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -168,10 +171,10 @@ export function Drawer({
   if (!open) return null;
 
   return (
-    <div className="drawer-root">
+    <div className={`drawer-root${variant === "dialog" ? " is-dialog" : ""}`}>
       <div className="drawer-scrim" onClick={onClose} aria-hidden="true" />
       <div
-        className={`drawer drawer-${width}`}
+        className={variant === "dialog" ? "dialog" : `drawer drawer-${width}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -190,4 +193,15 @@ export function Drawer({
       </div>
     </div>
   );
+}
+
+/** Centered confirm dialog for irreversible steps (focus trapped, Escape cancels). */
+export function Dialog(props: {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+  footer?: ReactNode;
+}) {
+  return <Drawer {...props} variant="dialog" />;
 }

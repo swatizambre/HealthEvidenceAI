@@ -260,8 +260,13 @@ export function documentTypeLabel(documentType: string | undefined): string {
     final_bill: "Final bill",
     bill: "Bill",
     investigation_report: "Investigation report",
+    radiology_report: "Radiology report",
+    imaging_report: "Imaging report",
     implant_invoice: "Implant invoice",
+    implant_quote: "Implant quotation",
+    anc_card: "ANC card",
     mlc: "MLC / police intimation",
+    mlc_copy: "MLC / police intimation",
     case: "Case record",
   };
   return labels[value] || "Attached document";

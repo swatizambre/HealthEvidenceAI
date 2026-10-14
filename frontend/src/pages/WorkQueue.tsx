@@ -14,7 +14,7 @@ import {
   type WorklistItem,
 } from "../deskApi";
 import { formatLiveAge, useLiveRefresh } from "../hooks/useLiveRefresh";
-import { useI18n } from "../i18n";
+import { useI18n, type Translate } from "../i18n";
 import {
   Button,
   ClockChip,
@@ -27,6 +27,7 @@ import {
   ageSex,
   clockState,
   formatInrPlain,
+  useIsPhone,
   useNow,
   type Column,
   type TabItem,
@@ -99,9 +100,48 @@ function StatTile({
 
 type Mode = "queue" | "cases";
 
+/** Phone layout: one card per case (patient + clock / treatment + insurer / stage + readiness). */
+function CaseCards({ rows, now, t }: { rows: WorklistItem[]; now: number; t: Translate }) {
+  return (
+    <ul className="card-list" aria-label={t("nav.cases")}>
+      {rows.map((row) => {
+        const state = clockState(row.clock, now);
+        const tone = state.overdue ? " is-overdue" : state.tone === "warning" ? " is-due-soon" : "";
+        const payer = [payerPrimary(row), row.tpa_name ? `via ${row.tpa_name}` : ""].filter(Boolean).join(" ");
+        return (
+          <li key={row.case_id}>
+            <Link
+              className={`list-card${tone}`}
+              to={`/cases/${encodeURIComponent(row.case_id)}`}
+              aria-label={t("queue.openCase", { id: row.case_id, name: row.patient_name || row.patient_id })}
+            >
+              <span className="list-card-line">
+                <strong className="list-card-title">{row.patient_name || row.patient_id}</strong>
+                <ClockChip clock={row.clock} />
+              </span>
+              <span className="list-card-line list-card-sub">
+                <span>{row.proposed_treatment || t("common.notRecorded")}</span>
+                <span className="muted">{payer}</span>
+              </span>
+              <span className="list-card-line">
+                <StagePill stage={row.stage} fallbackLabel={row.stage_label} />
+                <span className="list-card-meta num">
+                  {Math.round(row.readiness_percent)}%
+                  {row.open_items > 0 ? ` · ${t("queue.open", { n: row.open_items })}` : ""}
+                </span>
+              </span>
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export function WorkQueuePage({ mode }: { mode: Mode }) {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const isPhone = useIsPhone();
   const now = useNow(30_000);
   const [searchParams, setSearchParams] = useSearchParams();
   const stageParam = searchParams.get("stage") || "";
@@ -214,7 +254,7 @@ export function WorkQueuePage({ mode }: { mode: Mode }) {
       header: t("col.treatment"),
       render: (row) => (
         <div className="cell-stack">
-          <span className="cell-primary-text">{row.proposed_treatment || "Not recorded"}</span>
+          <span className="cell-primary-text">{row.proposed_treatment || t("common.notRecorded")}</span>
           <span className="cell-secondary">{row.case_id}</span>
         </div>
       ),
@@ -256,7 +296,7 @@ export function WorkQueuePage({ mode }: { mode: Mode }) {
             />
           </span>
           {row.open_items > 0 ? (
-            <span className="cell-secondary">{row.open_items} open</span>
+            <span className="cell-secondary">{t("queue.open", { n: row.open_items })}</span>
           ) : null}
         </div>
       ),
@@ -282,6 +322,33 @@ export function WorkQueuePage({ mode }: { mode: Mode }) {
   const title = mode === "queue" ? t("nav.queue") : t("nav.cases");
   const items = worklist?.items ?? [];
   const total = worklist?.total ?? 0;
+  const caption =
+    loading && !worklist
+      ? t("queue.loading")
+      : `${t(total === 1 ? "queue.countOne" : "queue.countOther", { n: total })}${stage ? ` · ${t(stageKey(stage))}` : ""}${debounced ? ` · “${debounced}”` : ""}`;
+  const emptyState = (
+    <EmptyState
+      icon="queue"
+      title={debounced ? `No cases match “${debounced}”` : stage ? `No cases in ${t(stageKey(stage))}` : t("queue.empty")}
+      action={
+        debounced || stage ? (
+          <Button
+            size="sm"
+            onClick={() => {
+              setQuery("");
+              setStage("");
+            }}
+          >
+            {t("queue.clearFilters")}
+          </Button>
+        ) : undefined
+      }
+    >
+      {debounced || stage
+        ? "Try another search or stage."
+        : "New admissions and planned procedures appear here once a case is opened from the patient chart."}
+    </EmptyState>
+  );
 
   return (
     <section className="page page-wide">
@@ -295,13 +362,11 @@ export function WorkQueuePage({ mode }: { mode: Mode }) {
             <h1 className="page-title">{title}</h1>
           )}
           <p className="page-sub">
-            {mode === "queue"
-              ? "Most urgent first: overdue, then least time left on the IRDAI clocks."
-              : "Every cashless case at this facility, including closed ones."}
+            {mode === "queue" ? t("queue.subQueue") : t("queue.subCases")}
             <span className="live-stamp">
-              {formatLiveAge(lastUpdatedAt, pushConnected)}
+              {formatLiveAge(lastUpdatedAt, pushConnected, t)}
               <button type="button" className="text-link" onClick={refreshNow}>
-                Refresh
+                {t("common.refresh")}
               </button>
             </span>
           </p>
@@ -309,13 +374,13 @@ export function WorkQueuePage({ mode }: { mode: Mode }) {
         <div className="page-actions">
           <label className="search">
             <Icon name="search" />
-            <span className="sr-only">Search cases</span>
+            <span className="sr-only">{t("queue.searchLabel")}</span>
             <input
               ref={searchRef}
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Patient, MRN, case, insurer…"
+              placeholder={t("queue.searchPlaceholder")}
               autoComplete="off"
             />
             <kbd aria-hidden="true">/</kbd>
@@ -324,7 +389,7 @@ export function WorkQueuePage({ mode }: { mode: Mode }) {
       </header>
 
       {mode === "queue" && !error?.missing ? (
-        <ul className="stat-strip" aria-label="Desk at a glance">
+        <ul className="stat-strip" aria-label={t("queue.atGlance")}>
           <StatTile value={stats?.overdue ?? null} label={t("stats.overdue")} tone="danger" />
           <StatTile value={stats?.due_within_60m ?? null} label={t("stats.due60")} tone="warning" />
           <StatTile
@@ -347,7 +412,7 @@ export function WorkQueuePage({ mode }: { mode: Mode }) {
           />
           {stats?.median_prep_minutes != null ? (
             <li className="stat-note">
-              Median prep time <strong>{stats.median_prep_minutes} min</strong>
+              {t("queue.medianPrep")} <strong>{t("queue.minutes", { n: stats.median_prep_minutes })}</strong>
             </li>
           ) : null}
         </ul>
@@ -358,7 +423,7 @@ export function WorkQueuePage({ mode }: { mode: Mode }) {
           items={tabItems}
           active={stage || "all"}
           onChange={(id) => setStage(id === "all" ? "" : id)}
-          label="Filter by stage"
+          label={t("queue.filterStage")}
           idPrefix="stage"
         />
       </div>
@@ -383,59 +448,46 @@ export function WorkQueuePage({ mode }: { mode: Mode }) {
               </>
             ) : null}
           </Notice>
+        ) : isPhone ? (
+          loading && !worklist ? (
+            <p className="muted" role="status">
+              {t("queue.loading")}
+            </p>
+          ) : items.length === 0 ? (
+            emptyState
+          ) : (
+            <>
+              <CaseCards rows={items} now={now} t={t} />
+              <p className="muted small">{caption}</p>
+            </>
+          )
         ) : (
           <DataTable
             columns={columns}
             rows={items}
             rowKey={(row) => row.case_id}
-            caption={
-              loading && !worklist
-                ? "Loading cases"
-                : `${total} case${total === 1 ? "" : "s"}${stage ? ` in ${t(stageKey(stage))}` : ""}${debounced ? ` matching “${debounced}”` : ""}`
-            }
+            caption={caption}
             loading={loading && !worklist}
             onRowActivate={(row) => navigate(`/cases/${encodeURIComponent(row.case_id)}`)}
-            rowLabel={(row) => `Open case ${row.case_id} for ${row.patient_name}`}
+            rowLabel={(row) => t("queue.openCase", { id: row.case_id, name: row.patient_name || row.patient_id })}
             rowClassName={(row) => {
               const state = clockState(row.clock, now);
               return state.overdue ? "row-overdue" : state.tone === "warning" ? "row-due-soon" : "";
             }}
-            empty={
-              <EmptyState
-                icon="queue"
-                title={debounced ? `No cases match “${debounced}”` : stage ? `No cases in ${t(stageKey(stage))}` : "No open cases"}
-                action={
-                  debounced || stage ? (
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setQuery("");
-                        setStage("");
-                      }}
-                    >
-                      Clear filters
-                    </Button>
-                  ) : undefined
-                }
-              >
-                {debounced || stage
-                  ? "Try another search or stage."
-                  : "New admissions and planned procedures appear here once a case is opened from the patient chart."}
-              </EmptyState>
-            }
+            empty={emptyState}
           />
         )}
 
         {worklist && total > PAGE_SIZE ? (
           <div className="pager">
             <Button size="sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}>
-              Previous
+              {t("common.previous")}
             </Button>
             <span className="muted">
               {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of {total}
             </span>
             <Button size="sm" disabled={offset + PAGE_SIZE >= total} onClick={() => setOffset(offset + PAGE_SIZE)}>
-              Next
+              {t("common.next")}
             </Button>
           </div>
         ) : null}

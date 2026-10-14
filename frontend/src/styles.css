@@ -1201,11 +1201,24 @@ input[readonly] {
   border-radius: var(--r-lg);
 }
 
-@media (min-width: 960px) {
+/* The page scrolls, not the table: no fixed-height inner scroll area. On wide screens the
+   table is not a scroll container, so its header sticks below the app header while the
+   page scrolls. Narrower screens keep horizontal scrolling inside the table. */
+@media (min-width: 1200px) {
   .table-scroll {
-    max-height: calc(100dvh - 260px);
-    min-height: 240px;
-    overflow-y: auto;
+    overflow: visible;
+  }
+
+  .data-table th {
+    top: var(--app-header-h, var(--header-h));
+  }
+
+  .data-table thead th:first-child {
+    border-top-left-radius: var(--r-lg);
+  }
+
+  .data-table thead th:last-child {
+    border-top-right-radius: var(--r-lg);
   }
 }
 
@@ -3050,4 +3063,459 @@ details.disclosure:not(.panel) > summary {
 .money {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* ==========================================================================
+   UX review fixes: cards on phones, confirm dialogs, form warnings, focus, touch
+   ========================================================================== */
+
+/* ---------- Phone header: one "Desk settings" menu ---------- */
+
+.settings-toggle {
+  display: none;
+}
+
+.icon.is-flipped {
+  transform: rotate(180deg);
+}
+
+@media (max-width: 959px) {
+  html {
+    scroll-padding-top: 64px;
+  }
+
+  .app-nav {
+    box-shadow: 0 1px 0 var(--line);
+  }
+}
+
+@media (max-width: 719px) {
+  .app-header {
+    flex-wrap: wrap;
+    gap: var(--s2);
+    padding: var(--s2) var(--s4);
+  }
+
+  .brand-text span {
+    display: none;
+  }
+
+  .settings-toggle {
+    display: inline-flex;
+    margin-left: auto;
+  }
+
+  .header-tools {
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    padding: var(--s2) 0 var(--s1);
+    border-top: 1px solid var(--line);
+  }
+
+  .header-tools.is-open {
+    display: flex;
+  }
+
+  .header-field select {
+    width: 100%;
+  }
+
+  .lang-toggle {
+    align-self: flex-start;
+  }
+}
+
+/* ---------- Horizontal scroll hint (stepper, tabs, phone nav) ---------- */
+
+@media (max-width: 959px) {
+  /* Shadows appear only at an edge that has more content to scroll to. */
+  .stepper,
+  .tabs {
+    background:
+      linear-gradient(to right, var(--paper) 30%, rgba(244, 245, 249, 0)) left center / 28px 100% no-repeat local,
+      linear-gradient(to left, var(--paper) 30%, rgba(244, 245, 249, 0)) right center / 28px 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, rgba(26, 34, 56, 0.2), transparent) left center / 12px 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, rgba(26, 34, 56, 0.2), transparent) right center / 12px 100% no-repeat scroll;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app-nav {
+    background:
+      linear-gradient(to right, var(--surface) 30%, rgba(255, 255, 255, 0)) left center / 28px 100% no-repeat local,
+      linear-gradient(to left, var(--surface) 30%, rgba(255, 255, 255, 0)) right center / 28px 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, rgba(26, 34, 56, 0.2), transparent) left center / 12px 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, rgba(26, 34, 56, 0.2), transparent) right center / 12px 100% no-repeat scroll,
+      var(--surface);
+  }
+
+  .stepper {
+    scroll-snap-type: x proximity;
+  }
+
+  .step {
+    scroll-snap-align: center;
+  }
+}
+
+/* ---------- Page heads ---------- */
+
+.page-head-inline {
+  align-items: center;
+}
+
+.page-sub-below {
+  margin-top: calc(-1 * var(--s4));
+}
+
+/* ---------- Phone lists: one card per row ---------- */
+
+.card-list {
+  display: grid;
+  gap: var(--s2);
+  list-style: none;
+}
+
+.list-card {
+  display: grid;
+  gap: 6px;
+  min-height: 44px;
+  padding: var(--s3) var(--s4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.list-card:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.list-card:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.list-card.is-overdue {
+  border-color: var(--danger-line);
+  box-shadow: inset 3px 0 0 var(--danger);
+}
+
+.list-card.is-due-soon {
+  box-shadow: inset 3px 0 0 #d08a1c;
+}
+
+.list-card-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px var(--s3);
+  min-width: 0;
+}
+
+.list-card-title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.list-card-sub {
+  justify-content: flex-start;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+
+.list-card-sub > * {
+  overflow-wrap: anywhere;
+}
+
+.list-card-meta {
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+
+/* ---------- Confirm dialog ---------- */
+
+.drawer-root.is-dialog {
+  display: grid;
+  place-items: center;
+  padding: var(--s4);
+}
+
+.dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(520px, 100%);
+  max-height: calc(100dvh - 32px);
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-overlay);
+  overflow: hidden;
+  animation: dialog-in 160ms ease-out;
+}
+
+.dialog:focus {
+  outline: none;
+}
+
+@keyframes dialog-in {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+}
+
+.dialog .drawer-body {
+  overflow-y: auto;
+}
+
+.confirm-summary {
+  display: grid;
+  gap: 6px;
+  padding: var(--s3) var(--s4);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.confirm-summary > div {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: var(--s3);
+}
+
+.confirm-summary dt {
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+
+.confirm-summary dd {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.confirm-blockers {
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--danger-line);
+  border-radius: var(--r-md);
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+.confirm-blockers-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.confirm-blockers ul {
+  margin-top: 4px;
+  padding-left: var(--s5);
+}
+
+/* ---------- Pre-auth form ---------- */
+
+.banner-list {
+  display: grid;
+  gap: 2px;
+  padding-left: var(--s5);
+}
+
+.form-value {
+  overflow-wrap: anywhere;
+}
+
+.field-hint-tag {
+  padding: 0 6px;
+  border-radius: var(--r-sm);
+  background: var(--info-bg);
+  color: var(--info);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.field-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-basis: 100%;
+  color: var(--warning);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.form-field.has-warning {
+  margin: 0 -8px;
+  padding: var(--s2) 8px;
+  background: var(--warning-bg);
+  border-bottom-color: var(--warning-line);
+}
+
+.field-error {
+  color: var(--danger);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+/* ---------- Checklist ---------- */
+
+.check-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--s2) var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.check-summary:hover {
+  background: var(--surface-2);
+}
+
+.check-summary .pill {
+  flex: none;
+}
+
+.check-fix {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.check-fix-action {
+  margin-left: auto;
+}
+
+/* ---------- Discharge citations ---------- */
+
+mark {
+  padding: 0 2px;
+  border-radius: 2px;
+  background: #ffe8a3;
+  color: inherit;
+}
+
+.citation-ref {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+
+/* ---------- My record ---------- */
+
+.count-badge {
+  margin-left: var(--s2);
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--surface-3);
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Attach report (visit note) ---------- */
+
+.attach-report > summary {
+  display: grid;
+  gap: 2px;
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.attach-report > summary::-webkit-details-marker {
+  display: none;
+}
+
+.attach-report[open] > summary {
+  margin-bottom: var(--s3);
+}
+
+/* ---------- Focus: visible 2px ring on every interactive element ---------- */
+
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible,
+.chip:focus-visible,
+.pill-link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Inside clipping / scrolling containers the ring is drawn inward so it is not cut off. */
+.tab:focus-visible,
+.lang-toggle button:focus-visible,
+.stat:focus-visible,
+.app-nav a:focus-visible,
+.queue-item:focus-visible,
+.check-summary:focus-visible,
+.data-table tbody tr:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+/* ---------- Phone touch targets (≥44px) ---------- */
+
+@media (max-width: 719px) {
+  .header-btn,
+  .lang-toggle button,
+  .header-field select,
+  .app-nav a,
+  .tab,
+  .chip,
+  .btn,
+  .text-link,
+  .icon-btn {
+    min-height: 44px;
+  }
+
+  .icon-btn {
+    min-width: 44px;
+  }
+
+  .text-link {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .app-nav a {
+    display: flex;
+    align-items: center;
+  }
+
+  .confirm-summary > div {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}
+
+@media print {
+  mark {
+    background: none;
+    font-weight: 600;
+  }
+
+  .form-field.has-warning {
+    background: none;
+  }
 }
