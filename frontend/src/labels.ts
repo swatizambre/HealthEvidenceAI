@@ -256,6 +256,13 @@ export function documentTypeLabel(documentType: string | undefined): string {
     medication: "Medication",
     procedure: "Procedure",
     claim: "Claim",
+    discharge_summary: "Discharge summary",
+    final_bill: "Final bill",
+    bill: "Bill",
+    investigation_report: "Investigation report",
+    implant_invoice: "Implant invoice",
+    mlc: "MLC / police intimation",
+    case: "Case record",
   };
   return labels[value] || "Attached document";
 }
@@ -272,8 +279,16 @@ export function noteTypeLabel(noteType: string | undefined): string {
   return value.replace(/\b\w/g, (ch) => ch.toUpperCase());
 }
 
+/** Synthea seeds US payer names; never show them on an Indian TPA desk. */
+const US_PAYER = /\b(medicare|medicaid|aetna|cigna|humana|anthem|blue cross|blue shield|unitedhealthcare|united health ?care|dual eligible|no_insurance|tricare)\b/i;
+
+export function indianPayerName(name: string | undefined): string {
+  const raw = (name || "").trim();
+  return raw && !US_PAYER.test(raw) ? raw : "";
+}
+
 export function professionalPolicyTitle(title: string | undefined): string {
-  const raw = (title || "").trim();
+  const raw = (title || "").replace(US_PAYER, "").replace(/\s{2,}/g, " ").replace(/^[\s·:-]+|[\s·:-]+$/g, "").trim();
   if (!raw || /dynamic catalog|catalog evidence/i.test(raw)) {
     return "Prior authorization evidence checklist";
   }
@@ -286,7 +301,8 @@ export function policyOptionLabel(policy: {
   payer_name?: string;
 }): string {
   const title = professionalPolicyTitle(policy.title);
-  const payer = policy.payer_name ? ` · ${policy.payer_name}` : "";
+  const payerName = indianPayerName(policy.payer_name);
+  const payer = payerName ? ` · ${payerName}` : "";
   return `${title}${payer}`;
 }
 
@@ -365,4 +381,32 @@ export function essentialsStatusLabel(status: string | undefined): string {
     default:
       return status || "Unclear";
   }
+}
+
+/**
+ * Synthea adds social-history "findings" (education, employment, housing…) that are not
+ * clinical conditions. Hide them wherever conditions are listed.
+ */
+const SOCIAL_FINDING =
+  /(education|employment|employed|labor force|labour force|criminal record|social (?:isolation|contact)|housing|transportation|stress|violence|abuse by|intimate partner|refugee|incarcerat|served in armed forces|medication review due|unhealthy alcohol|risk activity|received certificate|lack of access|not in labor|part-time|full-time|reports of)/i;
+
+export function isClinicalCondition(value: string): boolean {
+  const raw = value.trim();
+  if (!raw) return false;
+  const tagged = /\((?:finding|situation)\)\s*$/i.test(raw);
+  return !(tagged && SOCIAL_FINDING.test(raw));
+}
+
+export function clinicalConditions(values: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    if (!isClinicalCondition(value)) continue;
+    const label = conditionLabel(value);
+    const key = label.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(label);
+  }
+  return out;
 }
