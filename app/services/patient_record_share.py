@@ -23,11 +23,9 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
-def _next_code(session: Session, model: type, field: str, prefix: str) -> str:
-    existing = {
-        str(getattr(row, field))
-        for row in session.scalars(select(model)).all()
-    }
+def _next_code(session: Session, model: type[Any], field: str, prefix: str) -> str:
+    rows: list[Any] = list(session.scalars(select(model)).all())
+    existing = {str(getattr(row, field)) for row in rows}
     for index in range(1, 10_000):
         code = f"{prefix}-{index:06d}"
         if code not in existing:
