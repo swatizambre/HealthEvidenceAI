@@ -13,6 +13,7 @@ Canonical design and operations docs for HealthEvidence AI.
 |----------|---------|
 | [HLD.md](HLD.md) | High-level design — components, trust boundaries, non-goals |
 | [LLD.md](LLD.md) | Low-level design — modules, agents, MCP, permissions |
+| [design/onboarding/](design/onboarding/README.md) | Onboarding screen designs — patient, doctor, hospital |
 | [SEQUENCE_FLOWS.md](SEQUENCE_FLOWS.md) | End-to-end sequences (packet, review, OPD, MCP) |
 | [API_OVERVIEW.md](API_OVERVIEW.md) | HTTP API catalog (`/api/v1`, health, auth) |
 | [DATA_MODEL.md](DATA_MODEL.md) | Persistence entities and codes |

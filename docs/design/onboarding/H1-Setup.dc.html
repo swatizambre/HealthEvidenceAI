@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hospital setup</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Instrument+Sans:wght@500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+body{margin:0}
+a{color:#0E6B5C}a:hover{color:#0A5246}
+</style>
+</helmet>
+<div style="width: 100%; min-height: 900px; box-sizing: border-box; background: #F4F7F6; color: #10241F; font-family: 'Atkinson Hyperlegible', system-ui, sans-serif">
+  <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 32px; background: #FFFFFF; border-bottom: 1px solid #DCE5E2">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <div style="width: 34px; height: 34px; border-radius: 10px; background: #10241F; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 21V8l8-5 8 5v13"/><path d="M10 21v-6h4v6M12 8v4M10 10h4"/></svg></div>
+      <span style="font-family: 'Instrument Sans', sans-serif; font-weight: 700; font-size: 17px">Set up [Hospital name]</span>
+    </div>
+    <span style="font-size: 14px; color: #4E6660">Saved automatically · About 20 minutes in total</span>
+  </div>
+
+  <div style="max-width: 1280px; margin: 0 auto; padding: 28px 32px 40px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+    <nav aria-label="Setup steps" style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 18px; border-radius: 18px; background: #FFFFFF; border: 1px solid #DCE5E2">
+      <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px">
+        <span style="font-size: 14px; color: #4E6660">1 of 6 done</span>
+        <div style="height: 6px; border-radius: 3px; background: #E6EDEA"><div style="width: 22%; height: 6px; border-radius: 3px; background: #0E6B5C"></div></div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 15px"><span style="width: 26px; height: 26px; border-radius: 13px; background: #2F7D32; display: flex; align-items: center; justify-content: center; flex: none"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>Facility verified</div>
+      <div aria-current="step" style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; margin: 0 -10px; border-radius: 12px; background: #E3F1EE; font-size: 15px; font-weight: 700"><span style="width: 26px; height: 26px; border-radius: 13px; background: #0E6B5C; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 13px; flex: none">2</span>Connect your records</div>
+      <div style="display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 15px; color: #3D5650"><span style="width: 26px; height: 26px; border-radius: 13px; border: 1.5px solid #C9D6D2; display: flex; align-items: center; justify-content: center; font-size: 13px; flex: none">3</span>Link to ABDM</div>
+      <div style="display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 15px; color: #3D5650"><span style="width: 26px; height: 26px; border-radius: 13px; border: 1.5px solid #C9D6D2; display: flex; align-items: center; justify-content: center; font-size: 13px; flex: none">4</span>Invite staff</div>
+      <div style="display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 15px; color: #3D5650"><span style="width: 26px; height: 26px; border-radius: 13px; border: 1.5px solid #C9D6D2; display: flex; align-items: center; justify-content: center; font-size: 13px; flex: none">5</span>Reception QR</div>
+      <div style="display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 15px; color: #3D5650"><span style="width: 26px; height: 26px; border-radius: 13px; border: 1.5px solid #C9D6D2; display: flex; align-items: center; justify-content: center; font-size: 13px; flex: none">6</span>Go live</div>
+      <div style="margin-top: 10px; padding-top: 14px; border-top: 1px solid #E6EDEA; display: flex; flex-direction: column; gap: 8px">
+        <span style="font-size: 14px; color: #3D5650; line-height: 1.4">Stuck? An onboarding engineer can do this with you.</span>
+        <button type="button" style="min-height: 44px; border-radius: 12px; border: 1px solid #C9D6D2; background: #FFFFFF; color: #10241F; font: inherit; font-weight: 700">Book a 15-minute call</button>
+      </div>
+    </nav>
+
+    <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 18px">
+      <div style="display: flex; gap: 12px; align-items: center; padding: 12px 16px; border-radius: 14px; background: #E3F1EE; border: 1px solid #B9DCD4; color: #0A3D35; font-size: 15px">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+        <span>Verified on the Health Facility Registry · HFR ID <span style="font-family: 'IBM Plex Mono', monospace">[HFR ID]</span> · [City], [State]</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <h1 style="margin: 0; font-family: 'Instrument Sans', sans-serif; font-weight: 700; font-size: 30px">How do you keep patient records today?</h1>
+        <p style="margin: 0; font-size: 16px; color: #3D5650">Pick one. You can add more later. Records only move when a patient shares them.</p>
+      </div>
+
+      <div role="radiogroup" aria-label="Records system" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px">
+        <div role="radio" aria-checked="true" tabindex="0" style="display: flex; flex-direction: column; gap: 6px; padding: 18px; border-radius: 16px; background: #FFFFFF; border: 2px solid #0E6B5C">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px"><b style="font-size: 17px">FHIR API</b><span style="padding: 3px 8px; border-radius: 8px; background: #E3F1EE; color: #0A3D35; font-size: 12px; font-weight: 700">Recommended</span></div>
+          <span style="font-size: 14px; color: #3D5650; line-height: 1.4">Most modern HIS and EHRs. Live, two-way, standards-based.</span>
+        </div>
+        <div role="radio" aria-checked="false" tabindex="-1" style="display: flex; flex-direction: column; gap: 6px; padding: 18px; border-radius: 16px; background: #FFFFFF; border: 1.5px solid #DCE5E2">
+          <b style="font-size: 17px">HL7 v2 feed</b>
+          <span style="font-size: 14px; color: #3D5650; line-height: 1.4">Older lab and admission systems. We translate it for you.</span>
+        </div>
+        <div role="radio" aria-checked="false" tabindex="-1" style="display: flex; flex-direction: column; gap: 6px; padding: 18px; border-radius: 16px; background: #FFFFFF; border: 1.5px solid #DCE5E2">
+          <b style="font-size: 17px">Upload exports</b>
+          <span style="font-size: 14px; color: #3D5650; line-height: 1.4">PDFs, CSVs or DICOM from any system, on a schedule.</span>
+        </div>
+        <div role="radio" aria-checked="false" tabindex="-1" style="display: flex; flex-direction: column; gap: 6px; padding: 18px; border-radius: 16px; background: #FFFFFF; border: 1.5px solid #DCE5E2">
+          <b style="font-size: 17px">No system yet</b>
+          <span style="font-size: 14px; color: #3D5650; line-height: 1.4">Use our reception app and paper scanning. Free for small clinics.</span>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px; padding: 20px; border-radius: 18px; background: #FFFFFF; border: 1px solid #DCE5E2">
+        <h2 style="margin: 0; font-family: 'Instrument Sans', sans-serif; font-size: 19px">Connect FHIR</h2>
+        <div style="display: flex; flex-wrap: wrap; gap: 12px">
+          <div style="flex: 2 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+            <label for="fhir" style="font-size: 14px; font-weight: 700">Server address</label>
+            <input id="fhir" type="text" value="https://[your-his]/fhir/R4" style="min-height: 48px; border-radius: 12px; border: 1.5px solid #C9D6D2; padding: 0 14px; font-family: 'IBM Plex Mono', monospace; font-size: 15px; color: #10241F; background: #FFFFFF">
+          </div>
+          <div style="flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+            <label for="auth" style="font-size: 14px; font-weight: 700">Sign-in method</label>
+            <select id="auth" style="min-height: 48px; border-radius: 12px; border: 1.5px solid #C9D6D2; padding: 0 12px; font: inherit; font-size: 15px; color: #10241F; background: #FFFFFF"><option>SMART backend services</option><option>Client ID and secret</option></select>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 12px; background: #F1F5F4">
+          <div style="display: flex; gap: 10px; align-items: center; font-size: 15px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2F7D32" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>Reached server · R4 · 412 ms</div>
+          <div style="display: flex; gap: 10px; align-items: center; font-size: 15px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2F7D32" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>Read Patient, Encounter, Observation, MedicationRequest</div>
+          <div style="display: flex; gap: 10px; align-items: center; font-size: 15px; color: #5C3300"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A4B00" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>AllergyIntolerance not enabled. Ask your HIS vendor, or continue and add it later.</div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end">
+          <button type="button" style="min-height: 52px; padding: 0 20px; border-radius: 14px; border: 1px solid #C9D6D2; background: #FFFFFF; color: #10241F; font: inherit; font-weight: 700">Test again</button>
+          <a href="H2-Reception.dc.html" style="min-height: 52px; padding: 0 24px; border-radius: 14px; background: #0E6B5C; color: #FFFFFF; display: flex; align-items: center; text-decoration: none; font-family: 'Instrument Sans', sans-serif; font-weight: 600; font-size: 17px">Continue to ABDM</a>
+        </div>
+      </div>
+      <p style="margin: 0; font-size: 14px; color: #4E6660">Data stays in India. Every record a staff member opens shows in that patient's access log.</p>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

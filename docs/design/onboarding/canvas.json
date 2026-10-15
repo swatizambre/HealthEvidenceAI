@@ -1,0 +1,39 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-10-15T10:30:00Z" },
+  "title": "Lifelong Health Onboarding",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 390, "h": 844, "title": "Patient 1 · Welcome", "is_interactive": true },
+    "P2-Consent.dc.html": { "x": 470, "y": 0, "w": 390, "h": 844, "title": "Patient 2 · Your choices", "is_interactive": true },
+    "P3-Import.dc.html": { "x": 940, "y": 0, "w": 390, "h": 844, "title": "Patient 3 · Bring your records", "is_interactive": true },
+    "P4-Review.dc.html": { "x": 1410, "y": 0, "w": 390, "h": 844, "title": "Patient 4 · Check what AI read", "is_interactive": true },
+    "P5-Emergency.dc.html": { "x": 1880, "y": 0, "w": 390, "h": 844, "title": "Patient 5 · Emergency card", "is_interactive": true },
+    "P6-Family.dc.html": { "x": 2350, "y": 0, "w": 390, "h": 844, "title": "Patient 6 · Family and done", "is_interactive": true },
+    "D1-Verify.dc.html": { "x": 0, "y": 1264, "w": 390, "h": 844, "title": "Doctor 1 · Verify in 2 minutes", "is_interactive": true },
+    "D2-Scan.dc.html": { "x": 470, "y": 1264, "w": 390, "h": 844, "title": "Doctor 2 · Scan patient QR", "is_interactive": true },
+    "D3-Brief.dc.html": { "x": 940, "y": 1264, "w": 1280, "h": 980, "title": "Doctor 3 · AI patient brief", "expand": "fill" },
+    "H1-Setup.dc.html": { "x": 0, "y": 2664, "w": 1280, "h": 900, "title": "Hospital 1 · Setup wizard", "expand": "fill", "is_interactive": true },
+    "H2-Reception.dc.html": { "x": 1360, "y": 2664, "w": 1280, "h": 900, "title": "Hospital 2 · Reception desk", "expand": "fill" }
+  },
+  "order": [
+    "Main.dc.html",
+    "P2-Consent.dc.html",
+    "P3-Import.dc.html",
+    "P4-Review.dc.html",
+    "P5-Emergency.dc.html",
+    "P6-Family.dc.html",
+    "D1-Verify.dc.html",
+    "D2-Scan.dc.html",
+    "D3-Brief.dc.html",
+    "H1-Setup.dc.html",
+    "H2-Reception.dc.html"
+  ],
+  "notes": {
+    "patientTitle": { "x": 0, "y": -260, "text": "Patient & family onboarding · about 3 minutes", "kind": "title1", "maxW": 2740 },
+    "doctorTitle": { "x": 0, "y": 1004, "text": "Doctor onboarding · verify, scan, read the brief", "kind": "title1", "maxW": 2220 },
+    "hospitalTitle": { "x": 0, "y": 2404, "text": "Hospital onboarding · connect once, share at reception", "kind": "title1", "maxW": 2640 }
+  },
+  "designSystems": []
+}

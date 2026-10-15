@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Doctor sign-up</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Instrument+Sans:wght@500;600;700&display=swap">
+<style>
+body{margin:0}
+a{color:#0E6B5C}a:hover{color:#0A5246}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; padding: 26px 22px 24px; display: flex; flex-direction: column; gap: 16px; background: #F4F7F6; color: #10241F; font-family: 'Atkinson Hyperlegible', system-ui, sans-serif">
+  <div style="display: flex; align-items: center; gap: 10px">
+    <div style="width: 40px; height: 40px; border-radius: 12px; background: #10241F; display: flex; align-items: center; justify-content: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 3v6a4 4 0 0 0 8 0V3"/><path d="M10 13v3a5 5 0 0 0 10 0v-2"/><circle cx="20" cy="12" r="2"/></svg>
+    </div>
+    <span style="font-family: 'Instrument Sans', sans-serif; font-weight: 700; font-size: 18px">Lifelong Health for doctors</span>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 6px">
+    <h1 style="margin: 0; font-family: 'Instrument Sans', sans-serif; font-weight: 700; font-size: 28px; line-height: 1.12">Join in 2 minutes</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 1.45; color: #3D5650">No app needed in clinic. It works in any browser.</p>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 6px">
+    <label for="reg" style="font-size: 14px; font-weight: 700">HPR ID or medical council registration number</label>
+    <input id="reg" type="text" value="[REGISTRATION NUMBER]" style="min-height: 52px; border-radius: 14px; border: 1.5px solid #0E6B5C; background: #FFFFFF; padding: 0 14px; font: inherit; font-size: 17px; color: #10241F">
+  </div>
+
+  <div style="display: flex; gap: 12px; padding: 14px; border-radius: 16px; background: #E3F1EE; border: 1px solid #B9DCD4">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0A5246" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <b style="font-size: 16px; color: #0A3D35">Verified with the national register</b>
+      <span style="font-size: 14px; color: #0A3D35; line-height: 1.4">Dr. [Name] · [Specialty] · [State] Medical Council</span>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <span style="font-size: 14px; font-weight: 700">Where do you see patients?</span>
+    <div style="display: flex; flex-wrap: wrap; gap: 8px">
+      <button type="button" aria-pressed="true" style="min-height: 44px; padding: 0 14px; border-radius: 22px; border: 1.5px solid #10241F; background: #10241F; color: #FFFFFF; font: inherit; font-size: 15px">[Hospital name]</button>
+      <button type="button" aria-pressed="false" style="min-height: 44px; padding: 0 14px; border-radius: 22px; border: 1.5px solid #C9D6D2; background: #FFFFFF; color: #10241F; font: inherit; font-size: 15px">My own clinic</button>
+      <button type="button" aria-pressed="false" style="min-height: 44px; padding: 0 14px; border-radius: 22px; border: 1.5px solid #C9D6D2; background: #FFFFFF; color: #10241F; font: inherit; font-size: 15px">+ Add place</button>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 16px; background: #FFFFFF; border: 1px solid #DCE5E2">
+    <b style="font-size: 15px">What you'll see</b>
+    <span style="font-size: 14px; color: #3D5650; line-height: 1.45">Only records a patient shares with you, for the time they choose. Every view shows in their access log.</span>
+  </div>
+
+  <div style="flex: 1"></div>
+  <a href="D2-Scan.dc.html" style="min-height: 56px; border-radius: 16px; background: #0E6B5C; color: #FFFFFF; display: flex; align-items: center; justify-content: center; gap: 10px; text-decoration: none; font-family: 'Instrument Sans', sans-serif; font-weight: 600; font-size: 18px">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 11c0-2 1-3 3-3s3 1 3 3-1 6-3 8M6 15c0-5 2-9 6-9M9 19c1-1 2-4 2-8"/></svg>
+    Create account with fingerprint
+  </a>
+  <a href="#sso" style="min-height: 44px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px">Hospital staff? Sign in with your hospital account</a>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

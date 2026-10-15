@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Scan patient QR</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Instrument+Sans:wght@500;600;700&display=swap">
+<style>
+body{margin:0}
+a{color:#0E6B5C}a:hover{color:#0A5246}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; background: #0D1A17; color: #10241F; font-family: 'Atkinson Hyperlegible', system-ui, sans-serif">
+  <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px">
+    <span style="color: #E6EFEC; font-size: 17px; font-weight: 700">Scan the patient's QR</span>
+    <div style="width: 230px; height: 230px; position: relative; border-radius: 24px; background: #1A2B27" aria-hidden="true">
+      <div style="position: absolute; left: 0; top: 0; width: 46px; height: 46px; border-left: 5px solid #5BD1BE; border-top: 5px solid #5BD1BE; border-top-left-radius: 22px"></div>
+      <div style="position: absolute; right: 0; top: 0; width: 46px; height: 46px; border-right: 5px solid #5BD1BE; border-top: 5px solid #5BD1BE; border-top-right-radius: 22px"></div>
+      <div style="position: absolute; left: 0; bottom: 0; width: 46px; height: 46px; border-left: 5px solid #5BD1BE; border-bottom: 5px solid #5BD1BE; border-bottom-left-radius: 22px"></div>
+      <div style="position: absolute; right: 0; bottom: 0; width: 46px; height: 46px; border-right: 5px solid #5BD1BE; border-bottom: 5px solid #5BD1BE; border-bottom-right-radius: 22px"></div>
+    </div>
+    <span style="color: #A9BDB7; font-size: 14px; text-align: center; max-width: 260px; line-height: 1.4">Or type the patient's ABHA number</span>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 14px; padding: 12px 22px 24px; border-radius: 26px 26px 0 0; background: #FFFFFF">
+    <div style="width: 40px; height: 5px; border-radius: 3px; background: #CFDAD6; align-self: center" aria-hidden="true"></div>
+    <div style="display: flex; gap: 12px; align-items: center">
+      <div style="width: 48px; height: 48px; border-radius: 24px; background: #E3F1EE; display: flex; align-items: center; justify-content: center; font-family: 'Instrument Sans', sans-serif; font-weight: 700; color: #0A3D35">RP</div>
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <b style="font-size: 17px">[Patient name] shared their record</b>
+        <span style="font-size: 14px; color: #4E6660">With you for 24 hours · they can stop it any time</span>
+      </div>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 6px">
+      <span style="padding: 6px 10px; border-radius: 10px; background: #F1F5F4; font-size: 14px">Summary</span>
+      <span style="padding: 6px 10px; border-radius: 10px; background: #F1F5F4; font-size: 14px">Allergies</span>
+      <span style="padding: 6px 10px; border-radius: 10px; background: #F1F5F4; font-size: 14px">Medicines</span>
+      <span style="padding: 6px 10px; border-radius: 10px; background: #F1F5F4; font-size: 14px">Lab results</span>
+      <span style="padding: 6px 10px; border-radius: 10px; background: #F1F5F4; font-size: 14px">Reports</span>
+    </div>
+    <div style="display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; background: #FBE5E3; color: #7A1A14">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>
+      <span style="font-size: 14px; font-weight: 700">Allergy: Amoxicillin (rash, 2019)</span>
+    </div>
+    <a href="D3-Brief.dc.html" style="min-height: 56px; border-radius: 16px; background: #0E6B5C; color: #FFFFFF; display: flex; align-items: center; justify-content: center; text-decoration: none; font-family: 'Instrument Sans', sans-serif; font-weight: 600; font-size: 18px">Open patient brief</a>
+    <a href="#ask" style="min-height: 44px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px">Ask for the full record</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>
