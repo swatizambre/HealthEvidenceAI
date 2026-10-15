@@ -6,6 +6,8 @@ import { expect, test } from "@playwright/test";
  */
 test.describe("desk smoke", () => {
   test("today, patients, reviews show professional evidence-pack chrome", async ({ page }) => {
+    // The insurance desk is opt-in (Settings); the smoke covers it switched on.
+    await page.addInitScript(() => window.localStorage.setItem("he.insuranceDesk", "1"));
     await page.goto("/");
     await expect(page.getByRole("link", { name: "HealthEvidence AI" })).toBeVisible();
     await expect(page.locator(".app-footer")).toContainText(/not a medical device/i);

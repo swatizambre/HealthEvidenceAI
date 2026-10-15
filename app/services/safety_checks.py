@@ -161,14 +161,14 @@ def _allergy_targets(text: str) -> dict[str, str]:
     for word in words:
         generic = _BRAND_TO_GENERIC.get(word, word)
         for drug in _ingredients(generic):
-            family = _family_of(drug)
-            if family is None:
+            drug_family = _family_of(drug)
+            if drug_family is None:
                 if drug in _BRAND_TO_GENERIC.values():
                     targets[drug] = "same medicine"
                 continue
             targets[drug] = "same medicine"
-            for member in _DRUG_FAMILIES[family]:
-                targets.setdefault(member, f"same family ({family})")
+            for member in _DRUG_FAMILIES[drug_family]:
+                targets.setdefault(member, f"same family ({drug_family})")
     return targets
 
 
