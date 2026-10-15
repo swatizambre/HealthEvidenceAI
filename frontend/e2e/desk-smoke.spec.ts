@@ -34,7 +34,12 @@ test.describe("desk smoke", () => {
     await expect(page.locator("#evidence-packet, .packet-panel, .chart-name").first()).toBeVisible({
       timeout: 45_000,
     });
-    await expect(page.getByText(/Evidence pack/i).first()).toBeVisible();
+    // Insurance is an optional tab on the chart; the evidence pack lives there.
+    const insuranceTab = page.getByRole("tab", { name: /Insurance/ });
+    if (await insuranceTab.count()) {
+      await insuranceTab.first().click();
+    }
+    await expect(page.getByText(/Evidence pack/i).first()).toBeVisible({ timeout: 15_000 });
 
     await nav.getByRole("link", { name: "Reviews", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Reviews" })).toBeVisible({ timeout: 30_000 });
