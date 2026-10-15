@@ -36,6 +36,7 @@ Thumbs.db
 
 data/*.db-shm
 data/*.db-wal
+data/uploads/
 frontend/test-results/
 
 

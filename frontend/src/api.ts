@@ -27,7 +27,15 @@ export interface PatientDetail {
   };
   conditions: string[];
   medications: { medication_id: string; name: string; dose: string; status: string }[];
-  labs: { lab_id: string; test_name: string; value: string; unit: string; collected_at: string }[];
+  labs: {
+    lab_id: string;
+    test_name: string;
+    value: string;
+    unit: string;
+    collected_at: string;
+    document_id?: string | null;
+    has_file?: boolean;
+  }[];
   procedures: { procedure_id: string; name: string; performed_at: string }[];
   imaging: {
     imaging_id: string;
@@ -35,6 +43,8 @@ export interface PatientDetail {
     body_part: string;
     study_date: string;
     description: string;
+    document_id?: string | null;
+    has_file?: boolean;
   }[];
   clinical_notes: {
     note_id: string;
@@ -920,8 +930,116 @@ export function preparePacket(body: {
   });
 }
 
-export function getDocument(documentId: string): Promise<{ document_id: string; content: string; document_type: string }> {
+export function getDocument(documentId: string): Promise<{
+  document_id: string;
+  content: string;
+  document_type: string;
+  has_file?: boolean;
+  original_filename?: string;
+  content_type?: string;
+  file_url?: string | null;
+}> {
   return request(`/api/v1/documents/${documentId}`);
+}
+
+export interface ReportItem {
+  document_id: string;
+  patient_id: string;
+  document_type: string;
+  title: string;
+  source: string;
+  created_at: string | null;
+  has_file: boolean;
+  original_filename: string;
+  content_type: string;
+  byte_size: number;
+  preview_kind: "pdf" | "image" | "text" | "other" | string;
+  content_excerpt: string;
+  file_url: string | null;
+  content?: string | null;
+}
+
+export function listPatientReports(patientId: string): Promise<{ reports: ReportItem[]; patient_id: string }> {
+  return request(`/api/v1/patients/${encodeURIComponent(patientId)}/reports`);
+}
+
+export async function uploadPatientReport(
+  patientId: string,
+  file: File,
+  documentKind:
+    | "auto"
+    | "lab_report"
+    | "imaging_report"
+    | "prescription"
+    | "clinical_note" = "auto",
+): Promise<ReportItem> {
+  const token = await getAccessToken();
+  const body = new FormData();
+  body.append("file", file);
+  body.append("patient_id", patientId);
+  body.append("document_kind", documentKind);
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  const response = await fetch("/api/v1/reports/upload", {
+    method: "POST",
+    headers,
+    body,
+  });
+  if (!response.ok) {
+    const errBody = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      error_code?: string;
+    };
+    throw new Error(friendlyApiMessage(errBody.error_code, errBody.message, response.status));
+  }
+  return (await response.json()) as ReportItem;
+}
+
+export async function attachDocumentFile(documentId: string, file: File): Promise<ReportItem> {
+  const token = await getAccessToken();
+  const body = new FormData();
+  body.append("file", file);
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  const response = await fetch(`/api/v1/documents/${encodeURIComponent(documentId)}/file`, {
+    method: "POST",
+    headers,
+    body,
+  });
+  if (!response.ok) {
+    const errBody = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      error_code?: string;
+    };
+    throw new Error(friendlyApiMessage(errBody.error_code, errBody.message, response.status));
+  }
+  return (await response.json()) as ReportItem;
+}
+
+/** Authenticated blob URL for inline PDF/image preview — revoke when done. */
+export async function fetchDocumentFileBlob(documentId: string): Promise<{ blob: Blob; contentType: string }> {
+  const token = await getAccessToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  const response = await fetch(`/api/v1/documents/${encodeURIComponent(documentId)}/file`, {
+    headers,
+  });
+  if (!response.ok) {
+    const errBody = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      error_code?: string;
+    };
+    throw new Error(friendlyApiMessage(errBody.error_code, errBody.message, response.status));
+  }
+  const blob = await response.blob();
+  const contentType = response.headers.get("content-type") || blob.type || "application/octet-stream";
+  return { blob, contentType };
 }
 
 export interface PolicySummary {

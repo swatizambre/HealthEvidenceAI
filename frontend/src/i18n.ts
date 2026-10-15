@@ -31,6 +31,7 @@ const en = {
   "nav.family": "Family",
   "nav.addNote": "Add note",
   "nav.fullChart": "Full chart",
+  "nav.reports": "Reports",
 
   "stage.draft": "Draft",
   "stage.ready_to_send": "Ready to send",
@@ -170,6 +171,7 @@ const hi: Record<MessageKey, string> = {
   "nav.family": "परिवार",
   "nav.addNote": "नोट जोड़ें",
   "nav.fullChart": "पूरा चार्ट",
+  "nav.reports": "रिपोर्ट",
 
   "stage.draft": "ड्राफ़्ट",
   "stage.ready_to_send": "भेजने को तैयार",

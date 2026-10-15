@@ -33,6 +33,7 @@ from app.models import (
     Claim,
     ClinicalNote,
     Document,
+    DocumentFile,
     ImagingStudy,
     InsurancePolicy,
     LabResult,
@@ -128,9 +129,9 @@ def get_patient_detail(session: Session, patient_code: str) -> PatientDetail:
         ),
         conditions=clinical_conditions,
         medications=[_medication(item) for item in list_medications(session, patient.id)],
-        labs=[_lab(item) for item in list_labs(session, patient.id)],
+        labs=[_lab(session, item) for item in list_labs(session, patient.id)],
         procedures=[_procedure(item) for item in clinical_procedures],
-        imaging=[_imaging(item) for item in list_imaging(session, patient.id)],
+        imaging=[_imaging(session, item) for item in list_imaging(session, patient.id)],
         clinical_notes=[_note(item, note_documents.get(item.document_id, "")) for item in notes],
         claims=[_claim(item) for item in list_claims(session, patient.id)],
     )
@@ -815,13 +816,23 @@ def _medication(item: Medication) -> MedicationOut:
     )
 
 
-def _lab(item: LabResult) -> LabOut:
+def _lab(session: Session, item: LabResult) -> LabOut:
+    document = session.get(Document, item.document_id) if item.document_id else None
+    document_code = document.document_code if document else None
+    has_file = False
+    if document is not None:
+        has_file = (
+            session.scalar(select(DocumentFile.id).where(DocumentFile.document_id == document.id))
+            is not None
+        )
     return LabOut(
         lab_id=item.lab_code,
         test_name=item.test_name,
         value=item.value,
         unit=item.unit,
         collected_at=_as_utc(item.collected_at),
+        document_id=document_code,
+        has_file=has_file,
     )
 
 
@@ -833,13 +844,23 @@ def _procedure(item: Procedure) -> ProcedureOut:
     )
 
 
-def _imaging(item: ImagingStudy) -> ImagingOut:
+def _imaging(session: Session, item: ImagingStudy) -> ImagingOut:
+    document = session.get(Document, item.document_id) if item.document_id else None
+    document_code = document.document_code if document else None
+    has_file = False
+    if document is not None:
+        has_file = (
+            session.scalar(select(DocumentFile.id).where(DocumentFile.document_id == document.id))
+            is not None
+        )
     return ImagingOut(
         imaging_id=item.imaging_code,
         modality=item.modality,
         body_part=item.body_part,
         study_date=_as_utc(item.studied_at),
         description=item.description,
+        document_id=document_code,
+        has_file=has_file,
     )
 
 
@@ -877,6 +898,10 @@ def _document_out(session: Session, document: Document, patient_code: str | None
         for key, value in document.document_metadata.items()
         if isinstance(value, str | int | float | bool)
     }
+    file_row = session.scalar(
+        select(DocumentFile).where(DocumentFile.document_id == document.id)
+    )
+    has_file = file_row is not None
     return DocumentOut(
         document_id=document.document_code,
         patient_id=patient_code,
@@ -886,6 +911,18 @@ def _document_out(session: Session, document: Document, patient_code: str | None
         content=document.content,
         metadata=metadata,
         chunk_count=count_chunks(session, document.id),
+        has_file=has_file,
+        original_filename=(
+            file_row.original_filename
+            if file_row
+            else str(metadata.get("original_filename") or "")
+        ),
+        content_type=(
+            file_row.content_type if file_row else str(metadata.get("content_type") or "")
+        ),
+        file_url=(
+            f"/api/v1/documents/{document.document_code}/file" if has_file else None
+        ),
     )
 
 

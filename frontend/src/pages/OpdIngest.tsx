@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
+  attachDocumentFile,
   getConsentCapabilities,
   getHospitalPipelineStatus,
   getPatient,
@@ -141,6 +142,7 @@ export function OpdIngestPage() {
     "auto" | "lab_report" | "prescription" | "clinical_note"
   >("auto");
   const [extractMeta, setExtractMeta] = useState<DocumentExtractResult | null>(null);
+  const [pendingReportFile, setPendingReportFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [bp, setBp] = useState("");
   const [hr, setHr] = useState("");
@@ -423,6 +425,7 @@ export function OpdIngestPage() {
     setExtractBusy(true);
     setError("");
     setExtractMeta(null);
+    setPendingReportFile(file);
     try {
       const extracted = await extractOpdDocument(file, extractKind);
       setExtractMeta(extracted);
@@ -559,6 +562,19 @@ export function OpdIngestPage() {
         consent_attested: consentRequired ? true : consentAttested,
         ...consentFields,
       });
+      // Keep the original PDF/image on the first chart document created by this visit.
+      if (pendingReportFile && body.document_ids?.length) {
+        try {
+          await attachDocumentFile(body.document_ids[0], pendingReportFile);
+          setPendingReportFile(null);
+        } catch (attachErr) {
+          setError(
+            attachErr instanceof Error
+              ? `Visit saved, but attaching the original file failed: ${attachErr.message}`
+              : "Visit saved, but attaching the original file failed.",
+          );
+        }
+      }
       setResult(body);
       pushRecentPatient({
         patient_id: body.patient_id,
@@ -812,6 +828,11 @@ export function OpdIngestPage() {
                   {labRows.filter((r) => r.test_name.trim()).length} labs ·{" "}
                   {medRows.filter((r) => r.name.trim()).length} meds
                 </p>
+                {pendingReportFile ? (
+                  <p className="hint">
+                    Original file <strong>{pendingReportFile.name}</strong> will be kept on the chart when you save.
+                  </p>
+                ) : null}
                 {extractMeta.warnings?.length ? (
                   <ul className="extract-warnings">
                     {extractMeta.warnings.map((item) => (

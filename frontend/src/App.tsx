@@ -12,6 +12,7 @@ import { OpdIngestPage } from "./pages/OpdIngest";
 import { PatientDetailPage } from "./pages/PatientDetail";
 import { PatientsPage } from "./pages/Patients";
 import { PublicSharePage } from "./pages/PublicShare";
+import { ReportsPage } from "./pages/Reports";
 import { ReviewsPage } from "./pages/Reviews";
 import { ShareWithDoctorPage } from "./pages/ShareWithDoctor";
 import { WorkQueuePage } from "./pages/WorkQueue";
@@ -77,6 +78,7 @@ export function App() {
         { to: "/emergency", key: "nav.emergency", icon: "alert" },
         { to: "/share", key: "nav.share", icon: "send" },
         { to: "/family", key: "nav.family", icon: "users" },
+        { to: `/patients/${myPatientId}/reports`, key: "nav.reports", icon: "doc" },
         { to: "/visit", key: "nav.addNote", icon: "note" },
         { to: `/patients/${myPatientId}`, key: "nav.fullChart", icon: "folder" },
       ]
@@ -240,6 +242,7 @@ export function App() {
               element={isPatient ? <Navigate to="/my-record" replace /> : <PatientsPage />}
             />
             <Route path="/patients/:patientId" element={<PatientDetailPage />} />
+            <Route path="/patients/:patientId/reports" element={<ReportsPage />} />
             <Route path="/visit" element={<OpdIngestPage />} />
             <Route
               path="/reviews"

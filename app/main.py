@@ -36,6 +36,7 @@ from app.api.routes import (
     patients,
     policies,
     privacy,
+    reports,
     security,
     tools,
 )
@@ -155,6 +156,7 @@ def create_app() -> FastAPI:
         help.router,
         legal.router,
         me_record.router,
+        reports.router,
     )
     for router in api_routers:
         app.include_router(router, prefix="/api/v1")

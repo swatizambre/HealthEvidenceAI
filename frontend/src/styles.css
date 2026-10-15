@@ -3495,6 +3495,91 @@ mark {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---------- Reports library (PDF / image preview) ---------- */
+
+.reports-layout {
+  display: grid;
+  gap: var(--s4);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 900px) {
+  .reports-layout {
+    grid-template-columns: minmax(240px, 340px) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+.report-upload-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s3);
+  align-items: end;
+}
+
+.report-upload-row .grow {
+  flex: 1 1 220px;
+}
+
+.report-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.report-item {
+  width: 100%;
+  text-align: left;
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.report-item:hover {
+  background: var(--surface-2);
+}
+
+.report-item.is-selected {
+  background: var(--surface-2);
+  border-color: var(--border-strong, var(--border));
+}
+
+.report-item-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.report-preview-meta {
+  margin: 0 0 var(--s3);
+}
+
+.report-frame {
+  width: 100%;
+  min-height: 70vh;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-1);
+}
+
+.report-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+}
+
+.report-text {
+  max-height: 70vh;
+  overflow: auto;
+}
+
 /* ---------- Attach report (visit note) ---------- */
 
 .attach-report > summary {

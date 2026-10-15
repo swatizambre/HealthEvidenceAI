@@ -95,6 +95,8 @@ class LabOut(ResponseModel):
     value: str
     unit: str
     collected_at: datetime
+    document_id: str | None = None
+    has_file: bool = False
 
 
 class ProcedureOut(ResponseModel):
@@ -109,6 +111,8 @@ class ImagingOut(ResponseModel):
     body_part: str
     study_date: datetime
     description: str
+    document_id: str | None = None
+    has_file: bool = False
 
 
 class NoteOut(ResponseModel):
@@ -247,10 +251,36 @@ class DocumentOut(ResponseModel):
     content: str
     metadata: dict[str, str | int | float | bool]
     chunk_count: int
+    has_file: bool = False
+    original_filename: str = ""
+    content_type: str = ""
+    file_url: str | None = None
 
 
 class DocumentListResponse(ResponseModel):
     documents: list[DocumentOut]
+
+
+class ReportOut(ResponseModel):
+    document_id: str
+    patient_id: str
+    document_type: str
+    title: str = ""
+    source: str = ""
+    created_at: str | None = None
+    has_file: bool = False
+    original_filename: str = ""
+    content_type: str = ""
+    byte_size: int = 0
+    preview_kind: str = "other"
+    content_excerpt: str = ""
+    file_url: str | None = None
+    content: str | None = None
+
+
+class ReportListResponse(ResponseModel):
+    reports: list[ReportOut]
+    patient_id: str
 
 
 # Typed supporting documents a desk can attach to a chart (TPA checklist documents group).

@@ -66,6 +66,7 @@ def init_db(engine: Engine) -> None:
     ensure_authorization_case_columns(engine)
     ensure_patient_org_column(engine)
     ensure_patient_abha_column(engine)
+    ensure_imaging_document_column(engine)
     # Prefer Alembic for shared Postgres; SQLite soft-ALTER + create_all cover laptop/tests.
     url = str(engine.url)
     if url.startswith("sqlite"):
@@ -209,6 +210,19 @@ def ensure_patient_abha_column(engine: Engine) -> None:
         names = {str(row[1]) for row in rows}
         if "abha_id" not in names:
             connection.execute(text("ALTER TABLE patients ADD COLUMN abha_id VARCHAR(64)"))
+
+
+def ensure_imaging_document_column(engine: Engine) -> None:
+    """Soft-migrate imaging_studies.document_id for existing SQLite databases."""
+    if not str(engine.url).startswith("sqlite"):
+        return
+    with engine.begin() as connection:
+        rows = connection.execute(text("PRAGMA table_info(imaging_studies)")).fetchall()
+        names = {str(row[1]) for row in rows}
+        if "document_id" not in names:
+            connection.execute(
+                text("ALTER TABLE imaging_studies ADD COLUMN document_id VARCHAR(36)")
+            )
 
 
 def reset_database(engine: Engine) -> None:

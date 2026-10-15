@@ -314,6 +314,9 @@ export function PatientDetailPage() {
           </div>
         </div>
         <div className="button-row">
+          <ButtonLink to={`/patients/${encodeURIComponent(patient.patient_id)}/reports`} icon="doc">
+            Reports
+          </ButtonLink>
           {canDocument ? (
             <ButtonLink to={`/visit?patient=${encodeURIComponent(patient.patient_id)}`} icon="note">
               Add visit note
@@ -572,9 +575,17 @@ export function PatientDetailPage() {
                           <div className="record-body">
                             <p>{event.description}</p>
                             {event.document_id ? (
-                              <Button size="sm" loading={sourceBusy} onClick={() => void openSource(event.document_id || "")}>
-                                Open document
-                              </Button>
+                              <div className="button-row">
+                                <Button size="sm" loading={sourceBusy} onClick={() => void openSource(event.document_id || "")}>
+                                  Open text
+                                </Button>
+                                <ButtonLink
+                                  size="sm"
+                                  to={`/patients/${encodeURIComponent(patient.patient_id)}/reports?doc=${encodeURIComponent(event.document_id)}`}
+                                >
+                                  View report
+                                </ButtonLink>
+                              </div>
                             ) : null}
                             {source && source.id === event.document_id ? (
                               <pre className="source-text">{source.content}</pre>
@@ -611,6 +622,11 @@ export function PatientDetailPage() {
                 id: item.lab_id,
                 main: `${item.test_name}: ${item.value} ${item.unit}`,
                 when: formatDateTime(item.collected_at),
+                href:
+                  item.document_id
+                    ? `/patients/${encodeURIComponent(patient.patient_id)}/reports?doc=${encodeURIComponent(item.document_id)}`
+                    : undefined,
+                linkLabel: item.has_file ? "View report" : item.document_id ? "Open report" : undefined,
               }))}
             />
           ) : null}
@@ -631,6 +647,11 @@ export function PatientDetailPage() {
                 id: study.imaging_id,
                 main: `${study.modality}, ${study.body_part}: ${study.description}`,
                 when: formatDate(study.study_date),
+                href:
+                  study.document_id
+                    ? `/patients/${encodeURIComponent(patient.patient_id)}/reports?doc=${encodeURIComponent(study.document_id)}`
+                    : undefined,
+                linkLabel: study.has_file ? "View report" : study.document_id ? "Open report" : undefined,
               }))}
             />
           ) : null}
@@ -650,7 +671,13 @@ export function PatientDetailPage() {
   );
 }
 
-function SimpleList({ rows, empty }: { rows: { id: string; main: string; when: string }[]; empty: string }) {
+function SimpleList({
+  rows,
+  empty,
+}: {
+  rows: { id: string; main: string; when: string; href?: string; linkLabel?: string }[];
+  empty: string;
+}) {
   if (rows.length === 0) {
     return <EmptyState icon="doc" title={empty} />;
   }
@@ -660,6 +687,11 @@ function SimpleList({ rows, empty }: { rows: { id: string; main: string; when: s
         <li key={row.id}>
           <span>{row.main}</span>
           <span className="muted small">{row.when}</span>
+          {row.href && row.linkLabel ? (
+            <Link className="small" to={row.href}>
+              {row.linkLabel}
+            </Link>
+          ) : null}
         </li>
       ))}
     </ul>
