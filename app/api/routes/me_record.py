@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
@@ -18,14 +20,26 @@ from app.schemas.api import (
     ChartAskRequest,
     ChartAskResponse,
     DoctorBriefResponse,
+    EmergencyAlertListResponse,
+    EmergencyAlertOut,
     EmergencyCardOut,
     EmergencyCardPatch,
+    EmergencyPlaceIn,
+    EmergencyPublicOut,
     RecordShareCreate,
     RecordShareListResponse,
     RecordShareOut,
     RecordSharePublicOut,
+    SafetyChecksResponse,
 )
-from app.services import abdm_stub, doctor_view, patient_record_share
+from app.services import (
+    abdm_stub,
+    doctor_view,
+    emergency_access,
+    patient_record_share,
+    safety_checks,
+)
+from app.services.records import require_patient
 
 router = APIRouter(tags=["me-record"])
 
@@ -45,6 +59,12 @@ def _self_patient_code(request: Request, principal: AuthPrincipal) -> str:
     return code
 
 
+def _own_card(db: Session, code: str, payload: dict[str, Any]) -> EmergencyCardOut:
+    """Owner's card plus the QR link and alert setting (never sent to other viewers)."""
+    link = emergency_access.link_payload(db, require_patient(db, code))
+    return EmergencyCardOut(**{**payload, **link})
+
+
 @router.get("/me/emergency-card", response_model=EmergencyCardOut)
 def get_my_emergency_card(
     request: Request,
@@ -56,8 +76,9 @@ def get_my_emergency_card(
     payload = patient_record_share.emergency_card_payload(
         db, code, actor=_actor(request), record_view=True
     )
+    card = _own_card(db, code, payload)
     db.commit()
-    return EmergencyCardOut(**payload)
+    return card
 
 
 @router.patch("/me/emergency-card", response_model=EmergencyCardOut)
@@ -72,8 +93,81 @@ def patch_my_emergency_card(
     payload = patient_record_share.update_emergency_profile(
         db, code, body.model_dump(exclude_unset=True), actor=_actor(request)
     )
+    card = _own_card(db, code, payload)
     db.commit()
-    return EmergencyCardOut(**payload)
+    return card
+
+
+@router.post("/me/emergency-card/rotate-link", response_model=EmergencyCardOut)
+def rotate_my_emergency_link(
+    request: Request,
+    db: Session = Depends(get_db),
+    principal: AuthPrincipal = Depends(require_any_role("patient")),
+) -> EmergencyCardOut:
+    """New QR link; printed cards and saved copies with the old one stop working."""
+    code = _self_patient_code(request, principal)
+    enforce_patient_access(request, code, db)
+    emergency_access.rotate_public_token(db, code, actor=_actor(request))
+    payload = patient_record_share.emergency_card_payload(
+        db, code, actor=_actor(request), record_view=False
+    )
+    card = _own_card(db, code, payload)
+    db.commit()
+    return card
+
+
+@router.get("/me/emergency-alerts", response_model=EmergencyAlertListResponse)
+def list_my_emergency_alerts(
+    request: Request,
+    db: Session = Depends(get_db),
+    principal: AuthPrincipal = Depends(require_any_role("patient")),
+) -> EmergencyAlertListResponse:
+    """Openings of my card, and of cards of family who listed me."""
+    code = _self_patient_code(request, principal)
+    enforce_patient_access(request, code, db)
+    rows = emergency_access.list_alerts(db, code)
+    return EmergencyAlertListResponse(alerts=[EmergencyAlertOut(**row) for row in rows])
+
+
+@router.post("/me/emergency-alerts/{event_id}/ack", response_model=EmergencyAlertOut)
+def acknowledge_my_emergency_alert(
+    event_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    principal: AuthPrincipal = Depends(require_any_role("patient")),
+) -> EmergencyAlertOut:
+    code = _self_patient_code(request, principal)
+    enforce_patient_access(request, code, db)
+    row = emergency_access.acknowledge(db, code, event_id, actor=_actor(request))
+    db.commit()
+    return EmergencyAlertOut(**row)
+
+
+@router.get("/emergency/{token}", response_model=EmergencyPublicOut)
+def open_emergency_card(token: str, request: Request, db: Session = Depends(get_db)) -> EmergencyPublicOut:
+    """Public: the emergency summary behind a card's QR code. Each opening alerts the family."""
+    payload = emergency_access.open_public_card(
+        db, token, user_agent=request.headers.get("user-agent", "")
+    )
+    db.commit()
+    return EmergencyPublicOut(**payload)
+
+
+@router.post("/emergency/{token}/events/{event_id}/place", response_model=EmergencyAlertOut)
+def add_emergency_place(
+    token: str, event_id: str, body: EmergencyPlaceIn, db: Session = Depends(get_db)
+) -> EmergencyAlertOut:
+    """Public: the person who opened the card can tell the family where the patient is."""
+    row = emergency_access.add_place(
+        db,
+        token,
+        event_id,
+        place_note=body.place_note,
+        latitude=body.latitude,
+        longitude=body.longitude,
+    )
+    db.commit()
+    return EmergencyAlertOut(**{**row, "whose": ""})
 
 
 @router.get("/patients/{patient_id}/emergency-card", response_model=EmergencyCardOut)
@@ -193,6 +287,19 @@ def patient_doctor_brief(
     del principal
     enforce_patient_access(request, patient_id, db)
     return DoctorBriefResponse(**doctor_view.doctor_brief_pack(db, patient_id))
+
+
+@router.get("/patients/{patient_id}/safety-checks", response_model=SafetyChecksResponse)
+def patient_safety_checks(
+    patient_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    principal: AuthPrincipal = Depends(require_any_role(*sorted(ROLES_CHART_READ))),
+) -> SafetyChecksResponse:
+    """Cross-hospital checks: allergy vs medicine, same medicine twice, test not repeated."""
+    del principal
+    enforce_patient_access(request, patient_id, db)
+    return SafetyChecksResponse(**safety_checks.run_safety_checks(db, patient_id))
 
 
 @router.post("/patients/{patient_id}/chart-ask", response_model=ChartAskResponse)

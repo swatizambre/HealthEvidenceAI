@@ -1311,6 +1311,7 @@ class EmergencyCardPatch(APIModel):
     implants: str | None = None
     notes: str | None = None
     show_on_lock_screen: bool | None = None
+    alert_family: bool | None = None
     emergency_contacts: list[EmergencyContactIn] | None = None
 
 
@@ -1328,7 +1329,53 @@ class EmergencyCardOut(ResponseModel):
     notes: str = ""
     show_on_lock_screen: bool = True
     qr_payload: str = ""
+    emergency_url: str = ""
+    qr_modules: list[str] = []
+    alert_family: bool = True
     disclaimer: str = ""
+
+
+class EmergencyPublicContact(ResponseModel):
+    name: str = ""
+    phone: str = ""
+    relation: str = ""
+
+
+class EmergencyPublicOut(ResponseModel):
+    event_id: str
+    display_name: str
+    age: int | None = None
+    sex: str = ""
+    blood_group: str = ""
+    allergies: list[str] = []
+    conditions: list[str] = []
+    medications: list[dict[str, str]] = []
+    implants: str = ""
+    notes: str = ""
+    emergency_contacts: list[EmergencyPublicContact] = []
+    family_alerted: bool = True
+    disclaimer: str = ""
+
+
+class EmergencyPlaceIn(APIModel):
+    place_note: str = Field(default="", max_length=200)
+    latitude: float | None = None
+    longitude: float | None = None
+
+
+class EmergencyAlertOut(ResponseModel):
+    event_id: str
+    patient_id: str
+    whose: str
+    opened_at: str
+    place_note: str = ""
+    latitude: float | None = None
+    longitude: float | None = None
+    acknowledged: bool = False
+
+
+class EmergencyAlertListResponse(ResponseModel):
+    alerts: list[EmergencyAlertOut] = []
 
 
 class RecordShareCreate(APIModel):
@@ -1395,12 +1442,36 @@ class DoctorBriefLine(ResponseModel):
     source: str
 
 
+class SafetyFindingSource(ResponseModel):
+    ref: str
+    label: str
+
+
+class SafetyFinding(ResponseModel):
+    id: str
+    kind: str
+    severity: str
+    title: str
+    patient_text: str
+    doctor_text: str
+    sources: list[SafetyFindingSource] = []
+
+
+class SafetyChecksResponse(ResponseModel):
+    patient_id: str
+    checked_at: str
+    checked: dict[str, int] = {}
+    findings: list[SafetyFinding] = []
+    disclaimer: str = ""
+
+
 class DoctorBriefResponse(ResponseModel):
     patient_id: str
     display_name: str
     brief_lines: list[DoctorBriefLine] = []
     risk_flags: list[dict[str, str]] = []
     medications: dict = {}
+    safety_findings: list[SafetyFinding] = []
     completeness_percent: int = 0
     disclaimer: str = ""
 

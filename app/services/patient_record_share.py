@@ -19,6 +19,28 @@ _SHARE_SCOPES = frozenset(
 )
 
 
+# Coded-record tags that describe circumstances, not health problems (education,
+# employment, social risk). They never belong on an emergency card.
+_NON_CLINICAL_TAGS = ("(finding)", "(situation)", "(person)", "(social concept)", "(observable entity)")
+_INACTIVE_MED_STATUSES = frozenset({"stopped", "completed", "inactive", "discontinued", "cancelled"})
+
+
+def emergency_conditions(items: list[Any]) -> list[str]:
+    """Health problems worth showing in an emergency: no allergies, no social findings."""
+    out: list[str] = []
+    for item in items:
+        text = str(item).strip()
+        lower = text.lower()
+        if not text or any(word in lower for word in ("allerg", "hypersens", "anaphyla")):
+            continue
+        if lower.endswith(_NON_CLINICAL_TAGS):
+            continue
+        clean = text.removesuffix(" (disorder)").strip()
+        if clean and clean not in out:
+            out.append(clean)
+    return out
+
+
 def _now() -> datetime:
     return datetime.now(UTC)
 
@@ -62,7 +84,7 @@ def emergency_card_payload(
         for item in (patient.conditions or [])
         if "allerg" in str(item).lower() or "hypersens" in str(item).lower()
     ]
-    conditions = [item for item in (patient.conditions or []) if item not in allergies]
+    conditions = emergency_conditions(list(patient.conditions or []))
     if record_view:
         record_audit(
             session,
@@ -83,8 +105,10 @@ def emergency_card_payload(
         "allergies": allergies[:20],
         "conditions": conditions[:20],
         "medications": [
-            {"name": med.name, "dose": med.dose, "status": med.status} for med in meds[:20]
-        ],
+            {"name": med.name, "dose": med.dose, "status": med.status}
+            for med in meds
+            if (med.status or "").strip().lower() not in _INACTIVE_MED_STATUSES
+        ][:20],
         "implants": profile.implants or "",
         "emergency_contacts": profile.emergency_contacts or [],
         "notes": profile.notes or "",
@@ -110,6 +134,8 @@ def update_emergency_profile(
         profile.notes = str(patch["notes"])[:2000]
     if "show_on_lock_screen" in patch and patch["show_on_lock_screen"] is not None:
         profile.show_on_lock_screen = bool(patch["show_on_lock_screen"])
+    if "alert_family" in patch and patch["alert_family"] is not None:
+        profile.alert_family = bool(patch["alert_family"])
     if "emergency_contacts" in patch and patch["emergency_contacts"] is not None:
         contacts = patch["emergency_contacts"]
         if not isinstance(contacts, list):

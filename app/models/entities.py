@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
 
@@ -441,6 +441,27 @@ class EmergencyProfile(IdentityMixin, TimestampMixin, Base):
     emergency_contacts: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     notes: Mapped[str] = mapped_column(Text, default="")
     show_on_lock_screen: Mapped[bool] = mapped_column(default=True)
+    # Secret for the no-login emergency link printed as a QR; rotate to invalidate old cards.
+    public_token: Mapped[str | None] = mapped_column(String(48), nullable=True, unique=True, index=True)
+    alert_family: Mapped[bool] = mapped_column(default=True)
+
+
+class EmergencyAccessEvent(IdentityMixin, TimestampMixin, Base):
+    """One opening of a patient's emergency card through its public QR link."""
+
+    __tablename__ = "emergency_access_events"
+
+    event_code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    patient_id: Mapped[str] = mapped_column(
+        ForeignKey("patients.id", ondelete="CASCADE"), index=True
+    )
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    place_note: Mapped[str] = mapped_column(String(200), default="")
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    user_agent: Mapped[str] = mapped_column(String(160), default="")
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    acknowledged_by: Mapped[str] = mapped_column(String(120), default="")
 
 
 class RecordShare(IdentityMixin, TimestampMixin, Base):

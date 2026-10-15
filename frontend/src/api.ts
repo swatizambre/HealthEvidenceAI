@@ -1323,6 +1323,11 @@ export interface EmergencyCard {
   notes: string;
   show_on_lock_screen: boolean;
   qr_payload: string;
+  /** Secret no-login link behind the QR (owner only; empty for other viewers). */
+  emergency_url?: string;
+  /** QR matrix, one string per row ("1" dark). */
+  qr_modules?: string[];
+  alert_family?: boolean;
   disclaimer: string;
 }
 
@@ -1332,6 +1337,71 @@ export function getMyEmergencyCard(): Promise<EmergencyCard> {
 
 export function patchMyEmergencyCard(body: Partial<EmergencyCard>): Promise<EmergencyCard> {
   return request("/api/v1/me/emergency-card", { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export function rotateMyEmergencyLink(): Promise<EmergencyCard> {
+  return request("/api/v1/me/emergency-card/rotate-link", { method: "POST" });
+}
+
+export interface EmergencyAlert {
+  event_id: string;
+  patient_id: string;
+  /** "you" for your own card, otherwise the family member's name. */
+  whose: string;
+  opened_at: string;
+  place_note: string;
+  latitude: number | null;
+  longitude: number | null;
+  acknowledged: boolean;
+}
+
+export function getMyEmergencyAlerts(): Promise<{ alerts: EmergencyAlert[] }> {
+  return request("/api/v1/me/emergency-alerts");
+}
+
+export function ackEmergencyAlert(eventId: string): Promise<EmergencyAlert> {
+  return request(`/api/v1/me/emergency-alerts/${encodeURIComponent(eventId)}/ack`, { method: "POST" });
+}
+
+export interface PublicEmergencyCard {
+  event_id: string;
+  display_name: string;
+  age: number | null;
+  sex: string;
+  blood_group: string;
+  allergies: string[];
+  conditions: string[];
+  medications: { name: string; dose: string }[];
+  implants: string;
+  notes: string;
+  emergency_contacts: { name: string; phone: string; relation: string }[];
+  family_alerted: boolean;
+  disclaimer: string;
+}
+
+async function publicJson<T>(path: string, init?: RequestInit): Promise<T> {
+  // No sign-in on purpose: whoever finds the patient opens this.
+  const response = await fetch(path, { ...init, headers: { "Content-Type": "application/json" } });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { message?: string; error_code?: string };
+    throw new ApiError(body.message || "Could not open this emergency card.", response.status, body.error_code || "");
+  }
+  return (await response.json()) as T;
+}
+
+export function openPublicEmergencyCard(token: string): Promise<PublicEmergencyCard> {
+  return publicJson(`/api/v1/emergency/${encodeURIComponent(token)}`);
+}
+
+export function addEmergencyPlace(
+  token: string,
+  eventId: string,
+  body: { place_note?: string; latitude?: number; longitude?: number },
+): Promise<EmergencyAlert> {
+  return publicJson(
+    `/api/v1/emergency/${encodeURIComponent(token)}/events/${encodeURIComponent(eventId)}/place`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
 }
 
 export function getPatientEmergencyCard(patientId: string): Promise<EmergencyCard> {
@@ -1393,6 +1463,29 @@ export function createMyFamily(body: {
   return request("/api/v1/me/family", { method: "POST", body: JSON.stringify(body) });
 }
 
+export interface SafetyFinding {
+  id: string;
+  kind: "allergy_conflict" | "duplicate_medicine" | "test_not_repeated" | string;
+  severity: "high" | "review" | string;
+  title: string;
+  patient_text: string;
+  doctor_text: string;
+  sources: { ref: string; label: string }[];
+}
+
+export interface SafetyChecks {
+  patient_id: string;
+  checked_at: string;
+  checked: { active_medicines?: number; lab_results?: number; allergies?: number };
+  findings: SafetyFinding[];
+  disclaimer: string;
+}
+
+/** Cross-hospital checks: allergy vs medicine, same medicine twice, test not repeated. */
+export function getSafetyChecks(patientId: string): Promise<SafetyChecks> {
+  return request(`/api/v1/patients/${encodeURIComponent(patientId)}/safety-checks`);
+}
+
 export interface DoctorBrief {
   patient_id: string;
   display_name: string;
@@ -1403,6 +1496,7 @@ export interface DoctorBrief {
     duplicate_groups: { generic_key: string; names: string[] }[];
     disclaimer: string;
   };
+  safety_findings?: SafetyFinding[];
   completeness_percent: number;
   disclaimer: string;
 }
