@@ -9,7 +9,7 @@ import {
 import { useRole } from "../roleContext";
 import { Button, EmptyState, Notice, Skeleton, formatDateTime } from "../ui";
 
-const KIND_OPTIONS = [
+const ALL_KIND_OPTIONS = [
   { id: "auto", label: "Auto-detect" },
   { id: "lab_report", label: "Lab report (CBC, HbA1c…)" },
   { id: "imaging_report", label: "Imaging report (CT, MRI, X-ray…)" },
@@ -17,7 +17,13 @@ const KIND_OPTIONS = [
   { id: "clinical_note", label: "Clinical note" },
 ] as const;
 
-type UploadKind = (typeof KIND_OPTIONS)[number]["id"];
+const SCAN_KIND_OPTIONS = [
+  { id: "imaging_report", label: "CT / MRI / X-ray report" },
+  { id: "auto", label: "Auto-detect" },
+] as const;
+
+type UploadKind = (typeof ALL_KIND_OPTIONS)[number]["id"];
+export type LibraryScope = "all" | "scans";
 
 function typeLabel(value: string): string {
   return value.replace(/_/g, " ");
@@ -30,18 +36,34 @@ function bytesLabel(n: number): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function isScanReport(row: ReportItem): boolean {
+  if (row.document_type === "radiology_report") return true;
+  const hay = `${row.title} ${row.source} ${row.original_filename} ${row.document_type}`;
+  return /\b(ct|mri|x-?ray|usg|ultrasound|scan|radiolog|imaging|pet|mammogra)\b/i.test(hay);
+}
+
+export function ScansPage() {
+  return <DocumentLibraryPage scope="scans" />;
+}
+
 export function ReportsPage() {
+  return <DocumentLibraryPage scope="all" />;
+}
+
+function DocumentLibraryPage({ scope }: { scope: LibraryScope }) {
   const { patientId: routePatientId = "" } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const { isPatient, myPatientId } = useRole();
   const patientId = (routePatientId || myPatientId || "").toUpperCase();
   const focusDoc = searchParams.get("doc") || "";
+  const isScans = scope === "scans";
+  const kindOptions = isScans ? SCAN_KIND_OPTIONS : ALL_KIND_OPTIONS;
 
   const [reports, setReports] = useState<ReportItem[] | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
-  const [kind, setKind] = useState<UploadKind>("auto");
+  const [kind, setKind] = useState<UploadKind>(isScans ? "imaging_report" : "auto");
   const [selectedId, setSelectedId] = useState(focusDoc);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewType, setPreviewType] = useState("");
@@ -59,7 +81,7 @@ export function ReportsPage() {
       const body = await listPatientReports(patientId);
       setReports(body.reports);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load reports.");
+      setError(err instanceof Error ? err.message : "Could not load library.");
       setReports([]);
     } finally {
       setBusy(false);
@@ -74,9 +96,18 @@ export function ReportsPage() {
     if (focusDoc) setSelectedId(focusDoc);
   }, [focusDoc]);
 
+  useEffect(() => {
+    setKind(isScans ? "imaging_report" : "auto");
+  }, [isScans]);
+
+  const visible = useMemo(() => {
+    if (!reports) return null;
+    return isScans ? reports.filter(isScanReport) : reports;
+  }, [reports, isScans]);
+
   const selected = useMemo(
-    () => reports?.find((row) => row.document_id === selectedId) || null,
-    [reports, selectedId],
+    () => visible?.find((row) => row.document_id === selectedId) || null,
+    [visible, selectedId],
   );
 
   useEffect(() => {
@@ -131,7 +162,8 @@ export function ReportsPage() {
     setUploadBusy(true);
     setError("");
     try {
-      const saved = await uploadPatientReport(patientId, file, kind);
+      const uploadKind = isScans && kind === "auto" ? "imaging_report" : kind;
+      const saved = await uploadPatientReport(patientId, file, uploadKind);
       await load();
       setSelectedId(saved.document_id);
       setSearchParams({ doc: saved.document_id });
@@ -148,11 +180,16 @@ export function ReportsPage() {
     setSearchParams(id ? { doc: id } : {});
   }
 
+  const title = isScans ? "Scans" : "Reports";
+  const sibling = isScans
+    ? { to: `/patients/${patientId}/reports`, label: "All reports" }
+    : { to: `/patients/${patientId}/scans`, label: "Scans only" };
+
   if (!/^PAT-\d{6}$/.test(patientId)) {
     return (
       <section className="page">
         <Notice tone="warning" title="Choose a patient">
-          Open a chart first, then use Reports.{" "}
+          Open a chart first, then use {title}.{" "}
           <Link to={isPatient ? "/my-record" : "/patients"}>Go to patients</Link>
         </Notice>
       </section>
@@ -168,17 +205,22 @@ export function ReportsPage() {
         <span aria-hidden="true">/</span>
         <Link to={`/patients/${patientId}`}>{patientId}</Link>
         <span aria-hidden="true">/</span>
-        <span>Reports</span>
+        <span>{title}</span>
       </nav>
 
       <header className="page-head">
         <div>
-          <h1 className="page-title">Reports</h1>
+          <h1 className="page-title">{title}</h1>
           <p className="page-sub">
-            CBC PDFs, CT reports, and prescriptions — upload, extract, and preview the original file.
+            {isScans
+              ? "CT, MRI, X-ray, and ultrasound reports — upload the PDF or a photo of the film and preview it here. Full DICOM PACS viewing is not in this build."
+              : "Lab PDFs, prescriptions, and clinical notes — upload, extract, and preview the original file."}
           </p>
         </div>
         <div className="page-actions">
+          <Link className="button ghost" to={sibling.to}>
+            {sibling.label}
+          </Link>
           <Button variant="ghost" onClick={() => void load()} loading={busy}>
             Refresh
           </Button>
@@ -189,18 +231,18 @@ export function ReportsPage() {
       </header>
 
       {error ? (
-        <Notice tone="danger" title="Reports">
+        <Notice tone="danger" title={title}>
           {error}
         </Notice>
       ) : null}
 
       <form className="report-upload panel" onSubmit={(e) => void onUpload(e)}>
-        <h2 className="form-section-title">Upload a report</h2>
+        <h2 className="form-section-title">{isScans ? "Upload a scan report" : "Upload a report"}</h2>
         <div className="report-upload-row">
           <label className="field">
             <span>Type</span>
             <select value={kind} onChange={(e) => setKind(e.target.value as UploadKind)}>
-              {KIND_OPTIONS.map((opt) => (
+              {kindOptions.map((opt) => (
                 <option key={opt.id} value={opt.id}>
                   {opt.label}
                 </option>
@@ -208,8 +250,13 @@ export function ReportsPage() {
             </select>
           </label>
           <label className="field grow">
-            <span>File (PDF, image, or text · max 15 MB)</span>
-            <input name="report" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.txt,.md,application/pdf,image/*" required />
+            <span>File (PDF or image · max 15 MB)</span>
+            <input
+              name="report"
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.txt,.md,application/pdf,image/*"
+              required
+            />
           </label>
           <Button type="submit" variant="primary" icon="doc" loading={uploadBusy}>
             Upload &amp; extract
@@ -220,20 +267,25 @@ export function ReportsPage() {
       <div className="reports-layout">
         <div className="reports-list panel">
           <h2 className="form-section-title">Library</h2>
-          {busy && !reports ? <Skeleton lines={4} label="Loading reports" /> : null}
-          {reports && reports.length === 0 ? (
-            <EmptyState icon="doc" title="No reports yet" />
+          {busy && !visible ? <Skeleton lines={4} label={`Loading ${title.toLowerCase()}`} /> : null}
+          {visible && visible.length === 0 ? (
+            <EmptyState
+              icon="doc"
+              title={isScans ? "No scans yet" : "No reports yet"}
+            />
           ) : null}
-          {reports && reports.length > 0 ? (
+          {visible && visible.length > 0 ? (
             <ul className="report-items">
-              {reports.map((row) => (
+              {visible.map((row) => (
                 <li key={row.document_id}>
                   <button
                     type="button"
                     className={`report-item${selectedId === row.document_id ? " is-selected" : ""}`}
                     onClick={() => selectReport(row.document_id)}
                   >
-                    <span className="report-item-title">{row.title || row.original_filename || row.document_id}</span>
+                    <span className="report-item-title">
+                      {row.title || row.original_filename || row.document_id}
+                    </span>
                     <span className="muted small">
                       {typeLabel(row.document_type)}
                       {row.created_at ? ` · ${formatDateTime(row.created_at)}` : ""}
@@ -249,7 +301,11 @@ export function ReportsPage() {
         <div className="report-preview panel" aria-live="polite">
           <h2 className="form-section-title">Preview</h2>
           {!selected ? (
-            <p className="muted">Select a report to preview the original PDF or image.</p>
+            <p className="muted">
+              {isScans
+                ? "Select a scan report to preview the PDF or photo."
+                : "Select a report to preview the original PDF or image."}
+            </p>
           ) : (
             <>
               <p className="report-preview-meta">
@@ -261,13 +317,23 @@ export function ReportsPage() {
                 </span>
               </p>
               {previewBusy ? <Skeleton lines={3} label="Opening file" /> : null}
-              {!previewBusy && previewUrl && (previewType.includes("pdf") || selected.preview_kind === "pdf") ? (
+              {!previewBusy &&
+              previewUrl &&
+              (previewType.includes("pdf") || selected.preview_kind === "pdf") ? (
                 <iframe className="report-frame" title="PDF preview" src={previewUrl} />
               ) : null}
-              {!previewBusy && previewUrl && (previewType.startsWith("image/") || selected.preview_kind === "image") ? (
-                <img className="report-image" src={previewUrl} alt={selected.original_filename || "Report"} />
+              {!previewBusy &&
+              previewUrl &&
+              (previewType.startsWith("image/") || selected.preview_kind === "image") ? (
+                <img
+                  className="report-image"
+                  src={previewUrl}
+                  alt={selected.original_filename || "Scan"}
+                />
               ) : null}
-              {!previewBusy && previewText ? <pre className="source-text report-text">{previewText}</pre> : null}
+              {!previewBusy && previewText ? (
+                <pre className="source-text report-text">{previewText}</pre>
+              ) : null}
               {!previewBusy && selected.content_excerpt && !previewUrl && !previewText ? (
                 <pre className="source-text report-text">{selected.content_excerpt}</pre>
               ) : null}

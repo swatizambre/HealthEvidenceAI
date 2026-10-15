@@ -45,8 +45,8 @@ import {
   formatDateTime,
 } from "../ui";
 
-type ChartTab = "file" | "notes" | "labs" | "meds" | "imaging" | "procedures";
-const CHART_TABS: ChartTab[] = ["file", "notes", "labs", "meds", "imaging", "procedures"];
+type ChartTab = "file" | "notes" | "labs" | "meds" | "imaging" | "procedures" | "insurance";
+const CLINICAL_TABS: ChartTab[] = ["file", "notes", "labs", "meds", "imaging", "procedures"];
 
 const TYPE_LABELS: Record<string, string> = {
   clinical_note: "Note",
@@ -99,10 +99,18 @@ export function PatientDetailPage() {
 
   const blocked = isPatient && Boolean(patientId) && patientId.toUpperCase() !== myPatientId;
   const tabParam = searchParams.get("tab") || "";
-  const tab: ChartTab = (CHART_TABS as string[]).includes(tabParam) ? (tabParam as ChartTab) : "file";
   const autoPrepare = searchParams.get("prepare") === "1";
   const policyParam = searchParams.get("policy") || "";
   const caseParam = searchParams.get("case") || "";
+  // Insurance is optional — only open that tab when asked (tab=, prepare=, or an open case deep-link).
+  const wantsInsurance =
+    tabParam === "insurance" || autoPrepare || Boolean(caseParam);
+  const tab: ChartTab =
+    !isPatient && wantsInsurance
+      ? "insurance"
+      : (CLINICAL_TABS as string[]).includes(tabParam)
+        ? (tabParam as ChartTab)
+        : "file";
 
   useEffect(() => {
     if (blocked) return;
@@ -204,6 +212,9 @@ export function PatientDetailPage() {
     const params = new URLSearchParams(searchParams);
     if (next === "file") params.delete("tab");
     else params.set("tab", next);
+    if (next !== "insurance") {
+      params.delete("prepare");
+    }
     setSearchParams(params, { replace: true });
   }
 
@@ -317,6 +328,9 @@ export function PatientDetailPage() {
           <ButtonLink to={`/patients/${encodeURIComponent(patient.patient_id)}/reports`} icon="doc">
             Reports
           </ButtonLink>
+          <ButtonLink to={`/patients/${encodeURIComponent(patient.patient_id)}/scans`} icon="search">
+            Scans
+          </ButtonLink>
           {canDocument ? (
             <ButtonLink to={`/visit?patient=${encodeURIComponent(patient.patient_id)}`} icon="note">
               Add visit note
@@ -328,121 +342,6 @@ export function PatientDetailPage() {
       {!isPatient ? <DoctorBriefPanel patientId={patient.patient_id} /> : null}
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
-
-      <section className="panel packet-panel" id="evidence-packet" aria-labelledby="packet-title">
-        <div className="section-bar">
-          <h2 className="section-title" id="packet-title">
-            Evidence pack
-          </h2>
-          {!hasDeskCase && canPrepare && cases !== null ? (
-            <div className="button-row">
-              {policies.length > 1 ? (
-                <label className="inline-field">
-                  <span className="sr-only">Checklist</span>
-                  <select
-                    value={policyId}
-                    onChange={(event) => {
-                      setPolicyId(event.target.value);
-                      setPacket(null);
-                    }}
-                  >
-                    {policies.map((item) => (
-                      <option key={item.policy_id} value={item.policy_id}>
-                        {policyOptionLabel(item)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
-              <Button variant="primary" size="sm" loading={prepBusy} disabled={!policyId} onClick={() => void runPrepare()}>
-                {packet ? "Re-check evidence pack" : "Prepare evidence pack"}
-              </Button>
-            </div>
-          ) : null}
-        </div>
-
-        {hasDeskCase ? (
-          <>
-            <p className="muted small">
-              One readiness number per case: required checklist items supported by the chart.
-            </p>
-            <ul className="case-rows">
-              {(cases ?? []).map((item) => (
-                <li key={item.case_id}>
-                  <Link className="case-row" to={`/cases/${encodeURIComponent(item.case_id)}`}>
-                    <span className="case-row-main">
-                      <strong>{item.proposed_treatment || item.case_id}</strong>
-                      <span className="muted small">
-                        {item.case_id}
-                        {item.insurer_name ? `, ${item.insurer_name}` : ""}
-                        {item.tpa_name ? ` via ${item.tpa_name}` : ""}
-                      </span>
-                    </span>
-                    <StagePill stage={item.stage} fallbackLabel={item.stage_label} />
-                    <span className="num">
-                      {Math.round(item.readiness_percent)}% ready
-                      {item.open_items ? <span className="muted small">, {item.open_items} open</span> : null}
-                    </span>
-                    <ClockChip clock={item.clock} />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : packet ? (
-          <div className="packet-result">
-            <ReadinessMeter
-              percent={packet.readiness_percent}
-              label={`${packet.supported_count} supported, ${packet.gap_count} open item${packet.gap_count === 1 ? "" : "s"}`}
-            />
-            {packet.gaps.length > 0 ? (
-              <ul className="gap-list">
-                {packet.gaps.map((gap) => (
-                  <li key={`${gap.focus}-${gap.label}`}>
-                    <span>{gap.label}</span>
-                    <ButtonLink size="sm" to={visitHref(packet.patient_id, gap)}>
-                      {gap.draft_suggestion ? "Use draft in visit note" : "Add to chart"}
-                    </ButtonLink>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="muted">Nothing left open on this checklist.</p>
-            )}
-            <details className="disclosure">
-              <summary>Full checklist ({packet.criteria.length} items)</summary>
-              <ul className="check-list compact">
-                {packet.criteria.map((item) => (
-                  <li key={item.criterion_id} className="check-item">
-                    <div className="check-head">
-                      <ItemStatusPill status={packetStatus(item.status)} />
-                      <p className="check-label">{item.criterion}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </details>
-            <div className="button-row">
-              <Button size="sm" icon="print" onClick={printPacket}>
-                Print / Save PDF
-              </Button>
-              {packet.human_review_required ? (
-                <ButtonLink size="sm" to={`/reviews?case=${encodeURIComponent(packet.case_id)}&queue=open`}>
-                  Open in Reviews
-                </ButtonLink>
-              ) : null}
-            </div>
-          </div>
-        ) : (
-          <p className="muted">
-            {canPrepare
-              ? deskMissing
-                ? "Case tracking is not available on this server yet. You can still check the chart against a pre-auth checklist."
-                : "No cashless case is open for this patient. Check the chart against a pre-auth checklist to see what is still missing."
-              : "Preparing an evidence pack needs a care-team sign-in."}
-          </p>
-        )}
-      </section>
 
       {gaps.length > 0 ? (
         <section className="panel" aria-labelledby="gaps-title">
@@ -525,8 +424,17 @@ export function PatientDetailPage() {
             { id: "notes", label: "Notes", count: patient.clinical_notes.length },
             { id: "labs", label: "Labs", count: patient.labs.length },
             { id: "meds", label: "Medications", count: patient.medications.length },
-            { id: "imaging", label: "Imaging", count: patient.imaging.length },
+            { id: "imaging", label: "Scans", count: patient.imaging.length },
             { id: "procedures", label: "Procedures", count: patient.procedures.length },
+            ...(!isPatient
+              ? [
+                  {
+                    id: "insurance" as const,
+                    label: "Insurance",
+                    count: hasDeskCase ? (cases ?? []).length : undefined,
+                  },
+                ]
+              : []),
           ]}
           active={tab}
           onChange={setTab}
@@ -534,6 +442,138 @@ export function PatientDetailPage() {
           idPrefix="chart"
         />
         <div id="chart-panel" role="tabpanel" aria-labelledby={`chart-tab-${tab}`} className="panel tab-panel">
+          {tab === "insurance" && !isPatient ? (
+            <section className="packet-panel" id="evidence-packet" aria-labelledby="packet-title">
+              <div className="section-bar">
+                <div>
+                  <h2 className="section-title" id="packet-title">
+                    Insurance (optional)
+                  </h2>
+                  <p className="muted small">
+                    Only when the patient has cashless / insurance cover. Skip this tab for self-pay visits.
+                  </p>
+                </div>
+                {!hasDeskCase && canPrepare && cases !== null ? (
+                  <div className="button-row">
+                    {policies.length > 1 ? (
+                      <label className="inline-field">
+                        <span className="sr-only">Checklist</span>
+                        <select
+                          value={policyId}
+                          onChange={(event) => {
+                            setPolicyId(event.target.value);
+                            setPacket(null);
+                          }}
+                        >
+                          {policies.map((item) => (
+                            <option key={item.policy_id} value={item.policy_id}>
+                              {policyOptionLabel(item)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      loading={prepBusy}
+                      disabled={!policyId}
+                      onClick={() => void runPrepare()}
+                    >
+                      {packet ? "Re-check evidence pack" : "Prepare evidence pack"}
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+
+              {hasDeskCase ? (
+                <>
+                  <p className="muted small">
+                    One readiness number per case: required checklist items supported by the chart.
+                  </p>
+                  <ul className="case-rows">
+                    {(cases ?? []).map((item) => (
+                      <li key={item.case_id}>
+                        <Link className="case-row" to={`/cases/${encodeURIComponent(item.case_id)}`}>
+                          <span className="case-row-main">
+                            <strong>{item.proposed_treatment || item.case_id}</strong>
+                            <span className="muted small">
+                              {item.case_id}
+                              {item.insurer_name ? `, ${item.insurer_name}` : ""}
+                              {item.tpa_name ? ` via ${item.tpa_name}` : ""}
+                            </span>
+                          </span>
+                          <StagePill stage={item.stage} fallbackLabel={item.stage_label} />
+                          <span className="num">
+                            {Math.round(item.readiness_percent)}% ready
+                            {item.open_items ? (
+                              <span className="muted small">, {item.open_items} open</span>
+                            ) : null}
+                          </span>
+                          <ClockChip clock={item.clock} />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : packet ? (
+                <div className="packet-result">
+                  <ReadinessMeter
+                    percent={packet.readiness_percent}
+                    label={`${packet.supported_count} supported, ${packet.gap_count} open item${packet.gap_count === 1 ? "" : "s"}`}
+                  />
+                  {packet.gaps.length > 0 ? (
+                    <ul className="gap-list">
+                      {packet.gaps.map((gap) => (
+                        <li key={`${gap.focus}-${gap.label}`}>
+                          <span>{gap.label}</span>
+                          <ButtonLink size="sm" to={visitHref(packet.patient_id, gap)}>
+                            {gap.draft_suggestion ? "Use draft in visit note" : "Add to chart"}
+                          </ButtonLink>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="muted">Nothing left open on this checklist.</p>
+                  )}
+                  <details className="disclosure">
+                    <summary>Full checklist ({packet.criteria.length} items)</summary>
+                    <ul className="check-list compact">
+                      {packet.criteria.map((item) => (
+                        <li key={item.criterion_id} className="check-item">
+                          <div className="check-head">
+                            <ItemStatusPill status={packetStatus(item.status)} />
+                            <p className="check-label">{item.criterion}</p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                  <div className="button-row">
+                    <Button size="sm" icon="print" onClick={printPacket}>
+                      Print / Save PDF
+                    </Button>
+                    {packet.human_review_required ? (
+                      <ButtonLink
+                        size="sm"
+                        to={`/reviews?case=${encodeURIComponent(packet.case_id)}&queue=open`}
+                      >
+                        Open in Reviews
+                      </ButtonLink>
+                    ) : null}
+                  </div>
+                </div>
+              ) : (
+                <p className="muted">
+                  {canPrepare
+                    ? deskMissing
+                      ? "Case tracking is not available on this server yet. You can still check the chart against a pre-auth checklist."
+                      : "No cashless case is open. Use Prepare evidence pack only when insurance applies."
+                    : "Preparing an evidence pack needs a care-team sign-in."}
+                </p>
+              )}
+            </section>
+          ) : null}
           {tab === "file" ? (
             <>
               {specialties.length > 1 ? (
@@ -641,19 +681,25 @@ export function PatientDetailPage() {
             />
           ) : null}
           {tab === "imaging" ? (
-            <SimpleList
-              empty="No imaging recorded"
-              rows={patient.imaging.map((study) => ({
-                id: study.imaging_id,
-                main: `${study.modality}, ${study.body_part}: ${study.description}`,
-                when: formatDate(study.study_date),
-                href:
-                  study.document_id
-                    ? `/patients/${encodeURIComponent(patient.patient_id)}/reports?doc=${encodeURIComponent(study.document_id)}`
-                    : undefined,
-                linkLabel: study.has_file ? "View report" : study.document_id ? "Open report" : undefined,
-              }))}
-            />
+            <>
+              <div className="button-row" style={{ marginBottom: "0.75rem" }}>
+                <ButtonLink size="sm" to={`/patients/${encodeURIComponent(patient.patient_id)}/scans`}>
+                  Open scans library
+                </ButtonLink>
+              </div>
+              <SimpleList
+                empty="No scans recorded yet — upload a CT/MRI/X-ray report from Scans"
+                rows={patient.imaging.map((study) => ({
+                  id: study.imaging_id,
+                  main: `${study.modality}, ${study.body_part}: ${study.description}`,
+                  when: formatDate(study.study_date),
+                  href: study.document_id
+                    ? `/patients/${encodeURIComponent(patient.patient_id)}/scans?doc=${encodeURIComponent(study.document_id)}`
+                    : `/patients/${encodeURIComponent(patient.patient_id)}/scans`,
+                  linkLabel: study.has_file ? "View scan" : "Open scans",
+                }))}
+              />
+            </>
           ) : null}
           {tab === "procedures" ? (
             <SimpleList

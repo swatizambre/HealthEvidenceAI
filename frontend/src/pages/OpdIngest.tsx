@@ -155,7 +155,13 @@ export function OpdIngestPage() {
       focus === "diagnoses",
   );
   const [procedure, setProcedure] = useState("");
-  const [policyId, setPolicyId] = useState(policyParam || "POL-000001");
+  const [policyId, setPolicyId] = useState(policyParam || "");
+  const [includeInsurance, setIncludeInsurance] = useState(
+    () => Boolean(policyParam) || Boolean(caseParam),
+  );
+  const [advancedOpen, setAdvancedOpen] = useState(
+    () => window.location.hash === "#hospital-feed" || window.location.hash === "#fhir",
+  );
   const [fhirJson, setFhirJson] = useState(SAMPLE_FHIR);
   const [consentAttested, setConsentAttested] = useState(false);
   // PHI desks need a stored consent (selector / inline form) instead of the checkbox.
@@ -257,13 +263,9 @@ export function OpdIngestPage() {
     getPolicies()
       .then((body) => {
         setPolicies(body.policies);
-        const preferred =
-          body.policies.find((item) => item.policy_id === policyParam) ??
-          body.policies.find((item) => item.policy_id === "POL-000001") ??
-          body.policies[0];
-        if (preferred) {
-          setPolicyId(preferred.policy_id);
-          // Procedure stays empty: the desk types it (no Synthea default).
+        if (policyParam) {
+          const preferred = body.policies.find((item) => item.policy_id === policyParam);
+          if (preferred) setPolicyId(preferred.policy_id);
         }
       })
       .catch((err: Error) => setError(err.message));
@@ -555,8 +557,8 @@ export function OpdIngestPage() {
           }))
           .filter((row) => row.name),
         note: extractMeta?.note?.trim() || undefined,
-        procedure: procedure.trim(),
-        policy_id: policyId || undefined,
+        procedure: (includeInsurance ? procedure.trim() : "") || "Outpatient visit",
+        policy_id: includeInsurance && policyId ? policyId : undefined,
         source: "his_export",
         synthetic: !consentRequired,
         consent_attested: consentRequired ? true : consentAttested,
@@ -601,8 +603,8 @@ export function OpdIngestPage() {
         : {};
       const body = await ingestOpdFhir({
         bundle,
-        procedure: procedure.trim(),
-        policy_id: policyId || undefined,
+        procedure: procedure.trim() || "Outpatient visit",
+        policy_id: includeInsurance && policyId ? policyId : undefined,
         patient_id: consentRequired ? fhirPatient : undefined,
         synthetic: !consentRequired,
         consent_attested: consentRequired ? true : consentAttested,
@@ -623,8 +625,8 @@ export function OpdIngestPage() {
           <h1 className="page-title">Visit note</h1>
           <p className="page-sub">
             {isPatient
-              ? "Record a visit, treatment, or update so every future clinician can see it in your lifelong chart."
-              : "Document the visit under the correct facility and department so it becomes part of the lifelong chart."}
+              ? "Record today’s visit so every future clinician can see it in your lifelong chart."
+              : "Document today’s visit — facility, specialty, complaint, plan — then save to the chart."}
           </p>
         </div>
       </header>
@@ -632,99 +634,13 @@ export function OpdIngestPage() {
       {gapHint ? (
         <div className="notice notice-warning" role="status">
           <div className="notice-body">
-          <p className="notice-title">Please add this to the chart</p>
-          <p className="muted">{gapHint}</p>
-          <p className="muted small">
-            Form is focused on {focus || "a note"}. Save this visit note, then re-check the evidence
-            pack on the patient chart.
-          </p>
+            <p className="notice-title">Please add this to the chart</p>
+            <p className="muted">{gapHint}</p>
+            <p className="muted small">
+              Form is focused on {focus || "a note"}. Save the visit, then open the patient chart.
+            </p>
           </div>
         </div>
-      ) : null}
-
-      {!isPatient ? (
-        <details
-          className="panel disclosure"
-          id="hospital-feed"
-          aria-label="Hospital interface pipeline"
-          open={feedOpenInitially || undefined}
-        >
-          <summary>
-            <span className="section-title">Hospital feed</span>
-            <span className="muted small">Practice HIS/FHIR feed</span>
-          </summary>
-          <div className="section-bar">
-            <div>
-              <p className="muted">
-                Practice HIS/FHIR path: visit lands on chart, evidence pack refreshes, the work queue updates
-                over live push.
-              </p>
-            </div>
-            <p className="muted small" role="status">
-              {formatLiveAge(pipeUpdatedAt, pushConnected)}
-              {pipeStatus
-                ? ` · ${pipeStatus.recent_ok}/${pipeStatus.recent_total} recent ok`
-                : ""}
-            </p>
-          </div>
-          <div className="button-row">
-            {pipeStatus?.simulate_allowed !== false ? (
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={pipeBusy}
-                onClick={() => void onSimulateHospitalFeed()}
-              >
-                {pipeBusy ? "Running feed…" : "Simulate hospital visit"}
-              </button>
-            ) : (
-              <p className="muted small" role="status">
-                Live mode — use HIS/FHIR hospital feeds (simulator off).
-                {pipeStatus?.phi_live ? " PHI program attested." : ""}
-              </p>
-            )}
-            <button
-              type="button"
-              className="btn btn-secondary"
-              disabled={pipeBusy}
-              onClick={() => refreshPipeline()}
-            >
-              Refresh pipeline
-            </button>
-            {pipeRun?.case_id ? (
-              <Link
-                className="btn btn-secondary"
-                to={`/reviews?case=${encodeURIComponent(pipeRun.case_id)}`}
-              >
-                Open case {pipeRun.case_id}
-              </Link>
-            ) : null}
-            {pipeRun?.patient_id ? (
-              <Link className="btn btn-secondary" to={`/patients/${pipeRun.patient_id}?prepare=1`}>
-                Open chart
-              </Link>
-            ) : null}
-          </div>
-          {pipeRun ? (
-            <p className="muted small" role="status">
-              Last run {pipeRun.status}
-              {pipeRun.patient_id ? ` · ${pipeRun.patient_id}` : ""}
-              {pipeRun.case_id ? ` · ${pipeRun.case_id}` : ""}
-              {pipeRun.auto_prepared && pipeRun.readiness_percent != null
-                ? ` · pack ${pipeRun.readiness_percent}%`
-                : ""}
-              {pipeRun.detail ? ` — ${pipeRun.detail}` : ""}
-            </p>
-          ) : pipeStatus?.runs?.[0] ? (
-            <p className="muted small" role="status">
-              Latest feed: {pipeStatus.runs[0].status}
-              {pipeStatus.runs[0].patient_id ? ` · ${pipeStatus.runs[0].patient_id}` : ""}
-              {pipeStatus.runs[0].detail ? ` — ${pipeStatus.runs[0].detail}` : ""}
-            </p>
-          ) : (
-            <p className="muted small">No hospital feeds yet. Run a simulation to see a visit land on the chart.</p>
-          )}
-        </details>
       ) : null}
 
       {!isPatient && (focus === "document" || /^PAT-\d{6}$/.test(selectedPatientId)) ? (
@@ -736,27 +652,6 @@ export function OpdIngestPage() {
           defaultOpen={focus === "document"}
         />
       ) : null}
-
-      <div className="tabs" role="tablist" aria-label="Visit entry mode">
-        <button
-          type="button"
-          role="tab"
-          className={`tab${mode === "visit" ? " is-active" : ""}`}
-          aria-selected={mode === "visit"}
-          onClick={() => setMode("visit")}
-        >
-          Visit note form
-        </button>
-        <button
-          type="button"
-          role="tab"
-          className={`tab${mode === "fhir" ? " is-active" : ""}`}
-          aria-selected={mode === "fhir"}
-          onClick={() => setMode("fhir")}
-        >
-          FHIR import
-        </button>
-      </div>
 
       {error ? (
         <p className="form-error" role="alert">
@@ -1215,34 +1110,55 @@ export function OpdIngestPage() {
             </>
           ) : null}
 
-          <h2 className="form-section-title span-2">Evidence pack</h2>
-          <label className="field">
-            <span>Checklist</span>
-            <select
-              value={policyId}
-              onChange={(e) => {
-                const next = e.target.value;
-                setPolicyId(next);
-                const match = policies.find((item) => item.policy_id === next);
-                if (match && !procedure.trim()) setProcedure(match.procedure);
-              }}
-            >
-              {policies.map((item) => (
-                <option key={item.policy_id} value={item.policy_id}>
-                  {policyOptionLabel(item)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Procedure</span>
-            <input
-              value={procedure}
-              onChange={(e) => setProcedure(e.target.value)}
-              placeholder="e.g. Total knee replacement"
-              required
-            />
-          </label>
+          <div className="span-2 insurance-opt-in">
+            <label className="consent-check">
+              <input
+                type="checkbox"
+                checked={includeInsurance}
+                onChange={(e) => {
+                  const on = e.target.checked;
+                  setIncludeInsurance(on);
+                  if (on && !policyId && policies[0]) setPolicyId(policies[0].policy_id);
+                  if (!on) setPolicyId("");
+                }}
+              />
+              <span>This visit involves insurance / cashless (optional)</span>
+            </label>
+            {includeInsurance ? (
+              <div className="form-grid insurance-fields">
+                <label className="field">
+                  <span>Checklist</span>
+                  <select
+                    value={policyId}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setPolicyId(next);
+                      const match = policies.find((item) => item.policy_id === next);
+                      if (match && !procedure.trim()) setProcedure(match.procedure);
+                    }}
+                  >
+                    <option value="">Select checklist…</option>
+                    {policies.map((item) => (
+                      <option key={item.policy_id} value={item.policy_id}>
+                        {policyOptionLabel(item)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Procedure</span>
+                  <input
+                    value={procedure}
+                    onChange={(e) => setProcedure(e.target.value)}
+                    placeholder="e.g. Total knee replacement"
+                    required={includeInsurance}
+                  />
+                </label>
+              </div>
+            ) : (
+              <p className="muted small">Skip for self-pay or routine visits — no pre-auth case is created.</p>
+            )}
+          </div>
 
           {consentRequired ? (
             <ConsentCapture
@@ -1281,8 +1197,14 @@ export function OpdIngestPage() {
             <span className="muted">Save attaches this visit to the patient chart.</span>
           </div>
         </form>
-      ) : (
+      ) : null}
+
+      {mode === "fhir" ? (
         <form className="panel form-grid" onSubmit={onSubmitFhir}>
+          <p className="muted span-2">
+            Paste a FHIR R4 Bundle from the hospital interface. Prefer the visit form above for
+            day-to-day documentation.
+          </p>
           <label className="field span-2">
             <span>FHIR R4 Bundle JSON</span>
             <textarea
@@ -1293,25 +1215,38 @@ export function OpdIngestPage() {
               required
             />
           </label>
-          <label className="field">
-            <span>Policy</span>
-            <select value={policyId} onChange={(e) => setPolicyId(e.target.value)}>
-              {policies.map((item) => (
-                <option key={item.policy_id} value={item.policy_id}>
-                  {policyOptionLabel(item)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Procedure</span>
+          <label className="field span-2 consent-check">
             <input
-              value={procedure}
-              onChange={(e) => setProcedure(e.target.value)}
-              placeholder="e.g. Total knee replacement"
-              required
+              type="checkbox"
+              checked={includeInsurance}
+              onChange={(e) => setIncludeInsurance(e.target.checked)}
             />
+            <span>Also open an insurance / cashless case (optional)</span>
           </label>
+          {includeInsurance ? (
+            <>
+              <label className="field">
+                <span>Checklist</span>
+                <select value={policyId} onChange={(e) => setPolicyId(e.target.value)}>
+                  <option value="">Select checklist…</option>
+                  {policies.map((item) => (
+                    <option key={item.policy_id} value={item.policy_id}>
+                      {policyOptionLabel(item)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Procedure</span>
+                <input
+                  value={procedure}
+                  onChange={(e) => setProcedure(e.target.value)}
+                  placeholder="e.g. Total knee replacement"
+                  required={includeInsurance}
+                />
+              </label>
+            </>
+          ) : null}
           {consentRequired ? (
             <ConsentCapture
               patientId={
@@ -1337,16 +1272,82 @@ export function OpdIngestPage() {
                 </span>
               </label>
             )}
-            <button
-              className="btn btn-primary"
-              type="submit"
-              disabled={busy || !consentReady}
-            >
+            <button className="btn btn-primary" type="submit" disabled={busy || !consentReady}>
               {busy ? "Importing…" : "Import FHIR visit"}
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => setMode("visit")}>
+              Back to visit form
             </button>
           </div>
         </form>
-      )}
+      ) : null}
+
+      {!isPatient ? (
+        <details
+          className="panel disclosure visit-advanced"
+          id="hospital-feed"
+          open={advancedOpen || feedOpenInitially || undefined}
+          onToggle={(event) => setAdvancedOpen((event.target as HTMLDetailsElement).open)}
+        >
+          <summary>
+            <span className="section-title">Hospital systems</span>
+            <span className="muted small">HIS feed · FHIR import · optional for integrators</span>
+          </summary>
+          <div className="section-bar">
+            <p className="muted">
+              Practice path for interface engines: a simulated HIS visit lands on the chart, and live
+              push updates connected desks.
+            </p>
+            <p className="muted small" role="status">
+              {formatLiveAge(pipeUpdatedAt, pushConnected)}
+              {pipeStatus ? ` · ${pipeStatus.recent_ok}/${pipeStatus.recent_total} recent ok` : ""}
+            </p>
+          </div>
+          <div className="button-row">
+            {pipeStatus?.simulate_allowed !== false ? (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={pipeBusy}
+                onClick={() => void onSimulateHospitalFeed()}
+              >
+                {pipeBusy ? "Running feed…" : "Simulate hospital visit"}
+              </button>
+            ) : (
+              <p className="muted small" role="status">
+                Live mode — use HIS/FHIR hospital feeds (simulator off).
+                {pipeStatus?.phi_live ? " PHI program attested." : ""}
+              </p>
+            )}
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={pipeBusy}
+              onClick={() => refreshPipeline()}
+            >
+              Refresh pipeline
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => setMode("fhir")}>
+              Paste FHIR Bundle
+            </button>
+            {pipeRun?.patient_id ? (
+              <Link className="btn btn-secondary" to={`/patients/${pipeRun.patient_id}`}>
+                Open chart
+              </Link>
+            ) : null}
+          </div>
+          {pipeRun ? (
+            <p className="muted small" role="status">
+              Last run {pipeRun.status}
+              {pipeRun.patient_id ? ` · ${pipeRun.patient_id}` : ""}
+              {pipeRun.case_id ? ` · ${pipeRun.case_id}` : ""}
+              {pipeRun.detail ? ` — ${pipeRun.detail}` : ""}
+            </p>
+          ) : (
+            <p className="muted small">No hospital feeds yet.</p>
+          )}
+        </details>
+      ) : null}
 
       {result ? (
         <div className="panel success-panel" role="status">
@@ -1355,12 +1356,12 @@ export function OpdIngestPage() {
           </h2>
           <p>
             Patient <strong>{result.patient_id}</strong>
-            {result.case_id ? ` · Case ${result.case_id}` : null}
-            {pipeRun?.auto_prepared && pipeRun.readiness_percent != null
-              ? ` · Evidence pack ${pipeRun.readiness_percent}%`
-              : " Re-check the evidence pack so it updates with this note."}
+            {result.case_id ? ` · Case ${result.case_id}` : ""} — this visit is on the lifelong chart.
           </p>
           <div className="button-row">
+            <Link className="btn btn-primary" to={`/patients/${result.patient_id}`}>
+              Open chart
+            </Link>
             <button
               type="button"
               className="btn btn-secondary"
@@ -1390,21 +1391,21 @@ export function OpdIngestPage() {
             >
               Print visit summary
             </button>
-            <Link
-              className="btn btn-primary"
-              to={`/patients/${result.patient_id}?${new URLSearchParams({
-                prepare: "1",
-                ...(policyId ? { policy: policyId } : {}),
-                ...(result.case_id || caseParam
-                  ? { case: result.case_id || caseParam }
-                  : {}),
-              }).toString()}`}
-            >
-              Re-check evidence pack
-            </Link>
-            <Link className="btn btn-secondary" to={`/patients/${result.patient_id}`}>
-              Open chart
-            </Link>
+            {includeInsurance && (result.case_id || policyId) ? (
+              <Link
+                className="btn btn-secondary"
+                to={`/patients/${result.patient_id}?${new URLSearchParams({
+                  tab: "insurance",
+                  prepare: "1",
+                  ...(policyId ? { policy: policyId } : {}),
+                  ...(result.case_id || caseParam
+                    ? { case: result.case_id || caseParam }
+                    : {}),
+                }).toString()}`}
+              >
+                Open insurance tab
+              </Link>
+            ) : null}
             {result.case_id ? (
               <Link
                 className="btn btn-secondary"

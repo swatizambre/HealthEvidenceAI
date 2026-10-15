@@ -12,7 +12,7 @@ import { OpdIngestPage } from "./pages/OpdIngest";
 import { PatientDetailPage } from "./pages/PatientDetail";
 import { PatientsPage } from "./pages/Patients";
 import { PublicSharePage } from "./pages/PublicShare";
-import { ReportsPage } from "./pages/Reports";
+import { ReportsPage, ScansPage } from "./pages/Reports";
 import { ReviewsPage } from "./pages/Reviews";
 import { ShareWithDoctorPage } from "./pages/ShareWithDoctor";
 import { WorkQueuePage } from "./pages/WorkQueue";
@@ -21,15 +21,25 @@ import { Icon, type IconName } from "./ui";
 type NavItem = { to: string; key: MessageKey; icon: IconName; end?: boolean };
 
 const ROLE_IDS: DeskRole[] = ["staff", "resident", "senior_clinician", "admin", "patient"];
+const INSURANCE_DESK_KEY = "he.insuranceDesk";
 
 const LANGS: { id: Lang; label: string; name: string }[] = [
   { id: "en", label: "EN", name: "English" },
   { id: "hi", label: "हिंदी", name: "Hindi" },
 ];
 
+function readInsuranceDeskPref(): boolean {
+  try {
+    return window.localStorage.getItem(INSURANCE_DESK_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 export function App() {
   const { t, lang, setLang } = useI18n();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [insuranceDesk, setInsuranceDesk] = useState(readInsuranceDeskPref);
   const headerRef = useRef<HTMLElement | null>(null);
   const location = useLocation();
 
@@ -79,16 +89,30 @@ export function App() {
         { to: "/share", key: "nav.share", icon: "send" },
         { to: "/family", key: "nav.family", icon: "users" },
         { to: `/patients/${myPatientId}/reports`, key: "nav.reports", icon: "doc" },
+        { to: `/patients/${myPatientId}/scans`, key: "nav.scans", icon: "search" },
         { to: "/visit", key: "nav.addNote", icon: "note" },
         { to: `/patients/${myPatientId}`, key: "nav.fullChart", icon: "folder" },
       ]
     : [
-        { to: "/", key: "nav.queue", icon: "queue", end: true },
-        { to: "/cases", key: "nav.cases", icon: "folder" },
-        { to: "/reviews", key: "nav.reviews", icon: "check" },
+        ...(insuranceDesk
+          ? ([
+              { to: "/", key: "nav.queue", icon: "queue", end: true },
+              { to: "/cases", key: "nav.cases", icon: "folder" },
+              { to: "/reviews", key: "nav.reviews", icon: "check" },
+            ] as NavItem[])
+          : []),
         { to: "/patients", key: "nav.patients", icon: "users" },
         { to: "/visit", key: "nav.visit", icon: "note" },
       ];
+
+  function toggleInsuranceDesk(next: boolean) {
+    setInsuranceDesk(next);
+    try {
+      window.localStorage.setItem(INSURANCE_DESK_KEY, next ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }
 
   return (
     <div className="app">
@@ -176,6 +200,18 @@ export function App() {
             </p>
           )}
 
+          {!isPatient ? (
+            <label className="header-field header-toggle" title={t("shell.insuranceDeskHint")}>
+              <span className="header-field-label">{t("shell.insuranceDesk")}</span>
+              <input
+                type="checkbox"
+                checked={insuranceDesk}
+                onChange={(event) => toggleInsuranceDesk(event.target.checked)}
+                aria-label={t("shell.insuranceDeskHint")}
+              />
+            </label>
+          ) : null}
+
           <div className="lang-toggle" role="group" aria-label={t("shell.language")}>
             {LANGS.map((item) => (
               <button
@@ -213,15 +249,39 @@ export function App() {
           <Routes>
             <Route
               path="/"
-              element={isPatient ? <Navigate to="/my-record" replace /> : <WorkQueuePage mode="queue" />}
+              element={
+                isPatient ? (
+                  <Navigate to="/my-record" replace />
+                ) : insuranceDesk ? (
+                  <WorkQueuePage mode="queue" />
+                ) : (
+                  <Navigate to="/patients" replace />
+                )
+              }
             />
             <Route
               path="/cases"
-              element={isPatient ? <Navigate to="/my-record" replace /> : <WorkQueuePage mode="cases" />}
+              element={
+                isPatient ? (
+                  <Navigate to="/my-record" replace />
+                ) : insuranceDesk ? (
+                  <WorkQueuePage mode="cases" />
+                ) : (
+                  <Navigate to="/patients" replace />
+                )
+              }
             />
             <Route
               path="/cases/:caseId"
-              element={isPatient ? <Navigate to="/my-record" replace /> : <CaseWorkspacePage />}
+              element={
+                isPatient ? (
+                  <Navigate to="/my-record" replace />
+                ) : insuranceDesk ? (
+                  <CaseWorkspacePage />
+                ) : (
+                  <Navigate to="/patients" replace />
+                )
+              }
             />
             <Route path="/my-record" element={<MyRecordPage />} />
             <Route
@@ -243,10 +303,19 @@ export function App() {
             />
             <Route path="/patients/:patientId" element={<PatientDetailPage />} />
             <Route path="/patients/:patientId/reports" element={<ReportsPage />} />
+            <Route path="/patients/:patientId/scans" element={<ScansPage />} />
             <Route path="/visit" element={<OpdIngestPage />} />
             <Route
               path="/reviews"
-              element={isPatient ? <Navigate to="/my-record" replace /> : <ReviewsPage />}
+              element={
+                isPatient ? (
+                  <Navigate to="/my-record" replace />
+                ) : insuranceDesk ? (
+                  <ReviewsPage />
+                ) : (
+                  <Navigate to="/patients" replace />
+                )
+              }
             />
             <Route path="/encounter" element={<Navigate to="/visit" replace />} />
             <Route path="/opd" element={<Navigate to="/visit" replace />} />

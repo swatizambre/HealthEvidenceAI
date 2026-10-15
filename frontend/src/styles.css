@@ -329,6 +329,23 @@ textarea {
   gap: 2px;
 }
 
+.header-field.header-toggle {
+  align-items: center;
+  grid-template-columns: auto auto;
+  gap: 8px;
+}
+
+.header-field.header-toggle .header-field-label {
+  order: 1;
+}
+
+.header-field.header-toggle input[type="checkbox"] {
+  order: 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent, #0f6b5c);
+}
+
 .header-field-label {
   color: var(--ink-3);
   font-size: var(--text-xs);
@@ -3493,6 +3510,23 @@ mark {
   font-size: var(--text-xs);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Visit note: optional insurance ---------- */
+
+.insurance-opt-in {
+  display: grid;
+  gap: var(--s3);
+  padding-top: var(--s2);
+  border-top: 1px solid var(--border);
+}
+
+.insurance-fields {
+  margin: 0;
+}
+
+.visit-advanced {
+  margin-top: var(--s4);
 }
 
 /* ---------- Reports library (PDF / image preview) ---------- */

@@ -18,6 +18,8 @@ const en = {
   "shell.footer":
     "Your lifelong health record with sources for every doctor. Not a medical device. Does not diagnose, prescribe, approve, or deny care.",
   "shell.footerInsurer": "Hospital cashless checklists are illustrative — confirm with each insurer/TPA.",
+  "shell.insuranceDesk": "Insurance desk",
+  "shell.insuranceDeskHint": "Show work queue, cases, and reviews (optional — not every patient is insured)",
 
   "nav.label": "Application",
   "nav.queue": "Work queue",
@@ -32,6 +34,7 @@ const en = {
   "nav.addNote": "Add note",
   "nav.fullChart": "Full chart",
   "nav.reports": "Reports",
+  "nav.scans": "Scans",
 
   "stage.draft": "Draft",
   "stage.ready_to_send": "Ready to send",
@@ -158,6 +161,8 @@ const hi: Record<MessageKey, string> = {
   "shell.footer":
     "आपका आजीवन स्वास्थ्य रिकॉर्ड — हर डॉक्टर के लिए स्रोतों के साथ। यह चिकित्सा उपकरण नहीं है। निदान, नुस्खा, स्वीकृति या अस्वीकृति नहीं करता।",
   "shell.footerInsurer": "अस्पताल कैशलेस चेकलिस्ट उदाहरण हैं — हर बीमा कंपनी/TPA से पुष्टि करें।",
+  "shell.insuranceDesk": "बीमा डेस्क",
+  "shell.insuranceDeskHint": "कार्य सूची, केस और समीक्षा दिखाएँ (वैकल्पिक — हर मरीज़ बीमित नहीं होता)",
 
   "nav.label": "एप्लिकेशन",
   "nav.queue": "कार्य सूची",
@@ -172,6 +177,7 @@ const hi: Record<MessageKey, string> = {
   "nav.addNote": "नोट जोड़ें",
   "nav.fullChart": "पूरा चार्ट",
   "nav.reports": "रिपोर्ट",
+  "nav.scans": "स्कैन",
 
   "stage.draft": "ड्राफ़्ट",
   "stage.ready_to_send": "भेजने को तैयार",
