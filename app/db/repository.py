@@ -35,6 +35,13 @@ def next_public_code(session: Session, column: InstrumentedAttribute[str], prefi
         session.execute(text("SELECT pg_advisory_xact_lock(hashtext(:prefix))"), {"prefix": prefix})
     # SQLite serializes writers at the database level; a plain read is sufficient there.
     values = list(session.scalars(select(column).where(column.like(f"{prefix}-%"))).all())
+    # Pending inserts in this transaction are invisible to SELECT until flush — include them
+    # so multi-row OPD packs (several labs/meds) do not reuse the same code.
+    attr_name = column.key
+    for obj in session.new:
+        pending = getattr(obj, attr_name, None)
+        if isinstance(pending, str):
+            values.append(pending)
     highest = 0
     for value in values:
         if not isinstance(value, str):

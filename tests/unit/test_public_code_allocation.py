@@ -40,6 +40,27 @@ def test_next_public_code_sqlite_increments_max_without_locking() -> None:
         session.close()
 
 
+def test_next_public_code_counts_pending_session_new() -> None:
+    """Unflushed rows in the same transaction must not collide on medication/lab codes."""
+    session = _sqlite_session()
+    try:
+        first = next_public_code(session, Patient.patient_code, "PAT")
+        session.add(
+            Patient(
+                patient_code=first,
+                synthetic_name="Pending One",
+                birth_date=date(1980, 1, 1),
+                sex="female",
+                conditions=[],
+            )
+        )
+        second = next_public_code(session, Patient.patient_code, "PAT")
+        assert first == "PAT-000001"
+        assert second == "PAT-000002"
+    finally:
+        session.close()
+
+
 class _FakeDialect:
     name = "postgresql"
 
@@ -61,6 +82,7 @@ class _FakePostgresSession:
         self.values = values
         self.executed: list[tuple[str, dict[str, Any]]] = []
         self.scalar_statements: list[str] = []
+        self.new: set[object] = set()
 
     def get_bind(self) -> _FakeBind:
         return _FakeBind()

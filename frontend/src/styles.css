@@ -618,6 +618,41 @@ textarea {
   gap: var(--s2);
 }
 
+.extract-block {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--surface) 92%, var(--accent) 8%);
+}
+
+.extract-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s3);
+  align-items: end;
+}
+
+.extract-controls .field {
+  min-width: min(100%, 180px);
+}
+
+.extract-status {
+  display: grid;
+  gap: var(--s2);
+}
+
+.extract-status p {
+  margin: 0;
+}
+
+.extract-warnings {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--warning);
+}
+
 .pager {
   display: flex;
   align-items: center;
