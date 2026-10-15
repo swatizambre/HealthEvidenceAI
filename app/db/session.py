@@ -66,6 +66,7 @@ def init_db(engine: Engine) -> None:
     ensure_authorization_case_columns(engine)
     ensure_patient_org_column(engine)
     ensure_patient_abha_column(engine)
+    ensure_emergency_profile_columns(engine)
     ensure_imaging_document_column(engine)
     # Prefer Alembic for shared Postgres; SQLite soft-ALTER + create_all cover laptop/tests.
     url = str(engine.url)
@@ -222,6 +223,29 @@ def ensure_imaging_document_column(engine: Engine) -> None:
         if "document_id" not in names:
             connection.execute(
                 text("ALTER TABLE imaging_studies ADD COLUMN document_id VARCHAR(36)")
+            )
+
+
+def ensure_emergency_profile_columns(engine: Engine) -> None:
+    """Soft-migrate emergency_profiles public link columns for existing SQLite databases."""
+    if not str(engine.url).startswith("sqlite"):
+        return
+    with engine.begin() as connection:
+        rows = connection.execute(text("PRAGMA table_info(emergency_profiles)")).fetchall()
+        names = {str(row[1]) for row in rows}
+        if not names:
+            return
+        if "public_token" not in names:
+            connection.execute(text("ALTER TABLE emergency_profiles ADD COLUMN public_token VARCHAR(48)"))
+            connection.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ix_emergency_profiles_public_token "
+                    "ON emergency_profiles (public_token)"
+                )
+            )
+        if "alert_family" not in names:
+            connection.execute(
+                text("ALTER TABLE emergency_profiles ADD COLUMN alert_family BOOLEAN DEFAULT 1")
             )
 
 

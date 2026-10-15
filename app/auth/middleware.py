@@ -25,6 +25,8 @@ _PUBLIC_PREFIXES = (
     "/api/v1/legal/notices",
     "/api/v1/abdm/status",
     "/api/v1/share",
+    # No-login emergency card opened from its QR code.
+    "/api/v1/emergency",
 )
 
 _DOCS_PREFIXES = (

@@ -110,6 +110,8 @@ def update_emergency_profile(
         profile.notes = str(patch["notes"])[:2000]
     if "show_on_lock_screen" in patch and patch["show_on_lock_screen"] is not None:
         profile.show_on_lock_screen = bool(patch["show_on_lock_screen"])
+    if "alert_family" in patch and patch["alert_family"] is not None:
+        profile.alert_family = bool(patch["alert_family"])
     if "emergency_contacts" in patch and patch["emergency_contacts"] is not None:
         contacts = patch["emergency_contacts"]
         if not isinstance(contacts, list):

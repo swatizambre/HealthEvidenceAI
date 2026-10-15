@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     seed_on_startup: bool = True
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
+    # Public web address printed in emergency-card QR codes (defaults to the first CORS origin).
+    public_app_url: str = ""
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     gemini_api_key: str = ""
@@ -381,6 +383,11 @@ class Settings(BaseSettings):
 
     def origin_list(self) -> list[str]:
         return [item.strip() for item in self.cors_origins.split(",") if item.strip()]
+
+    def public_app_base(self) -> str:
+        """Web address patients' QR codes point at (no trailing slash)."""
+        base = self.public_app_url.strip() or next(iter(self.origin_list()), "http://localhost:5173")
+        return base.rstrip("/")
 
     def locale_list(self) -> list[str]:
         return [item.strip() for item in self.supported_locales.split(",") if item.strip()]
