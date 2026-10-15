@@ -60,6 +60,13 @@ def persist_dataset(session: Session, dataset: SyntheticDataset | None = None) -
     for document in data.documents:
         chunk_count += len(index_document(session, document))
     session.flush()
+    desk = {"checklists": 0, "desk_cases": 0}
+    if dataset is None:
+        # Synthetic seed only: India checklists + TPA desk demo cases (in-place relabel
+        # of catalog filler rows, so patient/policy/case counts are unchanged).
+        from app.services.tpa_seed import seed_tpa_desk_demo
+
+        desk = seed_tpa_desk_demo(session)
     return {
         "patients": len(data.patients),
         "notes": len(data.notes),
@@ -74,6 +81,8 @@ def persist_dataset(session: Session, dataset: SyntheticDataset | None = None) -
         "cases": len(data.cases),
         "chunks": chunk_count,
         "organizations": 2,
+        "india_checklists": desk["checklists"],
+        "desk_cases": desk["desk_cases"],
     }
 
 

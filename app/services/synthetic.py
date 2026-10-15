@@ -336,7 +336,12 @@ def _policy(
     payer_names: tuple[str, ...],
     dynamic: DynamicPolicy,
 ) -> InsurancePolicy:
-    payer_name = payer_names[(number - 1) % len(payer_names)]
+    # Synthea's payers.csv lists US payers (Medicare, Medicaid, ...). The desk serves
+    # Indian hospitals, so show synthetic Indian insurer/TPA labels instead.
+    from app.services.tpa_seed import indian_payer_label
+
+    del payer_names
+    payer_name = indian_payer_label(number - 1)
     if number == 1:
         code = DEMO_POLICY
         title = dynamic.title
@@ -348,7 +353,7 @@ def _policy(
         title = f"Catalog payer checklist {number:02d}"
         procedure_name = f"Catalog procedure {number:02d}"
         content = (
-            f"Payer name from the loaded catalog: {payer_name}. "
+            f"Payer label (synthetic): {payer_name}. "
             f"Policy {code} is an evidence checklist for this prototype, "
             "not a coverage determination. "
             f"Marker {code}."

@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { askHelp, getHelpTopics, type HelpTopic } from "../api";
+import { useI18n } from "../i18n";
+import { Button, Drawer, Icon } from "../ui";
 
 type ChatMessage = {
   id: string;
@@ -10,7 +12,8 @@ type ChatMessage = {
 };
 
 const LINK_LABELS: Record<string, string> = {
-  "/": "Today",
+  "/": "Work queue",
+  "/cases": "Cases",
   "/patients": "Patients",
   "/visit": "Visit note",
   "/reviews": "Reviews",
@@ -22,6 +25,9 @@ function linkLabel(path: string): string {
   }
   if (path.startsWith("/patients/PAT-")) {
     return "Open chart";
+  }
+  if (path.startsWith("/cases/")) {
+    return "Open case";
   }
   if (path.startsWith("/reviews")) {
     return "Reviews";
@@ -37,11 +43,18 @@ function patientFromLocation(pathname: string, searchPatient: string | null): st
   return match?.[1] || "";
 }
 
+function caseFromLocation(pathname: string, searchCase: string | null): string {
+  const match = pathname.match(/\/cases\/([^/?#]+)/);
+  return match?.[1] ? decodeURIComponent(match[1]) : searchCase || "";
+}
+
+/** Header "Help" button that opens desk guidance in a side panel (no floating launcher). */
 export function HelpChat() {
+  const { t } = useI18n();
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const routePatient = patientFromLocation(location.pathname, searchParams.get("patient"));
-  const caseId = searchParams.get("case") || "";
+  const caseId = caseFromLocation(location.pathname, searchParams.get("case"));
   const policyId = searchParams.get("policy") || "";
 
   const [open, setOpen] = useState(false);
@@ -54,40 +67,26 @@ export function HelpChat() {
       id: "welcome",
       role: "assistant",
       text:
-        "Ask about desk workflows — find a patient, add a visit note, prepare an evidence pack, or open Reviews for clinician confirmation. Answers can use the open chart. This tool does not diagnose or decide coverage.",
+        "Ask about desk workflows: finding a case, preparing the pre-auth form, answering a TPA query, or sending a case for senior review. Answers can use the open chart. This tool does not diagnose or decide coverage.",
       links: ["/", "/reviews", "/patients", "/visit"],
     },
   ]);
   const endRef = useRef<HTMLDivElement | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const launchRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
+    if (!open || topics.length) {
+      return;
+    }
     getHelpTopics()
       .then((body) => setTopics(body.topics))
       .catch(() => setTopics([]));
-  }, []);
+  }, [open, topics.length]);
 
   useEffect(() => {
     if (open) {
-      endRef.current?.scrollIntoView({ behavior: "smooth" });
-      window.setTimeout(() => inputRef.current?.focus(), 50);
+      endRef.current?.scrollIntoView({ block: "end" });
     }
   }, [open, messages, busy]);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpen(false);
-        launchRef.current?.focus();
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
 
   async function send(text: string) {
     const message = text.trim();
@@ -106,15 +105,10 @@ export function HelpChat() {
       });
       setMessages((prev) => [
         ...prev,
-        {
-          id: `a-${Date.now()}`,
-          role: "assistant",
-          text: reply.reply,
-          links: reply.suggested_links,
-        },
+        { id: `a-${Date.now()}`, role: "assistant", text: reply.reply, links: reply.suggested_links },
       ]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Help chat unavailable");
+      setError(err instanceof Error ? err.message : "Help is unavailable right now.");
     } finally {
       setBusy(false);
     }
@@ -126,117 +120,84 @@ export function HelpChat() {
   }
 
   return (
-    <div className="help-chat-root">
-      {open ? (
-        <section className="help-chat-panel" id="help-chat-panel" aria-label="Desk help">
-          <header className="help-chat-head">
-            <div>
-              <strong>Desk help</strong>
-              <p className="muted">
-                {routePatient
-                  ? `Grounded on ${routePatient} when you ask about this chart`
-                  : "Workflow guidance for staff, residents, and seniors"}
-              </p>
-            </div>
-            <button
-              type="button"
-              className="btn btn-ghost sm"
-              onClick={() => {
-                setOpen(false);
-                launchRef.current?.focus();
-              }}
-              aria-label="Close help chat"
-            >
-              Close
-            </button>
-          </header>
-
-          {topics.length > 0 ? (
-            <div className="help-topic-row" aria-label="Suggested topics">
-              {topics.map((topic) => (
-                <button
-                  key={topic.id}
-                  type="button"
-                  className="chip help-topic-chip"
-                  onClick={() => void send(topic.prompt)}
-                  disabled={busy}
-                >
-                  {topic.title}
-                </button>
-              ))}
-            </div>
-          ) : null}
-
-          <div className="help-chat-messages" role="log" aria-live="polite">
-            {messages.map((item) => (
-              <div
-                key={item.id}
-                className={`help-bubble ${item.role === "user" ? "user" : "assistant"}`}
-              >
-                <p>{item.text}</p>
-                {item.links && item.links.length > 0 ? (
-                  <div className="help-links">
-                    {item.links.map((path) => (
-                      <Link
-                        key={path}
-                        className="text-link"
-                        to={path}
-                        onClick={() => setOpen(false)}
-                      >
-                        {linkLabel(path)}
-                      </Link>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ))}
-            {busy ? <p className="muted help-typing">Looking up desk guidance…</p> : null}
-            <div ref={endRef} />
-          </div>
-
-          {error ? (
-            <p className="error" role="alert">
-              {error}
-            </p>
-          ) : null}
-
-          <form className="help-chat-form" onSubmit={onSubmit}>
+    <>
+      <button
+        type="button"
+        className="header-btn"
+        onClick={() => setOpen(true)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+      >
+        <Icon name="help" />
+        <span>{t("shell.help")}</span>
+      </button>
+      <Drawer
+        open={open}
+        title="Desk help"
+        onClose={() => setOpen(false)}
+        footer={
+          <form className="help-form" onSubmit={onSubmit}>
             <label className="sr-only" htmlFor="help-chat-input">
               Ask a help question
             </label>
             <input
               id="help-chat-input"
-              ref={inputRef}
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder={
-                routePatient
-                  ? "Ask about this chart or the next prep step…"
-                  : "Ask how to prepare an evidence pack…"
-              }
+              placeholder={routePatient ? "Ask about this chart or the next step…" : "Ask how to prepare a pre-auth…"}
               disabled={busy}
               autoComplete="off"
             />
-            <button className="btn btn-primary sm" type="submit" disabled={busy || !input.trim()}>
+            <Button type="submit" variant="primary" size="sm" disabled={!input.trim()} loading={busy}>
               Send
-            </button>
+            </Button>
           </form>
-          <p className="help-chat-foot muted">
-            Decision support only — never approves, denies, or diagnoses.
-          </p>
-        </section>
-      ) : null}
-
-      <button
-        type="button"
-        ref={launchRef}
-        className={`help-chat-launch ${open ? "open" : ""}`}
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
-        aria-controls="help-chat-panel"
+        }
       >
-        {open ? "Close help" : "Desk help"}
-      </button>
-    </div>
+        <p className="muted small">
+          {routePatient
+            ? `Answers can use ${routePatient} when you ask about this chart.`
+            : "Workflow guidance for desk staff, junior doctors and consultants."}
+        </p>
+        {topics.length > 0 ? (
+          <div className="chip-row" aria-label="Suggested topics">
+            {topics.map((topic) => (
+              <button
+                key={topic.id}
+                type="button"
+                className="chip"
+                onClick={() => void send(topic.prompt)}
+                disabled={busy}
+              >
+                {topic.title}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <div className="help-log" role="log" aria-live="polite">
+          {messages.map((item) => (
+            <div key={item.id} className={`help-bubble help-${item.role}`}>
+              <p>{item.text}</p>
+              {item.links && item.links.length > 0 ? (
+                <div className="help-links">
+                  {item.links.map((path) => (
+                    <Link key={path} className="text-link" to={path} onClick={() => setOpen(false)}>
+                      {linkLabel(path)}
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ))}
+          {busy ? <p className="muted small">Looking up desk guidance…</p> : null}
+          <div ref={endRef} />
+        </div>
+        {error ? (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </Drawer>
+    </>
   );
 }

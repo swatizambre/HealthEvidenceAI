@@ -118,10 +118,10 @@ export function ConsentCapture({
   const set = (patch: Partial<ConsentDraft>) => onChange({ ...draft, ...patch });
 
   return (
-    <fieldset className="panel span-2 consent-capture">
-      <legend className="panel-title">Patient consent (required on live records)</legend>
+    <fieldset className="span-2 consent-capture">
+      <legend className="form-section-title">Patient consent (required on live records)</legend>
       {loadError ? (
-        <p className="error" role="alert">
+        <p className="form-error" role="alert">
           {loadError}
         </p>
       ) : null}
@@ -141,7 +141,7 @@ export function ConsentCapture({
           </select>
         </label>
       ) : (
-        <p className="hint">New patient: the consent below is stored with this first visit.</p>
+        <p className="muted small">New patient: the consent below is stored with this first visit.</p>
       )}
       {!draft.consentId && canRecord ? (
         <div className="form-grid">

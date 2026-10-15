@@ -231,6 +231,67 @@ class AuthorizationCase(IdentityMixin, TimestampMixin, Base):
     # Clinician/staff subject from JWT — powers Today "my queue".
     assigned_to: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
 
+    # --- India cashless pre-authorization desk (docs/TPA_DESK_CONTRACT.md) ---
+    # Nullable / defaulted so pre-desk rows keep working. A case is a "desk case"
+    # once payer_type is set. Stage records what the insurer/TPA did; the product
+    # itself never approves or denies anything.
+    payer_type: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
+    insurer_name: Mapped[str] = mapped_column(String(160), default="")
+    tpa_name: Mapped[str] = mapped_column(String(160), default="")
+    policy_number: Mapped[str] = mapped_column(String(64), default="")
+    admission_type: Mapped[str] = mapped_column(String(16), default="planned")
+    admitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expected_discharge_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    treating_doctor: Mapped[str] = mapped_column(String(160), default="")
+    provisional_diagnosis: Mapped[str] = mapped_column(String(300), default="")
+    icd10_code: Mapped[str] = mapped_column(String(16), default="")
+    proposed_treatment: Mapped[str] = mapped_column(String(300), default="")
+    estimated_cost_inr: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    approved_amount_inr: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    stage: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    decision_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    discharge_requested_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    final_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Contract additions (allowed: add, never rename/remove).
+    revised_estimate_inr: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    enhancement_reason: Mapped[str] = mapped_column(String(500), default="")
+    enhancement_requested_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    enhancement_count: Mapped[int] = mapped_column(Integer, default=0)
+    discharge_override_reason: Mapped[str] = mapped_column(String(500), default="")
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Cost estimate lines (room, icu, ot, professional_fees, medicines_consumables,
+    # investigations, implants) and extra pre-auth form fields (room_type, gpla, mlc_number…).
+    cost_breakdown_inr: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    form_extra: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class CaseQuery(IdentityMixin, TimestampMixin, Base):
+    """Insurer/TPA query on a cashless case and the hospital's response."""
+
+    __tablename__ = "case_queries"
+
+    query_code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    case_id: Mapped[str] = mapped_column(
+        ForeignKey("authorization_cases.id", ondelete="CASCADE"), index=True
+    )
+    raised_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    text: Mapped[str] = mapped_column(Text, default="")
+    response_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    response: Mapped[str] = mapped_column(Text, default="")
+    raised_by: Mapped[str] = mapped_column(String(120), default="")
+    responded_by: Mapped[str] = mapped_column(String(120), default="")
+    # Stage to return to once every open query is answered (sent / enhancement / discharge_sent).
+    resume_stage: Mapped[str] = mapped_column(String(32), default="sent")
+
 
 class ReviewRun(Base):
     """Durable HITL pause/resume state for authorization review runs."""

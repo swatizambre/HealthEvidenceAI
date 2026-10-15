@@ -588,7 +588,8 @@ def build_pathway_node(
     state: dict[str, Any], session: Session, settings: Settings
 ) -> dict[str, Any]:
     """PathwayAgent: ordered documentation steps + readiness scorecard."""
-    del session, settings
+    del settings
+    from app.services.case_checklist import readiness_for_case_code
     from app.services.pathway import build_documentation_pathway
     from app.services.readiness import build_readiness_scorecard
 
@@ -599,9 +600,10 @@ def build_pathway_node(
         node="build_pathway",
     ):
         results = list(state.get("criterion_results") or [])
-        supported = sum(1 for item in results if str(item.get("status") or "").upper() == "SUPPORTED")
-        total = max(len(results), 1)
-        readiness = int(round(100 * supported / total))
+        # Same readiness computation as the desk workspace and evidence-pack prepare.
+        readiness = readiness_for_case_code(
+            session, str(state.get("case_id") or "") or None, results
+        ).percent
         risk = "low"
         if state.get("contradictions") or readiness < 50:
             risk = "high"
@@ -660,7 +662,7 @@ def human_review_gate(state: dict[str, Any], session: Session, settings: Setting
                 "paused": True,
                 "status": "awaiting_human_review",
                 "human_review_reason": state.get("human_review_reason")
-                or "Clinician checklist acknowledgment required",
+                or "Senior confirmation of the checklist required",
                 "agent_trace": [_trace("AuthorizationAgent", "human_review", "paused")],
             }
         from langgraph.types import interrupt
@@ -669,7 +671,7 @@ def human_review_gate(state: dict[str, Any], session: Session, settings: Setting
             {
                 "awaiting_human_review": True,
                 "reason": state.get("human_review_reason")
-                or "Clinician checklist acknowledgment required",
+                or "Senior confirmation of the checklist required",
                 "run_id": state.get("run_id"),
             }
         )

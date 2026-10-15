@@ -3,28 +3,65 @@ import { Link, useSearchParams } from "react-router-dom";
 import { getLifelongSummary, type LifelongEvent, type LifelongSummary } from "../api";
 import { PrivacyRights } from "../components/PrivacyRights";
 import { useRole } from "../roleContext";
+import { Button, ButtonLink, EmptyState, Notice, Skeleton } from "../ui";
 
-function yearLabel(value: string | null): string {
-  if (!value) {
-    return "Ongoing";
-  }
-  return value.slice(0, 4);
+const CATEGORY_LABEL: Record<string, string> = {
+  encounter: "Visit",
+  visit: "Visit",
+  condition: "Health condition",
+  diagnosis: "Health condition",
+  procedure: "Procedure or surgery",
+  medication: "Medicine",
+  lab: "Test result",
+  lab_result: "Test result",
+  imaging: "Scan or X-ray",
+  immunization: "Vaccine",
+  allergy: "Allergy",
+};
+
+function categoryLabel(value: string): string {
+  const key = value.trim().toLowerCase().replace(/\s+/g, "_");
+  return CATEGORY_LABEL[key] || value.replace(/_/g, " ");
 }
 
-function EventCard({ event }: { event: LifelongEvent }) {
+function yearLabel(value: string | null): string {
+  return value ? value.slice(0, 4) : "Ongoing";
+}
+
+/** The DEMO disclaimer is shown once at the top; strip repeats from briefs and events. */
+function withoutDisclaimer(text: string | null | undefined, disclaimer: string): string {
+  const value = (text || "").trim();
+  if (!disclaimer) return value;
+  return value.split(disclaimer).join(" ").replace(/\s{2,}/g, " ").trim();
+}
+
+function EventRow({
+  event,
+  markDemo,
+  disclaimer,
+}: {
+  event: LifelongEvent;
+  markDemo: boolean;
+  disclaimer: string;
+}) {
+  const why = withoutDisclaimer(event.why_it_matters, disclaimer);
   const labels = event.disorders ?? [];
-  const demo = Boolean(event.demo_synthetic);
   return (
-    <li className={`lifelong-item${demo ? " lifelong-item-demo" : ""}`}>
-      <div className="lifelong-when">{yearLabel(event.occurred_on)}</div>
-      <div className="lifelong-body">
-        <div className="lifelong-top">
+    <li className="record-event">
+      <span className="event-when">{yearLabel(event.occurred_on)}</span>
+      <div className="record-event-body">
+        <p className="record-event-title">
           <strong>{event.title}</strong>
-          <span className="badge neutral">{event.category}</span>
-          {demo ? <span className="badge warn">DEMO ONLY</span> : null}
-        </div>
+          {markDemo && event.demo_synthetic ? <span className="tag">Example</span> : null}
+        </p>
+        <p className="muted small">
+          {categoryLabel(event.category)}
+          {event.facility_name ? `, ${event.facility_name}` : ""}
+        </p>
+        {event.summary ? <p>{event.summary}</p> : null}
+        {why ? <p className="muted small">Why it matters: {why}</p> : null}
         {labels.length > 0 ? (
-          <div className="chip-row compact event-labels" aria-label="Labels">
+          <div className="chip-row" aria-label="Related to">
             {labels.map((label) => (
               <span key={label} className="chip chip-static">
                 {label}
@@ -32,8 +69,6 @@ function EventCard({ event }: { event: LifelongEvent }) {
             ))}
           </div>
         ) : null}
-        <p>{event.summary}</p>
-        {event.why_it_matters ? <p className="hint">{event.why_it_matters}</p> : null}
       </div>
     </li>
   );
@@ -43,10 +78,7 @@ export function MyRecordPage() {
   const { myPatientId, setMyPatientId, isPatient } = useRole();
   const [searchParams] = useSearchParams();
   const queryPatient = searchParams.get("patient") || "";
-  const activePatientId =
-    queryPatient && /^PAT-\d{6}$/i.test(queryPatient)
-      ? queryPatient.toUpperCase()
-      : myPatientId;
+  const activePatientId = queryPatient && /^PAT-\d{6}$/i.test(queryPatient) ? queryPatient.toUpperCase() : myPatientId;
   const [patientId, setPatientId] = useState(activePatientId);
   const [summary, setSummary] = useState<LifelongSummary | null>(null);
   const [error, setError] = useState("");
@@ -70,19 +102,13 @@ export function MyRecordPage() {
     setLabelFilter("all");
     getLifelongSummary(activePatientId)
       .then((body) => {
-        if (!cancelled) {
-          setSummary(body);
-        }
+        if (!cancelled) setSummary(body);
       })
-      .catch((err: Error) => {
-        if (!cancelled) {
-          setError(err.message);
-        }
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load the record.");
       })
       .finally(() => {
-        if (!cancelled) {
-          setBusy(false);
-        }
+        if (!cancelled) setBusy(false);
       });
     return () => {
       cancelled = true;
@@ -90,152 +116,122 @@ export function MyRecordPage() {
   }, [activePatientId]);
 
   const labels = useMemo(() => {
-    if (!summary) {
-      return [];
-    }
-    if (summary.disorders?.length) {
-      return summary.disorders;
-    }
-    if (summary.by_disorder?.length) {
-      return summary.by_disorder.map((group) => group.key);
-    }
+    if (!summary) return [];
+    if (summary.disorders?.length) return summary.disorders;
+    if (summary.by_disorder?.length) return summary.by_disorder.map((group) => group.key);
     const collected = new Set<string>();
-    for (const event of summary.events) {
-      for (const label of event.disorders ?? []) {
-        collected.add(label);
-      }
-    }
+    for (const event of summary.events) for (const label of event.disorders ?? []) collected.add(label);
     return Array.from(collected).sort((a, b) => a.localeCompare(b));
   }, [summary]);
 
   const visibleEvents = useMemo(() => {
-    if (!summary) {
-      return [];
-    }
-    if (labelFilter === "all") {
-      return summary.events;
-    }
+    if (!summary) return [];
+    if (labelFilter === "all") return summary.events;
     return summary.events.filter((event) => (event.disorders ?? []).includes(labelFilter));
   }, [summary, labelFilter]);
 
-  function onLink(event: FormEvent) {
+  const mixedDemo = Boolean(
+    summary && summary.events.some((event) => event.demo_synthetic) && summary.events.some((event) => !event.demo_synthetic),
+  );
+
+  const disclaimer = (summary?.demo_synthetic_disclaimer || "").trim();
+  const brief = summary
+    ? withoutDisclaimer(isPatient ? summary.patient_brief : summary.doctor_brief, disclaimer)
+    : "";
+
+  function onOpen(event: FormEvent) {
     event.preventDefault();
-    if (isPatient) {
-      return;
-    }
-    setMyPatientId(patientId);
+    if (!isPatient) setMyPatientId(patientId);
   }
 
   return (
-    <section className="page chart-page lifelong-page">
-      <header className="lifelong-header">
-        <div className="lifelong-header-copy">
-          <p className="eyebrow">Lifelong health record</p>
+    <section className="page record-page">
+      {summary?.includes_demo_synthetic ? (
+        <Notice tone="warning" title="Demo record">
+          {summary.demo_synthetic_disclaimer ||
+            (mixedDemo
+              ? "Events marked “Example” are invented to show how the record works. They are not from your chart."
+              : "The history below is invented to show how the record works. It is not from your chart.")}{" "}
+          Do not use it for care or insurance decisions.
+        </Notice>
+      ) : null}
+
+      <header className="page-head">
+        <div>
           <h1 className="page-title">{isPatient ? "My record" : "Lifelong record"}</h1>
-          <p className="page-subtitle">
-            Continuity across facilities — filter by topic, then review matching visits and results.
+          <p className="page-sub">
+            {isPatient
+              ? "Your visits, tests and treatments from every hospital and clinic, in one place."
+              : "Continuity across facilities. Filter by health topic."}
           </p>
         </div>
-        <div className="home-actions">
-          <Link className="btn btn-primary" to={`/visit?patient=${encodeURIComponent(myPatientId)}`}>
-            Add visit note
-          </Link>
-          <Link className="btn btn-ghost" to={`/patients/${myPatientId}`}>
-            Full chart
-          </Link>
+        <div className="button-row">
+          <ButtonLink variant="primary" icon="note" to={`/visit?patient=${encodeURIComponent(myPatientId)}`}>
+            Add a visit
+          </ButtonLink>
+          <ButtonLink to={`/patients/${myPatientId}`}>{isPatient ? "Full chart" : "Open chart"}</ButtonLink>
         </div>
       </header>
 
       {!isPatient ? (
-        <form className="inline-form lifelong-patient-picker" onSubmit={onLink}>
-          <label>
-            Patient ID
-            <input
-              value={patientId}
-              onChange={(event) => setPatientId(event.target.value.trim().toUpperCase())}
-              placeholder="PAT-000001"
-            />
+        <form className="inline-form" onSubmit={onOpen}>
+          <label className="field">
+            <span>Patient ID</span>
+            <input value={patientId} onChange={(e) => setPatientId(e.target.value.trim().toUpperCase())} placeholder="PAT-000001" />
           </label>
-          <button type="submit" className="btn btn-ghost">
-            Open
-          </button>
+          <Button type="submit">Open</Button>
         </form>
-      ) : (
-        <p className="hint" role="status">
-          Signed in as <strong>{myPatientId}</strong>
-        </p>
-      )}
-
-      {error ? (
-        <p className="error" role="alert">
-          {error}
-        </p>
       ) : null}
-      {busy && !summary ? <p className="muted">Loading lifelong history…</p> : null}
+
+      {error ? <Notice tone="danger" title="Could not load the record">{error}</Notice> : null}
+      {busy && !summary ? <Skeleton lines={5} label="Loading record" /> : null}
 
       {summary ? (
-        <div className="panel lifelong-panel lifelong-board">
-          <div className="lifelong-board-head">
+        <section className="panel" aria-labelledby="history-title">
+          <div className="section-bar">
             <div>
-              <h2 className="panel-title">{summary.patient_name}</h2>
-              <p className="muted">
-                {summary.patient_id}
-                {labels.length ? ` · ${labels.length} labels` : ""}
-                {` · ${visibleEvents.length} events`}
+              <h2 className="section-title" id="history-title">
+                {summary.patient_name}
+              </h2>
+              <p className="muted small">
+                {summary.patient_id}, {visibleEvents.length} event{visibleEvents.length === 1 ? "" : "s"}
+                {summary.facilities_count ? `, ${summary.facilities_count} facilit${summary.facilities_count === 1 ? "y" : "ies"}` : ""}
               </p>
             </div>
           </div>
-
-          {summary.includes_demo_synthetic ? (
-            <p className="error lifelong-demo-banner" role="alert">
-              {summary.demo_synthetic_disclaimer ||
-                "DEMO ONLY — invented example history, not from this patient's chart. Do not use for care or insurance decisions."}
-            </p>
-          ) : null}
-
-          {summary.doctor_brief || summary.patient_brief ? (
-            <p className="hint lifelong-brief">
-              {isPatient ? summary.patient_brief : summary.doctor_brief}
-            </p>
-          ) : null}
-
-          <div className="lifelong-filter-bar" aria-label="Disorder label filter">
-            <span className="chip-label">Filter</span>
-            <div className="chip-row specialty-filter label-filter">
-              <button
-                type="button"
-                className={`chip ${labelFilter === "all" ? "chip-active" : ""}`}
-                onClick={() => setLabelFilter("all")}
-              >
-                All
-              </button>
-              {labels.map((label) => (
+          {brief ? <p className="lead">{brief}</p> : null}
+          {labels.length > 0 ? (
+            <div className="chip-row" role="group" aria-label="Filter by health topic">
+              {["all", ...labels].map((label) => (
                 <button
                   key={label}
                   type="button"
-                  className={`chip ${labelFilter === label ? "chip-active" : ""}`}
+                  className={`chip${labelFilter === label ? " is-active" : ""}`}
+                  aria-pressed={labelFilter === label}
                   onClick={() => setLabelFilter(label)}
                 >
-                  {label}
+                  {label === "all" ? "Everything" : label}
                 </button>
               ))}
             </div>
-          </div>
-
+          ) : null}
           {visibleEvents.length === 0 ? (
-            <p className="muted">No clinical history for this label.</p>
+            <EmptyState icon="doc" title="Nothing recorded for this topic" />
           ) : (
-            <ul className="lifelong-list">
+            <ul className="record-events">
               {visibleEvents.map((event) => (
-                <EventCard key={event.event_id} event={event} />
+                <EventRow key={event.event_id} event={event} markDemo={mixedDemo} disclaimer={disclaimer} />
               ))}
             </ul>
           )}
-        </div>
+        </section>
       ) : null}
 
-      {isPatient && /^PAT-\d{6}$/.test(myPatientId) ? (
-        <PrivacyRights patientId={myPatientId} />
+      {isPatient && /^PAT-\d{6}$/.test(myPatientId) ? <PrivacyRights patientId={myPatientId} /> : null}
+      {!isPatient ? (
+        <p className="muted small">
+          <Link to={`/patients/${encodeURIComponent(activePatientId)}`}>Back to the chart</Link>
+        </p>
       ) : null}
     </section>
   );

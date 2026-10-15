@@ -205,7 +205,7 @@ def _sync_case_lifecycle(
 
     if response.awaiting_human_review:
         status = "ready_for_human"
-        note = response.human_review_reason or "Awaiting clinician checklist acknowledgment"
+        note = response.human_review_reason or "Awaiting senior confirmation of the checklist"
     elif clinician_decision == "needs_documentation" or (
         response.human_review_required and response.missing_evidence
     ):
@@ -213,7 +213,7 @@ def _sync_case_lifecycle(
         note = "; ".join(response.missing_evidence[:3]) or response.human_review_reason
     elif response.human_review_required:
         status = "ready_for_human" if not clinician_decision else "closed_as_draft"
-        note = response.human_review_reason or "Clinician acknowledgment recorded"
+        note = response.human_review_reason or "Senior confirmed the checklist"
         if clinician_decision == "acknowledged":
             status = "closed_as_draft"
     else:
@@ -225,6 +225,16 @@ def _sync_case_lifecycle(
         status=status,
         run_id=response.run_id or None,
         note=note,
+    )
+    # India TPA desk: senior acknowledgment moves a draft to ready_to_send (and a fresh
+    # pause / send-back moves it back) — the stage follows the HITL record.
+    from app.services.tpa_desk import on_review_decision
+
+    on_review_decision(
+        session,
+        response.case_id,
+        decision=clinician_decision,
+        awaiting=response.awaiting_human_review,
     )
 
 

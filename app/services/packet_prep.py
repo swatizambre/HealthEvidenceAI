@@ -99,11 +99,15 @@ def prepare_evidence_packet(session: Session, payload: PacketPrepareRequest) -> 
             )
             for item in review.criteria
         ]
-    supported = sum(1 for item in criteria if item.status == "SUPPORTED")
     gap_statuses = {"MISSING", "UNKNOWN", "NOT_SUPPORTED"}
-    gap_count = sum(1 for item in criteria if item.status in gap_statuses)
-    total = max(len(criteria), 1)
-    readiness = int(round(100 * supported / total))
+    # One readiness number for the whole product (desk worklist, workspace, Reviews):
+    # supported / required over the case checklist built from this same review.
+    from app.services.case_checklist import readiness_for_case
+
+    summary = readiness_for_case(session, case, criterion_results=review.criteria)
+    supported = summary.supported
+    gap_count = summary.required - summary.supported
+    readiness = summary.percent
 
     specialties = _patient_specialties(session, patient)
     gaps: list[PacketGapOut] = []
@@ -157,7 +161,7 @@ def prepare_evidence_packet(session: Session, payload: PacketPrepareRequest) -> 
         )
         next_steps.append("Re-run Prepare evidence pack to refresh the readiness score.")
     if review.human_review_required:
-        next_steps.append("Open Reviews to acknowledge the checklist or mark needs documentation.")
+        next_steps.append("Open Reviews to confirm the checklist or send it back for documentation.")
     if not gaps and not review.human_review_required:
         next_steps.append(
             "Checklist looks complete for this evidence pack — still not an approval or denial."
