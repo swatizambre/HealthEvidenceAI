@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Query
 
-from app.schemas.api import LegalNoticeListResponse, LegalNoticeOut
+from app.schemas.api import LegalNoticeListResponse, LegalNoticeMeta, LegalNoticeOut
 from app.services.legal_notices import get_notice, list_notice_ids
 
 router = APIRouter(prefix="/legal", tags=["legal"])
@@ -12,7 +12,9 @@ router = APIRouter(prefix="/legal", tags=["legal"])
 
 @router.get("/notices", response_model=LegalNoticeListResponse)
 def legal_notice_index() -> LegalNoticeListResponse:
-    return LegalNoticeListResponse(notices=list_notice_ids())
+    return LegalNoticeListResponse(
+        notices=[LegalNoticeMeta(**item) for item in list_notice_ids()]
+    )
 
 
 @router.get("/notices/{notice_id}", response_model=LegalNoticeOut)

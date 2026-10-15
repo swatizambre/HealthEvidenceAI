@@ -121,7 +121,9 @@ def list_my_shares(
 ) -> RecordShareListResponse:
     code = _self_patient_code(request, principal)
     enforce_patient_access(request, code, db)
-    return RecordShareListResponse(shares=patient_record_share.list_shares(db, code))
+    return RecordShareListResponse(
+        shares=[RecordShareOut(**item) for item in patient_record_share.list_shares(db, code)]
+    )
 
 
 @router.delete("/me/shares/{share_id}", response_model=RecordShareOut)

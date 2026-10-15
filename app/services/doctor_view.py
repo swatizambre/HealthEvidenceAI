@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.entities import LabResult, Medication, Patient, Procedure
+from app.models.entities import LabResult, Medication, Procedure
 from app.services.lifelong import get_lifelong_summary
 from app.services.records import get_patient_essentials, require_patient
 

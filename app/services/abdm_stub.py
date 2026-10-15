@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.core.exceptions import AppError
-from app.services.records import require_patient
 
 
 def abdm_status(settings: Settings | None = None) -> dict[str, Any]:

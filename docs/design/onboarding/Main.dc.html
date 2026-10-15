@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Welcome</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Instrument+Sans:wght@500;600;700&family=Noto+Sans+Devanagari:wght@400;600&display=swap">
+<style>
+body{margin:0}
+a{color:#0E6B5C}a:hover{color:#0A5246}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; padding: 28px 22px 26px; display: flex; flex-direction: column; gap: 22px; background: #F4F7F6; color: #10241F; font-family: 'Atkinson Hyperlegible', 'Noto Sans Devanagari', system-ui, sans-serif">
+  <div style="display: flex; align-items: center; justify-content: space-between">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <div style="width: 40px; height: 40px; border-radius: 12px; background: #0E6B5C; display: flex; align-items: center; justify-content: center">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/><path d="M12 9v5M9.5 11.5h5"/></svg>
+      </div>
+      <span style="font-family: 'Instrument Sans', sans-serif; font-weight: 700; font-size: 18px">Lifelong Health</span>
+    </div>
+    <div style="display: flex; gap: 6px" role="group" aria-label="Language">
+      <button type="button" aria-pressed="true" style="min-height: 44px; padding: 0 12px; border-radius: 22px; border: 1.5px solid #10241F; background: #10241F; color: #FFFFFF; font: inherit; font-size: 14px">EN</button>
+      <button type="button" aria-pressed="false" style="min-height: 44px; padding: 0 12px; border-radius: 22px; border: 1.5px solid #C9D6D2; background: #FFFFFF; color: #10241F; font: inherit; font-size: 14px">हिंदी</button>
+      <button type="button" aria-pressed="false" style="min-height: 44px; padding: 0 12px; border-radius: 22px; border: 1.5px solid #C9D6D2; background: #FFFFFF; color: #10241F; font: inherit; font-size: 14px">मराठी</button>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 18px">
+    <h1 style="margin: 0; font-family: 'Instrument Sans', sans-serif; font-weight: 700; font-size: 34px; line-height: 1.08; letter-spacing: -0.01em">All your medical records. With you, anywhere.</h1>
+    <p style="margin: 0; font-size: 17px; line-height: 1.45; color: #3D5650">Reports, prescriptions and scans in one place, plus an emergency card any doctor in the world can read.</p>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <div style="display: flex; gap: 12px; align-items: center; padding: 12px 14px; background: #FFFFFF; border-radius: 14px; border: 1px solid #DCE5E2">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0E6B5C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h10l6 6v10H4z"/><path d="M14 4v6h6"/></svg>
+      <span style="font-size: 16px"><b>Forgot your file?</b> Show it from your phone.</span>
+    </div>
+    <div style="display: flex; gap: 12px; align-items: center; padding: 12px 14px; background: #FFFFFF; border-radius: 14px; border: 1px solid #DCE5E2">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0E6B5C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M12 8v5M12 16h.01"/></svg>
+      <span style="font-size: 16px"><b>Old allergies</b> found in your papers.</span>
+    </div>
+    <div style="display: flex; gap: 12px; align-items: center; padding: 12px 14px; background: #FFFFFF; border-radius: 14px; border: 1px solid #DCE5E2">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0E6B5C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+      <span style="font-size: 16px"><b>Emergency card</b> works offline, abroad too.</span>
+    </div>
+  </div>
+
+  <div style="flex: 1"></div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <a href="P2-Consent.dc.html" style="min-height: 56px; border-radius: 16px; background: #0E6B5C; color: #FFFFFF; display: flex; align-items: center; justify-content: center; gap: 10px; text-decoration: none; font-family: 'Instrument Sans', sans-serif; font-weight: 600; font-size: 18px">Continue with ABHA</a>
+    <a href="P2-Consent.dc.html" style="min-height: 52px; border-radius: 16px; background: #FFFFFF; color: #10241F; border: 1.5px solid #C9D6D2; display: flex; align-items: center; justify-content: center; text-decoration: none; font-weight: 700; font-size: 17px">Use mobile number</a>
+    <a href="P2-Consent.dc.html" style="min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 8px; color: #0E6B5C; font-weight: 700; font-size: 16px; text-decoration: none">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3M21 12v2"/></svg>
+      Sign in with passkey
+    </a>
+  </div>
+  <p style="margin: 0; text-align: center; font-size: 13px; line-height: 1.4; color: #4E6660">Free for patients · Stored in India · You choose who sees it</p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

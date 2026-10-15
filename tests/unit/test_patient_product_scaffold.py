@@ -1,8 +1,7 @@
 """Patient-first scaffold: legal notices, emergency card, shares, ABDM stub, doctor brief."""
 
-from fastapi.testclient import TestClient
-
 from app.services import patient_record_share
+from fastapi.testclient import TestClient
 
 
 def test_legal_notices_list_and_privacy_en(client: TestClient) -> None:
