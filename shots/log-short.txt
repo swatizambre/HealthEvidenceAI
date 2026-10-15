@@ -1,0 +1,6 @@
+
+Running 1 test using 1 worker
+
+  ✓  1 e2e/emergency-shots.spec.ts:8:1 › emergency card flow screenshots (5.7s)
+
+  1 passed (15.7s)
