@@ -33,6 +33,23 @@ def test_qr_matrix_shape() -> None:
     assert rows[0][0] == rows[0][-1] == rows[-1][0] == "1"
 
 
+def test_emergency_conditions_drop_social_findings() -> None:
+    from app.services.patient_record_share import emergency_conditions
+
+    shown = emergency_conditions(
+        [
+            "Hyperlipidemia (disorder)",
+            "Full-time employment (finding)",
+            "Reports of violence in the environment (finding)",
+            "Medication review due (situation)",
+            "Allergy to amoxicillin",
+            "Type 2 diabetes",
+            "Hyperlipidemia (disorder)",
+        ]
+    )
+    assert shown == ["Hyperlipidemia", "Type 2 diabetes"]
+
+
 def test_owner_card_has_link_and_qr(monkeypatch) -> None:
     with make_client(monkeypatch, AUTH_MODE="dev-jwt", PUBLIC_APP_URL="https://app.example.in/") as client:
         headers = _patient_headers(client, "PAT-000001")

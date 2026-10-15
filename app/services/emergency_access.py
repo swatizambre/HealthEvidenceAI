@@ -31,7 +31,7 @@ from app.models.entities import (
 )
 from app.services import qr
 from app.services.audit import record_audit
-from app.services.patient_record_share import get_or_create_emergency_profile
+from app.services.patient_record_share import emergency_conditions, get_or_create_emergency_profile
 from app.services.records import require_patient
 
 logger = logging.getLogger("healthevidence.emergency")
@@ -195,7 +195,7 @@ def open_public_card(session: Session, token: str, *, user_agent: str = "") -> d
         for item in (patient.conditions or [])
         if any(word in str(item).lower() for word in ("allerg", "hypersens", "anaphyla"))
     ]
-    conditions = [str(item) for item in (patient.conditions or []) if str(item) not in allergies]
+    conditions = emergency_conditions(list(patient.conditions or []))
     return {
         "event_id": recent.event_code,
         "display_name": patient.synthetic_name,
