@@ -29,6 +29,8 @@ from app.api.routes import (
     help,
     hospital,
     imaging,
+    legal,
+    me_record,
     meta,
     opd,
     patients,
@@ -46,7 +48,8 @@ from app.db.session import create_db_engine, create_session_factory, init_db, pr
 from app.services.seed import seed_if_empty
 
 DESCRIPTION = (
-    "Prior-auth evidence prep and lifelong cross-facility health records: "
+    "Patient-owned lifelong health record with doctor brief and sources; "
+    "India cashless / TPA desk as a later hospital module. "
     "LangGraph agents, hybrid RAG, MCP tools, A2A messaging, MONAI-isolated imaging, "
     "OIDC authentication, and grounded LLM providers. "
     f"{PROTOTYPE_BANNER} {DISCLAIMER}"
@@ -150,6 +153,8 @@ def create_app() -> FastAPI:
         opd.router,
         privacy.router,
         help.router,
+        legal.router,
+        me_record.router,
     )
     for router in api_routers:
         app.include_router(router, prefix="/api/v1")

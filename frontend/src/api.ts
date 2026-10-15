@@ -1,10 +1,10 @@
-/** Quiet product strip — paperwork prep first; lifelong chart is the depth. */
+/** Quiet product strip — patient lifelong record first; TPA desk is a later hospital module. */
 export const VALUE_STRIP =
-  "Chart evidence for prior authorization · Lifelong record across care settings";
+  "Your lifelong health record · Doctor view with sources · Emergency card";
 
-/** Footer / evidence-pack honesty — never lead the chrome with this. */
+/** Footer honesty — never lead the chrome with this. */
 export const FOOTER_DISCLAIMER =
-  "Supports prior-authorization evidence preparation and lifelong chart continuity. Not a medical device. Does not diagnose, approve, or deny care.";
+  "Organises and shows health records with sources. Not a medical device. Does not diagnose, prescribe, approve, or deny care.";
 
 export interface PatientSummary {
   patient_id: string;
@@ -1157,7 +1157,12 @@ export function getHelpTopics(): Promise<{ topics: HelpTopic[] }> {
 export function askHelp(
   message: string,
   pathname?: string,
-  options?: { patient_id?: string; case_id?: string; policy_id?: string },
+  options?: {
+    patient_id?: string;
+    case_id?: string;
+    policy_id?: string;
+    history?: { role: "user" | "assistant"; content: string }[];
+  },
 ): Promise<HelpChatReply> {
   return request("/api/v1/help/chat", {
     method: "POST",
@@ -1167,8 +1172,141 @@ export function askHelp(
       patient_id: options?.patient_id,
       case_id: options?.case_id,
       policy_id: options?.policy_id,
+      history: options?.history?.slice(-6),
     }),
   });
+}
+
+/* ---------- Legal notices / emergency card / share / family / doctor brief ---------- */
+
+export interface LegalNotice {
+  id: string;
+  notice_version: string;
+  language: string;
+  format: string;
+  body: string;
+}
+
+export function getLegalNotice(id: string, lang = "en"): Promise<LegalNotice> {
+  return request(`/api/v1/legal/notices/${encodeURIComponent(id)}?lang=${encodeURIComponent(lang)}`);
+}
+
+export interface EmergencyCard {
+  patient_id: string;
+  display_name: string;
+  sex: string;
+  date_of_birth: string;
+  blood_group: string;
+  allergies: string[];
+  conditions: string[];
+  medications: { name: string; dose: string; status: string }[];
+  implants: string;
+  emergency_contacts: { name?: string; phone?: string; relation?: string }[];
+  notes: string;
+  show_on_lock_screen: boolean;
+  qr_payload: string;
+  disclaimer: string;
+}
+
+export function getMyEmergencyCard(): Promise<EmergencyCard> {
+  return request("/api/v1/me/emergency-card");
+}
+
+export function patchMyEmergencyCard(body: Partial<EmergencyCard>): Promise<EmergencyCard> {
+  return request("/api/v1/me/emergency-card", { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export function getPatientEmergencyCard(patientId: string): Promise<EmergencyCard> {
+  return request(`/api/v1/patients/${encodeURIComponent(patientId)}/emergency-card`);
+}
+
+export interface RecordShare {
+  share_id: string;
+  label: string;
+  scopes: string[];
+  expires_at: string | null;
+  revoked_at: string | null;
+  view_count: number;
+  last_viewed_at: string | null;
+  created_at: string | null;
+  token?: string | null;
+  path?: string | null;
+}
+
+export function listMyShares(): Promise<{ shares: RecordShare[] }> {
+  return request("/api/v1/me/shares");
+}
+
+export function createMyShare(body: {
+  scopes: string[];
+  hours: number;
+  label?: string;
+}): Promise<RecordShare> {
+  return request("/api/v1/me/shares", { method: "POST", body: JSON.stringify(body) });
+}
+
+export function revokeMyShare(shareId: string): Promise<RecordShare> {
+  return request(`/api/v1/me/shares/${encodeURIComponent(shareId)}`, { method: "DELETE" });
+}
+
+export function getPublicShare(token: string): Promise<Record<string, unknown>> {
+  return request(`/api/v1/share/${encodeURIComponent(token)}`);
+}
+
+export interface CareRelationship {
+  relationship_id: string;
+  related_display_name: string;
+  relationship_type: string;
+  related_patient_code: string | null;
+  access_level: string;
+  created_at: string | null;
+}
+
+export function listMyFamily(): Promise<{ relationships: CareRelationship[] }> {
+  return request("/api/v1/me/family");
+}
+
+export function createMyFamily(body: {
+  related_display_name: string;
+  relationship_type: string;
+  related_patient_code?: string;
+  access_level?: string;
+}): Promise<CareRelationship> {
+  return request("/api/v1/me/family", { method: "POST", body: JSON.stringify(body) });
+}
+
+export interface DoctorBrief {
+  patient_id: string;
+  display_name: string;
+  brief_lines: { text: string; source: string }[];
+  risk_flags: { kind: string; label: string; source: string }[];
+  medications: {
+    medications: { name: string; dose: string; status: string; generic_key: string }[];
+    duplicate_groups: { generic_key: string; names: string[] }[];
+    disclaimer: string;
+  };
+  completeness_percent: number;
+  disclaimer: string;
+}
+
+export function getDoctorBrief(patientId: string): Promise<DoctorBrief> {
+  return request(`/api/v1/patients/${encodeURIComponent(patientId)}/doctor-brief`);
+}
+
+export function askChart(patientId: string, question: string): Promise<{
+  patient_id: string;
+  question: string;
+  answers: { text: string; source: string }[];
+  disclaimer: string;
+}> {
+  return request(`/api/v1/patients/${encodeURIComponent(patientId)}/chart-ask`, {
+    method: "POST",
+    body: JSON.stringify({ question }),
+  });
+}
+
+export function getAbdmStatus(): Promise<{ status: string; message: string; sandbox: boolean }> {
+  return request("/api/v1/abdm/status");
 }
 
 /* ---------- Consent records & patient rights (DPDP / HIPAA) ---------- */

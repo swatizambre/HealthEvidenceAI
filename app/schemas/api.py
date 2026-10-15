@@ -1230,12 +1230,18 @@ class HelpTopicsResponse(ResponseModel):
     topics: list[HelpTopicOut]
 
 
+class HelpChatTurn(APIModel):
+    role: str = Field(pattern=r"^(user|assistant)$")
+    content: str = Field(min_length=1, max_length=2000)
+
+
 class HelpChatRequest(APIModel):
     message: str = Field(min_length=1, max_length=2000)
     pathname: str | None = Field(default=None, max_length=200)
     patient_id: str | None = Field(default=None, pattern=r"^PAT-\d{6}$")
     case_id: str | None = Field(default=None, pattern=r"^PA-\d{6}$")
     policy_id: str | None = Field(default=None, pattern=r"^POL-\d{6}$")
+    history: list[HelpChatTurn] = Field(default_factory=list, max_length=8)
 
 
 class HelpChatResponse(ResponseModel):
@@ -1244,3 +1250,150 @@ class HelpChatResponse(ResponseModel):
     suggested_links: list[str] = []
     context_used: list[str] = []
     disclaimer: str
+
+
+class LegalNoticeMeta(ResponseModel):
+    id: str
+    notice_version: str
+    langs: str = ""
+
+
+class LegalNoticeListResponse(ResponseModel):
+    notices: list[LegalNoticeMeta]
+
+
+class LegalNoticeOut(ResponseModel):
+    id: str
+    notice_version: str
+    language: str
+    format: str = "markdown"
+    body: str
+
+
+class EmergencyContactIn(APIModel):
+    name: str = ""
+    phone: str = ""
+    relation: str = ""
+
+
+class EmergencyCardPatch(APIModel):
+    blood_group: str | None = None
+    implants: str | None = None
+    notes: str | None = None
+    show_on_lock_screen: bool | None = None
+    emergency_contacts: list[EmergencyContactIn] | None = None
+
+
+class EmergencyCardOut(ResponseModel):
+    patient_id: str
+    display_name: str
+    sex: str
+    date_of_birth: str
+    blood_group: str = ""
+    allergies: list[str] = []
+    conditions: list[str] = []
+    medications: list[dict[str, str]] = []
+    implants: str = ""
+    emergency_contacts: list[dict[str, str]] = []
+    notes: str = ""
+    show_on_lock_screen: bool = True
+    qr_payload: str = ""
+    disclaimer: str = ""
+
+
+class RecordShareCreate(APIModel):
+    scopes: list[str] = Field(default_factory=lambda: ["emergency", "medications", "allergies"])
+    hours: int = Field(default=24, ge=1, le=336)
+    label: str = Field(default="", max_length=160)
+
+
+class RecordShareOut(ResponseModel):
+    share_id: str
+    label: str = ""
+    scopes: list[str] = []
+    expires_at: str | None = None
+    revoked_at: str | None = None
+    view_count: int = 0
+    last_viewed_at: str | None = None
+    created_at: str | None = None
+    token: str | None = None
+    path: str | None = None
+
+
+class RecordShareListResponse(ResponseModel):
+    shares: list[RecordShareOut]
+
+
+class RecordSharePublicOut(ResponseModel):
+    share_code: str
+    label: str = ""
+    scopes: list[str] = []
+    expires_at: str | None = None
+    patient_id: str
+    display_name: str
+    allergies: list[str] = []
+    blood_group: str = ""
+    implants: str = ""
+    emergency_contacts: list[dict[str, str]] = []
+    medications: list[dict[str, str]] = []
+    conditions: list[str] = []
+    disclaimer: str = ""
+
+
+class CareRelationshipCreate(APIModel):
+    related_display_name: str = Field(min_length=2, max_length=160)
+    relationship_type: str = Field(default="caregiver", max_length=32)
+    related_patient_code: str | None = Field(default=None, pattern=r"^PAT-\d{6}$")
+    access_level: str = Field(default="view", max_length=32)
+
+
+class CareRelationshipOut(ResponseModel):
+    relationship_id: str
+    related_display_name: str
+    relationship_type: str
+    related_patient_code: str | None = None
+    access_level: str = "view"
+    created_at: str | None = None
+
+
+class CareRelationshipListResponse(ResponseModel):
+    relationships: list[CareRelationshipOut]
+
+
+class DoctorBriefLine(ResponseModel):
+    text: str
+    source: str
+
+
+class DoctorBriefResponse(ResponseModel):
+    patient_id: str
+    display_name: str
+    brief_lines: list[DoctorBriefLine] = []
+    risk_flags: list[dict[str, str]] = []
+    medications: dict = {}
+    completeness_percent: int = 0
+    disclaimer: str = ""
+
+
+class ChartAskRequest(APIModel):
+    question: str = Field(min_length=2, max_length=500)
+
+
+class ChartAskResponse(ResponseModel):
+    patient_id: str
+    question: str
+    answers: list[dict[str, str]] = []
+    disclaimer: str = ""
+
+
+class AbdmStatusResponse(ResponseModel):
+    status: str
+    sandbox: bool = True
+    phr_registered: bool = False
+    message: str = ""
+    docs: str = ""
+
+
+class AbdmLinkRequest(APIModel):
+    abha_id: str = Field(min_length=8, max_length=64)
+    patient_id: str | None = Field(default=None, pattern=r"^PAT-\d{6}$")

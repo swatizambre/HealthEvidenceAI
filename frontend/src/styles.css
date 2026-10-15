@@ -3005,6 +3005,37 @@ details.disclosure:not(.panel) > summary {
   font-size: var(--text-sm);
 }
 
+.help-text {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+.stack-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--s3);
+}
+
+.legal-notice-body {
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  max-height: 16rem;
+  overflow: auto;
+  margin: var(--s2) 0 0;
+}
+
+.emergency-card-preview {
+  border-left: 4px solid var(--accent);
+}
+
+.doctor-brief-panel h3 {
+  margin-top: var(--s4);
+}
+
 .help-assistant {
   background: var(--surface-2);
   border: 1px solid var(--line);

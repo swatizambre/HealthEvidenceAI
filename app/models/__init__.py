@@ -3,6 +3,7 @@
 from app.models.entities import (
     AuditEvent,
     AuthorizationCase,
+    CareRelationship,
     CaseQuery,
     Claim,
     ClinicalNote,
@@ -10,6 +11,7 @@ from app.models.entities import (
     DataSubjectRequest,
     Document,
     DocumentChunk,
+    EmergencyProfile,
     HospitalPipelineRunRow,
     ImagingStudy,
     InsurancePolicy,
@@ -19,12 +21,14 @@ from app.models.entities import (
     Patient,
     PolicyCriterion,
     Procedure,
+    RecordShare,
     ReviewRun,
 )
 
 __all__ = [
     "AuditEvent",
     "AuthorizationCase",
+    "CareRelationship",
     "CaseQuery",
     "Claim",
     "ClinicalNote",
@@ -32,6 +36,7 @@ __all__ = [
     "DataSubjectRequest",
     "Document",
     "DocumentChunk",
+    "EmergencyProfile",
     "HospitalPipelineRunRow",
     "ImagingStudy",
     "InsurancePolicy",
@@ -41,5 +46,6 @@ __all__ = [
     "Patient",
     "PolicyCriterion",
     "Procedure",
+    "RecordShare",
     "ReviewRun",
 ]

@@ -460,10 +460,39 @@ function RequestsSection() {
   );
 }
 
+function PrivacyNoticeSection() {
+  const [body, setBody] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    import("../api")
+      .then(({ getLegalNotice }) => getLegalNotice("privacy-notice", "en"))
+      .then((notice) => {
+        if (!cancelled) setBody(notice.body);
+      })
+      .catch(() => {
+        if (!cancelled) setBody("");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  if (!body) return null;
+  return (
+    <section className="panel">
+      <h2 className="section-title">Privacy notice</h2>
+      <details>
+        <summary>Read privacy-notice.v1 (English)</summary>
+        <pre className="legal-notice-body">{body}</pre>
+      </details>
+    </section>
+  );
+}
+
 /** Patient self-service privacy rights (DPDP / HIPAA). Patient sign-ins only. */
 export function PrivacyRights({ patientId }: { patientId: string }) {
   return (
     <section className="privacy-rights" aria-label="Privacy and my rights">
+      <PrivacyNoticeSection />
       <AccessLogSection />
       <ExportSection />
       <ConsentSection patientId={patientId} />

@@ -23,6 +23,7 @@ import {
   noteTypeLabel,
   policyOptionLabel,
 } from "../labels";
+import { DoctorBriefPanel } from "../components/DoctorBriefPanel";
 import { printEvidencePacket } from "../printSheet";
 import { pushRecentPatient } from "../recentPatients";
 import { useRole } from "../roleContext";
@@ -320,6 +321,8 @@ export function PatientDetailPage() {
           ) : null}
         </div>
       </header>
+
+      {!isPatient ? <DoctorBriefPanel patientId={patient.patient_id} /> : null}
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
 

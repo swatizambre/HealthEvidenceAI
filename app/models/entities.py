@@ -61,6 +61,8 @@ class Patient(IdentityMixin, TimestampMixin, Base):
         nullable=True,
         index=True,
     )
+    # ABDM sandbox stub — never treat as a live HIU link until certified.
+    abha_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
 
 class Document(IdentityMixin, TimestampMixin, Base):
@@ -404,3 +406,53 @@ class DataSubjectRequest(IdentityMixin, Base):
     # Erasure outcome: retained_legal_hold | restricted_processing | completed_outside_system
     outcome: Mapped[str] = mapped_column(String(40), default="")
     handled_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
+
+
+class EmergencyProfile(IdentityMixin, TimestampMixin, Base):
+    """Patient-owned emergency card fields (demo scaffolding)."""
+
+    __tablename__ = "emergency_profiles"
+
+    patient_id: Mapped[str] = mapped_column(
+        ForeignKey("patients.id", ondelete="CASCADE"), unique=True, index=True
+    )
+    blood_group: Mapped[str] = mapped_column(String(16), default="")
+    implants: Mapped[str] = mapped_column(Text, default="")
+    emergency_contacts: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    show_on_lock_screen: Mapped[bool] = mapped_column(default=True)
+
+
+class RecordShare(IdentityMixin, TimestampMixin, Base):
+    """Time-limited share link a patient creates for a doctor (demo scaffolding)."""
+
+    __tablename__ = "record_shares"
+
+    share_code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    patient_id: Mapped[str] = mapped_column(
+        ForeignKey("patients.id", ondelete="CASCADE"), index=True
+    )
+    label: Mapped[str] = mapped_column(String(160), default="")
+    scopes: Mapped[list[str]] = mapped_column(JSON, default=list)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by: Mapped[str] = mapped_column(String(120), default="")
+    view_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_viewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class CareRelationship(IdentityMixin, TimestampMixin, Base):
+    """Family / caregiver link stub (demo — not full multi-account auth)."""
+
+    __tablename__ = "care_relationships"
+
+    relationship_code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    patient_id: Mapped[str] = mapped_column(
+        ForeignKey("patients.id", ondelete="CASCADE"), index=True
+    )
+    related_display_name: Mapped[str] = mapped_column(String(160))
+    # parent | child | spouse | caregiver | other
+    relationship_type: Mapped[str] = mapped_column(String(32), default="caregiver")
+    related_patient_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    access_level: Mapped[str] = mapped_column(String(32), default="view")  # view | manage

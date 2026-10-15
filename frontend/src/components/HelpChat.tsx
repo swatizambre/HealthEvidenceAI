@@ -67,7 +67,7 @@ export function HelpChat() {
       id: "welcome",
       role: "assistant",
       text:
-        "Ask about desk workflows: finding a case, preparing the pre-auth form, answering a TPA query, or sending a case for senior review. Answers can use the open chart. This tool does not diagnose or decide coverage.",
+        "Hi — I am Desk Help. Ask naturally where to start, how to prepare a pre-auth, how to answer a TPA query, or what is missing on an open chart. I use the product guide (and the open chart when linked). I do not diagnose or decide coverage.",
       links: ["/", "/reviews", "/patients", "/visit"],
     },
   ]);
@@ -96,12 +96,17 @@ export function HelpChat() {
     setError("");
     setBusy(true);
     setInput("");
+    const history = messages
+      .filter((item) => item.id !== "welcome")
+      .slice(-6)
+      .map((item) => ({ role: item.role, content: item.text }));
     setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: "user", text: message }]);
     try {
       const reply = await askHelp(message, location.pathname, {
         patient_id: routePatient || undefined,
         case_id: caseId || undefined,
         policy_id: policyId || undefined,
+        history,
       });
       setMessages((prev) => [
         ...prev,
@@ -177,7 +182,7 @@ export function HelpChat() {
         <div className="help-log" role="log" aria-live="polite">
           {messages.map((item) => (
             <div key={item.id} className={`help-bubble help-${item.role}`}>
-              <p>{item.text}</p>
+              <p className="help-text">{item.text}</p>
               {item.links && item.links.length > 0 ? (
                 <div className="help-links">
                   {item.links.map((path) => (
@@ -189,7 +194,7 @@ export function HelpChat() {
               ) : null}
             </div>
           ))}
-          {busy ? <p className="muted small">Looking up desk guidance…</p> : null}
+          {busy ? <p className="muted small">Thinking with desk AI…</p> : null}
           <div ref={endRef} />
         </div>
         {error ? (

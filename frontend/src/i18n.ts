@@ -8,16 +8,16 @@ export type Lang = "en" | "hi";
 
 const en = {
   "shell.skip": "Skip to main content",
-  "shell.brandSub": "Cashless pre-auth desk",
+  "shell.brandSub": "Lifelong health record",
   "shell.facility": "Facility",
   "shell.signIn": "Demo sign-in",
   "shell.signedIn": "Signed in",
   "shell.help": "Help",
   "shell.language": "Language",
-  "shell.loading": "Signing in to the desk…",
+  "shell.loading": "Signing in…",
   "shell.footer":
-    "Prepares cashless pre-authorization paperwork and keeps a lifelong chart. Not a medical device. Does not diagnose, approve, or deny care.",
-  "shell.footerInsurer": "Checklists and form fields are illustrative — confirm with each insurer/TPA.",
+    "Your lifelong health record with sources for every doctor. Not a medical device. Does not diagnose, prescribe, approve, or deny care.",
+  "shell.footerInsurer": "Hospital cashless checklists are illustrative — confirm with each insurer/TPA.",
 
   "nav.label": "Application",
   "nav.queue": "Work queue",
@@ -26,6 +26,9 @@ const en = {
   "nav.visit": "Visit note",
   "nav.reviews": "Reviews",
   "nav.myRecord": "My record",
+  "nav.emergency": "Emergency card",
+  "nav.share": "Share",
+  "nav.family": "Family",
   "nav.addNote": "Add note",
   "nav.fullChart": "Full chart",
 
@@ -144,16 +147,16 @@ export type MessageKey = keyof typeof en;
 
 const hi: Record<MessageKey, string> = {
   "shell.skip": "मुख्य सामग्री पर जाएँ",
-  "shell.brandSub": "कैशलेस प्री-ऑथ डेस्क",
+  "shell.brandSub": "आजीवन स्वास्थ्य रिकॉर्ड",
   "shell.facility": "अस्पताल",
   "shell.signIn": "डेमो साइन-इन",
   "shell.signedIn": "साइन इन",
   "shell.help": "सहायता",
   "shell.language": "भाषा",
-  "shell.loading": "डेस्क में साइन इन हो रहा है…",
+  "shell.loading": "साइन इन हो रहा है…",
   "shell.footer":
-    "कैशलेस प्री-ऑथराइज़ेशन के कागज़ात तैयार करता है और आजीवन चार्ट रखता है। यह चिकित्सा उपकरण नहीं है। निदान, स्वीकृति या अस्वीकृति नहीं करता।",
-  "shell.footerInsurer": "चेकलिस्ट और फ़ॉर्म फ़ील्ड उदाहरण हैं — हर बीमा कंपनी/TPA से पुष्टि करें।",
+    "आपका आजीवन स्वास्थ्य रिकॉर्ड — हर डॉक्टर के लिए स्रोतों के साथ। यह चिकित्सा उपकरण नहीं है। निदान, नुस्खा, स्वीकृति या अस्वीकृति नहीं करता।",
+  "shell.footerInsurer": "अस्पताल कैशलेस चेकलिस्ट उदाहरण हैं — हर बीमा कंपनी/TPA से पुष्टि करें।",
 
   "nav.label": "एप्लिकेशन",
   "nav.queue": "कार्य सूची",
@@ -162,6 +165,9 @@ const hi: Record<MessageKey, string> = {
   "nav.visit": "विज़िट नोट",
   "nav.reviews": "समीक्षा",
   "nav.myRecord": "मेरा रिकॉर्ड",
+  "nav.emergency": "आपातकाल कार्ड",
+  "nav.share": "साझा करें",
+  "nav.family": "परिवार",
   "nav.addNote": "नोट जोड़ें",
   "nav.fullChart": "पूरा चार्ट",
 

@@ -25,6 +25,20 @@ def test_help_chat_answers_workflow(client: TestClient) -> None:
     assert "approve" not in body["reply"].lower() or "does not approve" in body["reply"].lower()
 
 
+def test_help_chat_onboarding_where_to_start(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/help/chat",
+        json={"message": "hi i want to start with this platform from where to start"},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    reply = body["reply"].lower()
+    assert body["matched_topic"] in {"start", "workflow"}
+    assert any(token in reply for token in ("work queue", "patients", "visit note", "reviews"))
+    assert "try: end-to-end prep" not in reply
+    assert body["suggested_links"]
+
+
 def test_help_chat_refuses_coverage_decision(client: TestClient) -> None:
     response = client.post(
         "/api/v1/help/chat",

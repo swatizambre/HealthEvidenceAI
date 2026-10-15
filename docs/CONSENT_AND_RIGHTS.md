@@ -93,10 +93,14 @@ So the app **never hard-deletes** clinical rows in response to a request. A reso
 
 Resolving any request requires a resolution note of at least 10 characters. Erasure also requires an `outcome`.
 
+## Notice registry (in-repo)
+
+Versioned markdown notices live under `docs/legal/` and are served by `GET /api/v1/legal/notices` and `GET /api/v1/legal/notices/{id}?lang=en|hi|mr`. Consent capture and Privacy rights UI load `privacy-notice.v1` before recording consent. Counsel must still review copy and appoint a named DPO / grievance officer (**Out-of-repo**).
+
 ## Not yet done
 
-- Consent-manager (DPDP s.6(7)) and ABDM consent-artefact integration
-- Patient-facing notice rendering and notice-version registry
+- Consent-manager (DPDP s.6(7)) and live ABDM consent-artefact integration (sandbox stubs only — see `docs/ABDM_SANDBOX.md`)
+- Named DPO / grievance officer and facility-owned counsel sign-off on notice text
 - Automated purpose-expiry review and a retention scheduler for real deletion after legal hold ends
 - Accounting of disclosures made outside the system (fax, email, payer portals)
 - Desk UI for `/privacy/requests` (API only today; staff can use the API or OpenAPI on local)

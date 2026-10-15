@@ -22,6 +22,9 @@ _PUBLIC_PREFIXES = (
     "/api/v1/auth/dev-token",
     "/api/v1/auth/oidc/status",
     "/api/v1/auth/capabilities",
+    "/api/v1/legal/notices",
+    "/api/v1/abdm/status",
+    "/api/v1/share",
 )
 
 _DOCS_PREFIXES = (

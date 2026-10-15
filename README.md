@@ -1,16 +1,20 @@
 # HealthEvidence AI
 
-**What it is for:** **prior-auth evidence prep** (insurance paperwork) on top of a **lifelong digital health record across hospitals**.
+**Promise:** Your lifelong health record that keeps every doctor, anywhere, from giving you the wrong medicine.
 
-It is a **safety-conscious prototype for organizing prior-authorization checklists**, not a clinical AI and not a “perfect model.” In the default setup, evidence checking is **mostly deterministic rules** (keyword/lab matching, negation, units). Optional AI (Ollama or a cloud model) only runs when you turn it on, and cloud models are blocked once real patient data is enabled without attestation. Desk copy labels **rule check** vs **AI check** honestly.
+**What it is for (product focus):** a **patient-owned lifelong health record** with an emergency card and a **doctor AI view** (brief, risk flags, medicines with sources). The **India cashless / TPA insurance desk** is a later hospital (B2B) module already present in this repo.
 
-1. **Records / PA staff** prepare evidence packets when payers need documentation readiness — gaps ranked, staff minutes estimated, senior handoff ready.
-2. **Seniors** final-acknowledge Reviews; residents may check evidence but not final-sign.
-3. **Patients** keep **My record**: surgeries, symptoms, injuries, treatments from many facilities so the next doctor sees the full story.
-4. **Any clinician** (physio, surgeon, resident, senior) opens the same lifelong history for continuity of care.
+**Intended use:** Organises and shows records with sources. **Does not diagnose, prescribe, approve, or deny care.** Not a medical device.
+
+It is a **safety-conscious prototype**, not a “perfect model.” Default evidence checking is **mostly deterministic rules** (keyword/lab matching, negation, units). Optional AI runs when configured; cloud models are blocked for real PHI without attestation. Desk copy labels **rule check** vs **AI check** honestly.
+
+1. **Patients** own **My record**: timeline, emergency card, share-with-doctor, family/caregiver stubs, visit notes from any facility.
+2. **Any clinician** opens a 30-second brief with sources, risk flags, and medicine reconciliation — continuity of care.
+3. **Records / PA staff** (hospital module) prepare cashless / TPA evidence packets when needed.
+4. **Seniors** final-acknowledge Reviews; residents may check evidence but not final-sign.
 5. **Visit notes** tag hospital + department so new care joins the lifelong chart.
 
-It organizes evidence for paperwork. **It does not approve, deny, diagnose, or submit prior auth to a payer.** Clinical data arrives when staff type notes, paste FHIR, or use synthetic seed — there is no live EHR/HIS/ABDM feed yet.
+**It does not approve, deny, diagnose, or submit prior auth to a payer.** Clinical data arrives when staff type notes, paste FHIR, or use synthetic seed — there is no live EHR/HIS/ABDM feed yet (ABDM sandbox stubs only). See [docs/PRODUCT_ROADMAP.md](docs/PRODUCT_ROADMAP.md).
 
 Designed for **clinic → multispecialty → super-specialty → government/teaching** facilities. Set Facility + Role in the top bar — small clinics may switch hats; teaching hospitals keep resident draft / senior sign-off.
 
@@ -33,16 +37,16 @@ Prepare packet never auto-acks clinician HITL. Visit note requires synthetic/con
 
 ## Who this is for (sales)
 
-Sell as **prior-auth evidence prep + lifelong digital health record** — never as an approval engine or clinical AI. Lead with PA cycle-time reduction; lifelong chart is the continuity moat. Be explicit that default checklist scoring is rule-based.
+Sell as **lifelong patient record + doctor continuity view** first — never as an approval engine or clinical AI. Hospital cashless / TPA desk is the later B2B add-on. Be explicit that default checklist scoring is rule-based.
 
 | Buyer | Why they buy |
 |-------|----------------|
-| Hospital / health-system **PA coordinators & RCM** | Cut chart chase time before payer submission |
-| High-PA **specialty groups** (ortho, oncology, cardiology, imaging) | Staff assemble packets across multi-specialty charts |
-| **RCM / PA outsourcing** vendors | White-label prep desk for client practices |
-| Health systems preparing for **CMS FHIR ePA (~2027)** | DTR-style evidence assembly before PAS submit |
+| **Patients & caregivers** | One chart across PHC → city hospital; emergency card; share with any doctor |
+| **Emergency / GP / specialists** | Seconds to history, allergy flags, medicine list with sources |
+| Hospital / health-system **PA coordinators & RCM** (later module) | Cut chart chase time before cashless submission |
+| Health systems preparing for **ABDM / CMS FHIR ePA** | Consent-linked record pull + evidence assembly |
 
-Start with one specialty service line that already has dedicated PA staff, prove packet cycle-time drop, then expand hospital-wide.
+Start with patient + doctor pilot; add TPA desk once verified packets matter to admissions.
 
 ## Architecture
 

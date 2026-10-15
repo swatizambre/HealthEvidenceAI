@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  getLegalNotice,
   listConsents,
   recordConsent,
   type ConsentInput,
@@ -25,7 +26,7 @@ export const emptyConsentDraft = (): ConsentDraft => ({
   consentId: "",
   purpose: "prior_auth_evidence",
   method: "written",
-  noticeVersion: "",
+  noticeVersion: "privacy-notice.v1",
   grantedByName: "",
   language: "en",
   evidenceRef: "",
@@ -83,6 +84,27 @@ export function ConsentCapture({
 }) {
   const [active, setActive] = useState<ConsentRecord[]>([]);
   const [loadError, setLoadError] = useState("");
+  const [noticeBody, setNoticeBody] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    const lang = draft.language || "en";
+    getLegalNotice("privacy-notice", lang)
+      .then((notice) => {
+        if (cancelled) return;
+        setNoticeBody(notice.body);
+        if (!draft.consentId) {
+          onChange({ ...draft, noticeVersion: notice.notice_version });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setNoticeBody("");
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load notice when language changes only
+  }, [draft.language]);
 
   useEffect(() => {
     let cancelled = false;
@@ -145,6 +167,12 @@ export function ConsentCapture({
       )}
       {!draft.consentId && canRecord ? (
         <div className="form-grid">
+          {noticeBody ? (
+            <details className="span-2 consent-notice">
+              <summary>Privacy notice ({draft.noticeVersion || "privacy-notice.v1"})</summary>
+              <pre className="legal-notice-body">{noticeBody}</pre>
+            </details>
+          ) : null}
           <label className="field">
             <span>Purpose</span>
             <select

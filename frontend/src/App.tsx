@@ -5,11 +5,15 @@ import { HelpChat } from "./components/HelpChat";
 import { useI18n, type Lang, type MessageKey } from "./i18n";
 import { facilityOptions, useRole, type DeskRole, type FacilityType } from "./roleContext";
 import { CaseWorkspacePage } from "./pages/CaseWorkspace";
+import { EmergencyCardPage } from "./pages/EmergencyCard";
+import { FamilyProfilesPage } from "./pages/FamilyProfiles";
 import { MyRecordPage } from "./pages/MyRecord";
 import { OpdIngestPage } from "./pages/OpdIngest";
 import { PatientDetailPage } from "./pages/PatientDetail";
 import { PatientsPage } from "./pages/Patients";
+import { PublicSharePage } from "./pages/PublicShare";
 import { ReviewsPage } from "./pages/Reviews";
+import { ShareWithDoctorPage } from "./pages/ShareWithDoctor";
 import { WorkQueuePage } from "./pages/WorkQueue";
 import { Icon, type IconName } from "./ui";
 
@@ -70,6 +74,9 @@ export function App() {
   const nav: NavItem[] = isPatient
     ? [
         { to: "/my-record", key: "nav.myRecord", icon: "shield" },
+        { to: "/emergency", key: "nav.emergency", icon: "alert" },
+        { to: "/share", key: "nav.share", icon: "send" },
+        { to: "/family", key: "nav.family", icon: "users" },
         { to: "/visit", key: "nav.addNote", icon: "note" },
         { to: `/patients/${myPatientId}`, key: "nav.fullChart", icon: "folder" },
       ]
@@ -215,6 +222,19 @@ export function App() {
               element={isPatient ? <Navigate to="/my-record" replace /> : <CaseWorkspacePage />}
             />
             <Route path="/my-record" element={<MyRecordPage />} />
+            <Route
+              path="/emergency"
+              element={isPatient ? <EmergencyCardPage /> : <Navigate to="/my-record" replace />}
+            />
+            <Route
+              path="/share"
+              element={isPatient ? <ShareWithDoctorPage /> : <Navigate to="/my-record" replace />}
+            />
+            <Route path="/share/:token" element={<PublicSharePage />} />
+            <Route
+              path="/family"
+              element={isPatient ? <FamilyProfilesPage /> : <Navigate to="/my-record" replace />}
+            />
             <Route
               path="/patients"
               element={isPatient ? <Navigate to="/my-record" replace /> : <PatientsPage />}
