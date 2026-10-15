@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Caregiver alert</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Instrument+Sans:wght@500;600;700&display=swap">
+<style>
+body{margin:0}
+a{color:#0E6B5C}a:hover{color:#0A5246}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; padding: 18px 20px 24px; display: flex; flex-direction: column; gap: 14px; background: #10241F; color: #FFFFFF; font-family: 'Atkinson Hyperlegible', system-ui, sans-serif">
+  <span style="align-self: center; font-family: 'Instrument Sans', sans-serif; font-size: 56px; font-weight: 600; margin-top: 30px">9:41</span>
+  <span style="align-self: center; font-size: 15px; color: #A9BDB7; margin-top: -10px">Friday, 16 October</span>
+
+  <div style="margin-top: 24px; display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 22px; background: #FFFFFF; color: #10241F">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <span style="width: 32px; height: 32px; border-radius: 10px; background: #B3261E; display: flex; align-items: center; justify-content: center; flex: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+      <span style="flex: 1; font-size: 13px; color: #4E6660">Lifelong Health · now</span>
+    </div>
+    <b style="font-size: 17px; line-height: 1.3">Aai's emergency card was opened</b>
+    <span style="font-size: 15px; line-height: 1.4">At [Hospital name], [City] · 9:38 am. Her allergy and medicines were shown.</span>
+    <div style="height: 120px; border-radius: 14px; background: #E6EDEA; position: relative; overflow: hidden" role="img" aria-label="Map showing the hospital location">
+      <svg width="100%" height="120" viewBox="0 0 350 120" preserveAspectRatio="none" aria-hidden="true"><path d="M0 80 Q90 60 170 74 T350 50" fill="none" stroke="#FFFFFF" stroke-width="10"/><path d="M120 0 L150 120" stroke="#FFFFFF" stroke-width="8"/><path d="M240 0 L220 120" stroke="#FFFFFF" stroke-width="6"/></svg>
+      <span style="position: absolute; left: 160px; top: 38px; width: 22px; height: 22px; border-radius: 11px; background: #B3261E; border: 3px solid #FFFFFF"></span>
+    </div>
+    <div style="display: flex; gap: 8px">
+      <button type="button" style="flex: 1; min-height: 48px; border-radius: 14px; border: 0; background: #0E6B5C; color: #FFFFFF; font: inherit; font-weight: 700; font-size: 15px">Call hospital</button>
+      <button type="button" style="flex: 1; min-height: 48px; border-radius: 14px; border: 1px solid #C9D6D2; background: #FFFFFF; color: #10241F; font: inherit; font-weight: 700; font-size: 15px">Directions</button>
+    </div>
+    <a href="#share-full" style="min-height: 44px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px">Share her full record with the doctor</a>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: 18px; background: rgba(255,255,255,0.12)">
+    <b style="font-size: 15px">Medicine reminder</b>
+    <span style="font-size: 14px; color: #D5E3DF">Aai hasn't marked her 8 am dose taken.</span>
+  </div>
+  <div style="flex: 1"></div>
+  <span style="align-self: center; font-size: 13px; color: #A9BDB7">You manage Aai's records as her caregiver</span>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

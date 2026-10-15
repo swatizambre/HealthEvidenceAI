@@ -24,8 +24,9 @@ from app.schemas.api import (
     RecordShareListResponse,
     RecordShareOut,
     RecordSharePublicOut,
+    SafetyChecksResponse,
 )
-from app.services import abdm_stub, doctor_view, patient_record_share
+from app.services import abdm_stub, doctor_view, patient_record_share, safety_checks
 
 router = APIRouter(tags=["me-record"])
 
@@ -193,6 +194,19 @@ def patient_doctor_brief(
     del principal
     enforce_patient_access(request, patient_id, db)
     return DoctorBriefResponse(**doctor_view.doctor_brief_pack(db, patient_id))
+
+
+@router.get("/patients/{patient_id}/safety-checks", response_model=SafetyChecksResponse)
+def patient_safety_checks(
+    patient_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    principal: AuthPrincipal = Depends(require_any_role(*sorted(ROLES_CHART_READ))),
+) -> SafetyChecksResponse:
+    """Cross-hospital checks: allergy vs medicine, same medicine twice, test not repeated."""
+    del principal
+    enforce_patient_access(request, patient_id, db)
+    return SafetyChecksResponse(**safety_checks.run_safety_checks(db, patient_id))
 
 
 @router.post("/patients/{patient_id}/chart-ask", response_model=ChartAskResponse)

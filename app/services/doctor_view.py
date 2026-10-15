@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.models.entities import LabResult, Medication, Procedure
 from app.services.lifelong import get_lifelong_summary
 from app.services.records import get_patient_essentials, require_patient
+from app.services.safety_checks import run_safety_checks
 
 # Small demo brand → generic map (India common brands). Not a formulary.
 _BRAND_TO_GENERIC: dict[str, str] = {
@@ -125,6 +126,7 @@ def doctor_brief_pack(session: Session, patient_id: str) -> dict[str, Any]:
     lifelong = get_lifelong_summary(session, patient_id)
     meds = medicine_reconciliation(session, patient_id)
     flags = risk_flags(session, patient_id)
+    safety = run_safety_checks(session, patient_id)["findings"]
     brief_lines = [
         {
             "text": essentials.doctor_brief,
@@ -133,6 +135,15 @@ def doctor_brief_pack(session: Session, patient_id: str) -> dict[str, Any]:
     ]
     if lifelong.doctor_brief:
         brief_lines.append({"text": lifelong.doctor_brief, "source": "lifelong.doctor_brief"})
+    for finding in safety:
+        if finding["severity"] == "high":
+            brief_lines.insert(
+                0,
+                {
+                    "text": finding["doctor_text"],
+                    "source": ", ".join(src["ref"] for src in finding["sources"]),
+                },
+            )
     for flag in flags[:5]:
         brief_lines.append(
             {
@@ -146,6 +157,7 @@ def doctor_brief_pack(session: Session, patient_id: str) -> dict[str, Any]:
         "brief_lines": brief_lines[:12],
         "risk_flags": flags,
         "medications": meds,
+        "safety_findings": safety,
         "completeness_percent": essentials.completeness_percent,
         "disclaimer": (
             "Organises chart facts with sources for clinician review. "

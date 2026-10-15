@@ -6,6 +6,8 @@ import { expect, test } from "@playwright/test";
  */
 test.describe("desk smoke", () => {
   test("today, patients, reviews show professional evidence-pack chrome", async ({ page }) => {
+    // The insurance desk is opt-in (Settings); the smoke covers it switched on.
+    await page.addInitScript(() => window.localStorage.setItem("he.insuranceDesk", "1"));
     await page.goto("/");
     await expect(page.getByRole("link", { name: "HealthEvidence AI" })).toBeVisible();
     await expect(page.locator(".app-footer")).toContainText(/not a medical device/i);
@@ -32,7 +34,12 @@ test.describe("desk smoke", () => {
     await expect(page.locator("#evidence-packet, .packet-panel, .chart-name").first()).toBeVisible({
       timeout: 45_000,
     });
-    await expect(page.getByText(/Evidence pack/i).first()).toBeVisible();
+    // Insurance is an optional tab on the chart; the evidence pack lives there.
+    const insuranceTab = page.getByRole("tab", { name: /Insurance/ });
+    if (await insuranceTab.count()) {
+      await insuranceTab.first().click();
+    }
+    await expect(page.getByText(/Evidence pack/i).first()).toBeVisible({ timeout: 15_000 });
 
     await nav.getByRole("link", { name: "Reviews", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Reviews" })).toBeVisible({ timeout: 30_000 });

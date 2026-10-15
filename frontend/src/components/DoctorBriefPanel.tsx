@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { askChart, getDoctorBrief, type DoctorBrief } from "../api";
 import { Button, Notice, Skeleton } from "../ui";
+import { SafetyFindingsList } from "./SafetyChecks";
 
 /** 30-second chart brief with sources, risk flags, medicine reconciliation, ask-with-sources. */
 export function DoctorBriefPanel({ patientId }: { patientId: string }) {
@@ -50,6 +51,12 @@ export function DoctorBriefPanel({ patientId }: { patientId: string }) {
     <section className="panel doctor-brief-panel" aria-label="Doctor brief">
       <h2>Doctor view — 30-second brief</h2>
       <p className="muted small">{brief.disclaimer}</p>
+      {(brief.safety_findings || []).length > 0 ? (
+        <>
+          <h3>Worth a look across hospitals</h3>
+          <SafetyFindingsList findings={brief.safety_findings || []} audience="doctor" />
+        </>
+      ) : null}
       <ul className="stack-list">
         {brief.brief_lines.map((line, index) => (
           <li key={`${line.source}-${index}`}>

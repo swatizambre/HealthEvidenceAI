@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Things to ask your doctor</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Instrument+Sans:wght@500;600;700&display=swap">
+<style>
+body{margin:0}
+a{color:#0E6B5C}a:hover{color:#0A5246}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; padding: 18px 20px 24px; display: flex; flex-direction: column; gap: 14px; background: #F4F7F6; color: #10241F; font-family: 'Atkinson Hyperlegible', system-ui, sans-serif">
+  <div style="display: flex; align-items: center; gap: 8px">
+    <a href="X1-Home.dc.html" aria-label="Back" style="width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #10241F">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+    </a>
+    <span style="font-family: 'Instrument Sans', sans-serif; font-weight: 700; font-size: 18px">Things to ask your doctor</span>
+  </div>
+  <p style="margin: 0; font-size: 15px; line-height: 1.45; color: #3D5650">We checked records from 5 hospitals and clinics. These are questions, not advice. Don't stop any medicine on your own.</p>
+
+  <div style="display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 18px; background: #FFFFFF; border: 1px solid #E2A33B">
+    <div style="display: flex; gap: 8px; align-items: center">
+      <span style="padding: 3px 9px; border-radius: 8px; background: #FFF4E0; color: #5C3300; font-weight: 700; font-size: 13px">Same medicine twice</span>
+    </div>
+    <b style="font-size: 17px; line-height: 1.3">Two doctors prescribed metformin under two brand names</b>
+    <div style="display: flex; flex-direction: column; gap: 6px; font-size: 14px">
+      <div style="display: flex; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 10px; background: #F1F5F4"><span>[Brand A] 500 mg · Dr. [Name]</span><a href="#src1" style="font-weight: 700">Source</a></div>
+      <div style="display: flex; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 10px; background: #F1F5F4"><span>[Brand B] 500 mg · Dr. [Name]</span><a href="#src2" style="font-weight: 700">Source</a></div>
+    </div>
+    <span style="font-size: 14px; color: #3D5650">Both contain metformin.</span>
+    <div style="display: flex; gap: 8px">
+      <a href="X3-Opinion.dc.html" style="flex: 1; min-height: 48px; border-radius: 14px; background: #0E6B5C; color: #FFFFFF; display: flex; align-items: center; justify-content: center; text-decoration: none; font-weight: 700; font-size: 15px">Send to my doctor</a>
+      <button type="button" style="flex: 1; min-height: 48px; border-radius: 14px; border: 1px solid #C9D6D2; background: #FFFFFF; color: #10241F; font: inherit; font-weight: 700; font-size: 15px">Already sorted</button>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 18px; background: #FFFFFF; border: 1px solid #DCE5E2">
+    <span style="align-self: flex-start; padding: 3px 9px; border-radius: 8px; background: #F1F5F4; color: #3D5650; font-weight: 700; font-size: 13px">Test not repeated</span>
+    <b style="font-size: 17px; line-height: 1.3">HbA1c was 8.1% in January. No test since.</b>
+    <span style="font-size: 14px; color: #3D5650">Your doctor may want to repeat it.</span>
+    <div style="display: flex; gap: 8px">
+      <button type="button" style="flex: 1; min-height: 48px; border-radius: 14px; border: 1px solid #C9D6D2; background: #FFFFFF; color: #10241F; font: inherit; font-weight: 700; font-size: 15px">Remind me</button>
+      <a href="#src3" style="flex: 1; min-height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px">See report</a>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-radius: 14px; background: #E3F1EE; color: #0A3D35; font-size: 14px">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true" style="flex: none"><path d="M20 6L9 17l-5-5"/></svg>
+    <span>Amoxicillin allergy: not in any new prescription.</span>
+  </div>
+  <div style="flex: 1"></div>
+  <span style="font-size: 12px; color: #4E6660; text-align: center">Checks run each time a new record arrives.</span>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

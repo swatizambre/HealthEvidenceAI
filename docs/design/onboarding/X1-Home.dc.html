@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Patient home</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Instrument+Sans:wght@500;600;700&family=Noto+Sans+Devanagari:wght@400;600&display=swap">
+<style>
+body{margin:0}
+a{color:#0E6B5C}a:hover{color:#0A5246}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; background: #F4F7F6; color: #10241F; font-family: 'Atkinson Hyperlegible', 'Noto Sans Devanagari', system-ui, sans-serif">
+  <div style="flex: 1; overflow: hidden; padding: 20px 20px 0; display: flex; flex-direction: column; gap: 14px">
+    <div style="display: flex; align-items: center; justify-content: space-between">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <span style="font-size: 14px; color: #4E6660">Good evening</span>
+        <b style="font-family: 'Instrument Sans', sans-serif; font-size: 22px">[Your name]</b>
+      </div>
+      <a href="P5-Emergency.dc.html" aria-label="Emergency card" style="width: 48px; height: 48px; border-radius: 16px; background: #B3261E; display: flex; align-items: center; justify-content: center">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      </a>
+    </div>
+
+    <div role="group" aria-label="Whose records" style="display: flex; gap: 8px; overflow: hidden">
+      <button type="button" aria-pressed="true" style="min-height: 40px; padding: 0 14px; border-radius: 20px; border: 1.5px solid #10241F; background: #10241F; color: #FFFFFF; font: inherit; font-size: 14px; flex: none">Me</button>
+      <button type="button" aria-pressed="false" style="min-height: 40px; padding: 0 14px; border-radius: 20px; border: 1.5px solid #C9D6D2; background: #FFFFFF; color: #10241F; font: inherit; font-size: 14px; flex: none">Aai (mother)</button>
+      <button type="button" aria-pressed="false" style="min-height: 40px; padding: 0 14px; border-radius: 20px; border: 1.5px solid #C9D6D2; background: #FFFFFF; color: #10241F; font: inherit; font-size: 14px; flex: none">[Child]</button>
+    </div>
+
+    <a href="X2-Safety.dc.html" style="display: flex; gap: 12px; align-items: center; padding: 14px; border-radius: 16px; background: #FFF4E0; border: 1px solid #E2A33B; text-decoration: none; color: #5C3300">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8A4B00" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="flex: none"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>
+      <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><b style="font-size: 16px">2 things to ask your doctor</b><span style="font-size: 14px">Same medicine twice · test not repeated</span></span>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+    </a>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+      <a href="D2-Scan.dc.html" style="min-height: 76px; padding: 12px; border-radius: 16px; background: #0E6B5C; color: #FFFFFF; text-decoration: none; display: flex; flex-direction: column; justify-content: space-between">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2M18 14h2v2M14 18h2v2M18 20h2"/></svg>
+        <b style="font-size: 15px">Show QR to doctor</b>
+      </a>
+      <a href="P4-Review.dc.html" style="min-height: 76px; padding: 12px; border-radius: 16px; background: #FFFFFF; border: 1px solid #DCE5E2; color: #10241F; text-decoration: none; display: flex; flex-direction: column; justify-content: space-between">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0E6B5C" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M8 12h8"/></svg>
+        <b style="font-size: 15px">Scan a paper</b>
+      </a>
+      <a href="X3-Opinion.dc.html" style="min-height: 76px; padding: 12px; border-radius: 16px; background: #FFFFFF; border: 1px solid #DCE5E2; color: #10241F; text-decoration: none; display: flex; flex-direction: column; justify-content: space-between">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0E6B5C" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="16" r="3"/><path d="M10.5 10.5l3 3"/></svg>
+        <b style="font-size: 15px">Second opinion</b>
+      </a>
+      <a href="P6-Family.dc.html" style="min-height: 76px; padding: 12px; border-radius: 16px; background: #FFFFFF; border: 1px solid #DCE5E2; color: #10241F; text-decoration: none; display: flex; flex-direction: column; justify-content: space-between">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0E6B5C" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20c.8-3.5 3-5 6-5s5.2 1.5 6 5M16 5a3 3 0 0 1 0 6M18 15c1.6.6 2.6 2.2 3 5"/></svg>
+        <b style="font-size: 15px">Family</b>
+      </a>
+    </div>
+
+    <div style="display: flex; gap: 10px">
+      <div style="flex: 1; min-width: 0; padding: 12px; border-radius: 16px; background: #FFFFFF; border: 1px solid #DCE5E2; display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 13px; color: #4E6660">HbA1c</span>
+        <b style="font-size: 18px">8.1%</b>
+        <svg width="100%" height="28" viewBox="0 0 140 28" preserveAspectRatio="none" role="img" aria-label="HbA1c rising over four years"><polyline points="0,22 35,20 70,16 105,10 140,4" fill="none" stroke="#B3261E" stroke-width="2.5"/></svg>
+        <span style="font-size: 12px; color: #4E6660">Up since 2022</span>
+      </div>
+      <div style="flex: 1; min-width: 0; padding: 12px; border-radius: 16px; background: #FFFFFF; border: 1px solid #DCE5E2; display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 13px; color: #4E6660">Next medicine</span>
+        <b style="font-size: 18px">8:00 pm</b>
+        <span style="font-size: 14px">Metformin 500 mg</span>
+        <button type="button" style="min-height: 36px; border-radius: 10px; border: 1px solid #C9D6D2; background: #F4F7F6; color: #10241F; font: inherit; font-size: 13px; font-weight: 700">Mark taken</button>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; justify-content: space-between; align-items: baseline"><b style="font-size: 16px">Latest records</b><a href="#all" style="font-size: 14px; font-weight: 700">All 46</a></div>
+      <div style="display: flex; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 14px; background: #FFFFFF; border: 1px solid #DCE5E2">
+        <span style="width: 36px; height: 36px; border-radius: 10px; background: #E3F1EE; display: flex; align-items: center; justify-content: center; flex: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0E6B5C" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 3v6L4 19a1 1 0 0 0 1 1.5h14A1 1 0 0 0 20 19l-5-10V3M8 3h8"/></svg></span>
+        <span style="flex: 1; display: flex; flex-direction: column"><b style="font-size: 15px">Lab report · HbA1c, lipids</b><span style="font-size: 13px; color: #4E6660">[Lab name] · Jan 2026 · from ABDM</span></span>
+      </div>
+      <div style="display: flex; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 14px; background: #FFFFFF; border: 1px solid #DCE5E2">
+        <span style="width: 36px; height: 36px; border-radius: 10px; background: #E3F1EE; display: flex; align-items: center; justify-content: center; flex: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0E6B5C" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h6M9 16h4"/></svg></span>
+        <span style="flex: 1; display: flex; flex-direction: column"><b style="font-size: 15px">Prescription · Dr. [Name]</b><span style="font-size: 13px; color: #4E6660">Handwritten · read by AI, you confirmed</span></span>
+      </div>
+    </div>
+  </div>
+
+  <nav aria-label="Main" style="display: flex; justify-content: space-around; padding: 8px 8px 18px; background: #FFFFFF; border-top: 1px solid #DCE5E2">
+    <a href="X1-Home.dc.html" aria-current="page" style="min-width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 12px; font-weight: 700; color: #0E6B5C; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 11l8-7 8 7v9H4z"/></svg>Home</a>
+    <a href="#records" style="min-width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 12px; color: #4E6660; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4h10l6 6v10H4z"/></svg>Records</a>
+    <a href="#shares" style="min-width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 12px; color: #4E6660; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5M5 14v6h14v-6"/></svg>Shared</a>
+    <a href="#log" style="min-width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 12px; color: #4E6660; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Who viewed</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

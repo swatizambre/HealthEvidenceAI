@@ -77,6 +77,9 @@ def downgrade() -> None:
             indexes = {ix["name"] for ix in inspector.get_indexes("imaging_studies")}
             if "ix_imaging_studies_document_id" in indexes:
                 op.drop_index("ix_imaging_studies_document_id", table_name="imaging_studies")
-            op.drop_column("imaging_studies", "document_id")
+            # SQLite cannot drop a column a foreign key points at in place; batch mode
+            # rebuilds the table without it (a plain ALTER elsewhere).
+            with op.batch_alter_table("imaging_studies") as batch:
+                batch.drop_column("document_id")
     if "document_files" in tables:
         op.drop_table("document_files")
