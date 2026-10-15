@@ -1,0 +1,31 @@
+name: mypy-capture
+on:
+  push:
+    branches: [tmp/mypy-capture]
+permissions:
+  contents: write
+jobs:
+  cap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.26"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: uv sync --all-extras --frozen
+      - run: cd frontend && npm ci --no-audit --no-fund && npx playwright install --with-deps chromium
+      - run: |
+          cd frontend && mkdir -p shots
+          CI=1 ENVIRONMENT=local AUTH_MODE=dev-jwt DEV_JWT_SECRET=ci-only-healthevidence-hmac-do-not-reuse-32 LLM_PROVIDER=local SEED_ON_STARTUP=true npx playwright test e2e/emergency-shots.spec.ts --retries=0 > shots/log.txt 2>&1 || true
+          grep -v WebServer shots/log.txt | tail -60 > shots/log-short.txt
+      - run: |
+          cp -r frontend/shots /tmp/shots
+          git config user.name ci; git config user.email ci@example.com
+          git checkout --orphan tmp/mypy-out
+          git rm -rfq .
+          cp -r /tmp/shots shots
+          rm -f shots/log.txt
+          git add shots && git commit -qm out && git push -f origin tmp/mypy-out
