@@ -1395,12 +1395,36 @@ class DoctorBriefLine(ResponseModel):
     source: str
 
 
+class SafetyFindingSource(ResponseModel):
+    ref: str
+    label: str
+
+
+class SafetyFinding(ResponseModel):
+    id: str
+    kind: str
+    severity: str
+    title: str
+    patient_text: str
+    doctor_text: str
+    sources: list[SafetyFindingSource] = []
+
+
+class SafetyChecksResponse(ResponseModel):
+    patient_id: str
+    checked_at: str
+    checked: dict[str, int] = {}
+    findings: list[SafetyFinding] = []
+    disclaimer: str = ""
+
+
 class DoctorBriefResponse(ResponseModel):
     patient_id: str
     display_name: str
     brief_lines: list[DoctorBriefLine] = []
     risk_flags: list[dict[str, str]] = []
     medications: dict = {}
+    safety_findings: list[SafetyFinding] = []
     completeness_percent: int = 0
     disclaimer: str = ""
 

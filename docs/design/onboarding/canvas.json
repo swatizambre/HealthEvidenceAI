@@ -15,7 +15,12 @@
     "D2-Scan.dc.html": { "x": 470, "y": 1264, "w": 390, "h": 844, "title": "Doctor 2 · Scan patient QR", "is_interactive": true },
     "D3-Brief.dc.html": { "x": 940, "y": 1264, "w": 1280, "h": 980, "title": "Doctor 3 · AI patient brief", "expand": "fill" },
     "H1-Setup.dc.html": { "x": 0, "y": 2664, "w": 1280, "h": 900, "title": "Hospital 1 · Setup wizard", "expand": "fill", "is_interactive": true },
-    "H2-Reception.dc.html": { "x": 1360, "y": 2664, "w": 1280, "h": 900, "title": "Hospital 2 · Reception desk", "expand": "fill" }
+    "H2-Reception.dc.html": { "x": 1360, "y": 2664, "w": 1280, "h": 900, "title": "Hospital 2 · Reception desk", "expand": "fill" },
+    "X1-Home.dc.html": { "x": 0, "y": 3984, "w": 390, "h": 844, "title": "Daily use 1 · Patient home", "is_interactive": true },
+    "X2-Safety.dc.html": { "x": 470, "y": 3984, "w": 390, "h": 844, "title": "Daily use 2 · Safety checks across hospitals", "is_interactive": true },
+    "X3-Opinion.dc.html": { "x": 940, "y": 3984, "w": 390, "h": 844, "title": "Daily use 3 · Second-opinion pack", "is_interactive": true },
+    "X4-Alert.dc.html": { "x": 1410, "y": 3984, "w": 390, "h": 844, "title": "Daily use 4 · Caregiver alert", "is_interactive": true },
+    "X5-InHIS.dc.html": { "x": 1880, "y": 3984, "w": 1280, "h": 860, "title": "Daily use 5 · Brief beside the hospital system", "expand": "fill" }
   },
   "order": [
     "Main.dc.html",
@@ -28,12 +33,18 @@
     "D2-Scan.dc.html",
     "D3-Brief.dc.html",
     "H1-Setup.dc.html",
-    "H2-Reception.dc.html"
+    "H2-Reception.dc.html",
+    "X1-Home.dc.html",
+    "X2-Safety.dc.html",
+    "X3-Opinion.dc.html",
+    "X4-Alert.dc.html",
+    "X5-InHIS.dc.html"
   ],
   "notes": {
     "patientTitle": { "x": 0, "y": -260, "text": "Patient & family onboarding · about 3 minutes", "kind": "title1", "maxW": 2740 },
     "doctorTitle": { "x": 0, "y": 1004, "text": "Doctor onboarding · verify, scan, read the brief", "kind": "title1", "maxW": 2220 },
-    "hospitalTitle": { "x": 0, "y": 2404, "text": "Hospital onboarding · connect once, share at reception", "kind": "title1", "maxW": 2640 }
+    "hospitalTitle": { "x": 0, "y": 2404, "text": "Hospital onboarding · connect once, share at reception", "kind": "title1", "maxW": 2640 },
+    "dailyTitle": { "x": 0, "y": 3724, "text": "Best of all systems · daily use after onboarding", "kind": "title1", "maxW": 3160 }
   },
   "designSystems": []
 }

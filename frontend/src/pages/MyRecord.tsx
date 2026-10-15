@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { getLifelongSummary, type LifelongEvent, type LifelongSummary } from "../api";
 import { PrivacyRights } from "../components/PrivacyRights";
+import { SafetyChecksCard } from "../components/SafetyChecks";
 import { useRole } from "../roleContext";
 import { Button, ButtonLink, EmptyState, Notice, Skeleton } from "../ui";
 
@@ -185,6 +186,8 @@ export function MyRecordPage() {
 
       {error ? <Notice tone="danger" title="Could not load the record">{error}</Notice> : null}
       {busy && !summary ? <Skeleton lines={5} label="Loading record" /> : null}
+
+      {isPatient && /^PAT-\d{6}$/.test(activePatientId) ? <SafetyChecksCard patientId={activePatientId} /> : null}
 
       {summary ? (
         <section className="panel" aria-labelledby="history-title">

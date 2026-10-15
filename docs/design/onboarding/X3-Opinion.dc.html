@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Second opinion</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Instrument+Sans:wght@500;600;700&display=swap">
+<style>
+body{margin:0}
+a{color:#0E6B5C}a:hover{color:#0A5246}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; padding: 18px 20px 24px; display: flex; flex-direction: column; gap: 14px; background: #F4F7F6; color: #10241F; font-family: 'Atkinson Hyperlegible', system-ui, sans-serif">
+  <div style="display: flex; align-items: center; gap: 8px">
+    <a href="X1-Home.dc.html" aria-label="Back" style="width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #10241F">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+    </a>
+    <span style="font-family: 'Instrument Sans', sans-serif; font-weight: 700; font-size: 18px">Get a second opinion</span>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 6px">
+    <label for="topic" style="font-size: 14px; font-weight: 700">What is it about?</label>
+    <select id="topic" style="min-height: 52px; border-radius: 14px; border: 1.5px solid #C9D6D2; background: #FFFFFF; padding: 0 12px; font: inherit; font-size: 16px; color: #10241F"><option>Knee pain after replacement</option><option>Diabetes control</option><option>Something else</option></select>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 16px; background: #FFFFFF; border: 1px solid #DCE5E2">
+    <b style="font-size: 15px">The pack we made</b>
+    <label style="display: flex; gap: 10px; align-items: center; min-height: 40px; font-size: 15px"><input type="checkbox" checked style="width: 22px; height: 22px; accent-color: #0E6B5C">One-page summary with sources</label>
+    <label style="display: flex; gap: 10px; align-items: center; min-height: 40px; font-size: 15px"><input type="checkbox" checked style="width: 22px; height: 22px; accent-color: #0E6B5C">Operation note, 2022</label>
+    <label style="display: flex; gap: 10px; align-items: center; min-height: 40px; font-size: 15px"><input type="checkbox" checked style="width: 22px; height: 22px; accent-color: #0E6B5C">Knee X-ray and MRI, 2026</label>
+    <label style="display: flex; gap: 10px; align-items: center; min-height: 40px; font-size: 15px"><input type="checkbox" checked style="width: 22px; height: 22px; accent-color: #0E6B5C">Current medicines and allergies</label>
+    <label style="display: flex; gap: 10px; align-items: center; min-height: 40px; font-size: 15px; color: #3D5650"><input type="checkbox" style="width: 22px; height: 22px; accent-color: #0E6B5C">Everything else (44 files)</label>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <span style="font-size: 14px; font-weight: 700">Doctor can see it for</span>
+    <div role="group" aria-label="Access time" style="display: flex; gap: 8px">
+      <button type="button" aria-pressed="false" style="flex: 1; min-height: 44px; border-radius: 22px; border: 1.5px solid #C9D6D2; background: #FFFFFF; color: #10241F; font: inherit; font-size: 15px">1 day</button>
+      <button type="button" aria-pressed="true" style="flex: 1; min-height: 44px; border-radius: 22px; border: 1.5px solid #10241F; background: #10241F; color: #FFFFFF; font: inherit; font-size: 15px">7 days</button>
+      <button type="button" aria-pressed="false" style="flex: 1; min-height: 44px; border-radius: 22px; border: 1.5px solid #C9D6D2; background: #FFFFFF; color: #10241F; font: inherit; font-size: 15px">30 days</button>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-radius: 14px; background: #FFFFFF; border: 1px solid #DCE5E2; font-size: 14px; color: #3D5650">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0E6B5C" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="flex: none"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+    <span>You'll see each time it's opened. Stop sharing any time.</span>
+  </div>
+
+  <div style="flex: 1"></div>
+  <a href="X4-Alert.dc.html" style="min-height: 56px; border-radius: 16px; background: #0E6B5C; color: #FFFFFF; display: flex; align-items: center; justify-content: center; text-decoration: none; font-family: 'Instrument Sans', sans-serif; font-weight: 600; font-size: 18px">Create link for doctor</a>
+  <span style="font-size: 13px; color: #4E6660; text-align: center">Send by WhatsApp, email or show as QR</span>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

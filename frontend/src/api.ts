@@ -1393,6 +1393,29 @@ export function createMyFamily(body: {
   return request("/api/v1/me/family", { method: "POST", body: JSON.stringify(body) });
 }
 
+export interface SafetyFinding {
+  id: string;
+  kind: "allergy_conflict" | "duplicate_medicine" | "test_not_repeated" | string;
+  severity: "high" | "review" | string;
+  title: string;
+  patient_text: string;
+  doctor_text: string;
+  sources: { ref: string; label: string }[];
+}
+
+export interface SafetyChecks {
+  patient_id: string;
+  checked_at: string;
+  checked: { active_medicines?: number; lab_results?: number; allergies?: number };
+  findings: SafetyFinding[];
+  disclaimer: string;
+}
+
+/** Cross-hospital checks: allergy vs medicine, same medicine twice, test not repeated. */
+export function getSafetyChecks(patientId: string): Promise<SafetyChecks> {
+  return request(`/api/v1/patients/${encodeURIComponent(patientId)}/safety-checks`);
+}
+
 export interface DoctorBrief {
   patient_id: string;
   display_name: string;
@@ -1403,6 +1426,7 @@ export interface DoctorBrief {
     duplicate_groups: { generic_key: string; names: string[] }[];
     disclaimer: string;
   };
+  safety_findings?: SafetyFinding[];
   completeness_percent: number;
   disclaimer: string;
 }

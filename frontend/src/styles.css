@@ -3704,3 +3704,55 @@ textarea:focus-visible,
     background: none;
   }
 }
+
+/* Cross-hospital safety checks */
+.safety-findings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.safety-finding {
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--warning-line);
+  background: var(--warning-bg);
+  color: var(--ink);
+}
+.safety-finding.is-high {
+  border-color: var(--danger-line);
+  background: var(--danger-bg);
+}
+.safety-finding p {
+  margin: 0 0 4px;
+  overflow-wrap: anywhere;
+}
+.safety-kind {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--warning);
+}
+.safety-finding.is-high .safety-kind {
+  color: var(--danger);
+}
+.safety-title {
+  font-weight: 700;
+}
+.safety-sources summary {
+  cursor: pointer;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+}
+.safety-sources ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.safety-card .section-title {
+  margin-bottom: 4px;
+}

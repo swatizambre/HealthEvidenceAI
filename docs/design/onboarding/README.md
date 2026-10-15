@@ -8,6 +8,7 @@ They are design references, not app code: they render inside the Claude design c
 | Patient and family (phone) | `Main` welcome → `P2-Consent` → `P3-Import` (ABHA + paper scan) → `P4-Review` (check what AI read) → `P5-Emergency` (offline emergency card) → `P6-Family` |
 | Doctor | `D1-Verify` (HPR / council check, passkey) → `D2-Scan` (patient QR) → `D3-Brief` (desktop patient brief with sources) |
 | Hospital (desktop) | `H1-Setup` (HFR verify, connect FHIR / HL7 / exports) → `H2-Reception` (shared-today queue, QR standee, staff SSO) |
+| Daily use (best of all systems) | `X1-Home` (family switcher, safety card, reminders, trends) · `X2-Safety` (things to ask your doctor) · `X3-Opinion` (second-opinion pack) · `X4-Alert` (caregiver alert when the emergency card is opened) · `X5-InHIS` (brief beside the hospital's own system) |
 
 Rules the designs follow:
 
